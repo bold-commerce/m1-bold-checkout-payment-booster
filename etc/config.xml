@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<config>
+    <modules>
+        <Bold_CheckoutPaymentBooster>
+            <version>1.0.0</version>
+        </Bold_CheckoutPaymentBooster>
+    </modules>
+    <global>
+        <blocks>
+            <bold_checkout_payment_booster>
+                <class>Bold_CheckoutPaymentBooster_Block</class>
+            </bold_checkout_payment_booster>
+        </blocks>
+        <models>
+            <bold_checkout_payment_booster>
+                <class>Bold_CheckoutPaymentBooster_Model</class>
+            </bold_checkout_payment_booster>
+        </models>
+    </global>
+    <default>
+        <checkout>
+            <bold_checkout_payment_booster>
+                <is_payment_booster_enabled>0</is_payment_booster_enabled>
+                <is_fastlane_enabled>0</is_fastlane_enabled>
+            </bold_checkout_payment_booster>
+            <bold_checkout_payment_booster_advanced>
+                <api_url>https://api.boldcommerce.com/</api_url>
+                <is_log_enabled>0</is_log_enabled>
+            </bold_checkout_payment_booster_advanced>
+        </checkout>
+    </default>
+</config>

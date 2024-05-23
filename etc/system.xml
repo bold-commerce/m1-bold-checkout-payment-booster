@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<config>
+    <sections>
+        <checkout>
+            <groups>
+                <bold_checkout_payment_booster translate="label">
+                    <label>Bold Checkout Payment Booster Extension</label>
+                    <frontend_type>text</frontend_type>
+                    <sort_order>1000</sort_order>
+                    <show_in_default>1</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <fields>
+                        <notice>
+                            <show_in_default>1</show_in_default>
+                            <show_in_website>0</show_in_website>
+                            <frontend_model>bold_checkout_payment_booster/adminhtml_system_config_notice</frontend_model>
+                        </notice>
+                        <is_payment_booster_enabled translate="label">
+                            <label>Enabled Payment Booster</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[Use the native checkout with Bold Checkout's payment options.]]></comment>
+                        </is_payment_booster_enabled>
+                        <is_fastlane_enabled translate="label">
+                            <label>Enabled PayPal Fastlane</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>15</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[Use PayPal Fastlane Checkout.]]></comment>
+                            <depends>
+                                <is_payment_booster_enabled>1</is_payment_booster_enabled>
+                            </depends>
+                        </is_fastlane_enabled>
+                        <api_token>
+                            <label>API Token</label>
+                            <frontend_type>obscure</frontend_type>
+                            <backend_model>adminhtml/system_config_backend_encrypted</backend_model>
+                            <sort_order>20</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>required-entry</frontend_class>
+                            <comment><![CDATA[API token used to communicate with the Bold Checkout APIs. Obtain in the <a target='_blank' href="https://apps.boldapps.net/accounts/welcome">Bold Account Center</a>.]]></comment>
+                            <depends>
+                                <is_payment_booster_enabled>1</is_payment_booster_enabled>
+                            </depends>
+                        </api_token>
+                    </fields>
+                </bold_checkout_payment_booster>
+                <bold_checkout_payment_booster_advanced translate="label">
+                    <label>Bold Checkout Payment Booster Extension Advanced Settings</label>
+                    <frontend_type>text</frontend_type>
+                    <sort_order>1005</sort_order>
+                    <show_in_default>0</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <expanded>0</expanded>
+                    <fields>
+                        <api_url translate="label">
+                            <label>API URL</label>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>validate-url</frontend_class>
+                            <comment><![CDATA[ Bold Checkout API URL. Do not change. ]]></comment>
+                        </api_url>
+                        <is_log_enabled translate="label">
+                            <label>Enable requests log</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>15</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[ Log requests in var/log/bold_checkout_payment_booster.log for debugging purposes. ]]></comment>
+                        </is_log_enabled>
+                    </fields>
+                </bold_checkout_payment_booster_advanced>
+            </groups>
+        </checkout>
+    </sections>
+</config>
