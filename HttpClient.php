@@ -16,7 +16,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function call($method, $url, $websiteId, $data = null, $headers = [])
+    public static function call(string $method, string $url, int $websiteId, string $data = null, array $headers = [])
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -88,7 +88,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return string
      */
-    private static function prepareRequest($method, $curl, $url, $data = null)
+    private static function prepareRequest(string $method, $curl, string $url, string $data = null)
     {
         switch ($method) {
             case "POST":
@@ -120,7 +120,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return void
      */
-    private static function preparePostRequest($curl, $data)
+    private static function preparePostRequest($curl, ?string $data)
     {
         curl_setopt($curl, CURLOPT_POST, 1);
         if ($data) {
@@ -135,7 +135,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return void
      */
-    private static function preparePutRequest($curl, $data)
+    private static function preparePutRequest($curl, ?string $data)
     {
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PUT');
         if ($data) {
@@ -150,7 +150,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return void
      */
-    private static function preparePatchRequest($curl, $data)
+    private static function preparePatchRequest($curl, ?string $data)
     {
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'PATCH');
         if ($data) {
@@ -165,7 +165,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return void
      */
-    private static function prepareDeleteRequest($curl, $data)
+    private static function prepareDeleteRequest($curl, ?string $data)
     {
         if ($data) {
             curl_setopt($curl, CURLOPT_POSTFIELDS, $data);

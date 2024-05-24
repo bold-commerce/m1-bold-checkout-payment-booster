@@ -23,7 +23,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return bool
      * @throws Mage_Core_Exception
      */
-    public function isPaymentBoosterEnabled($websiteId)
+    public function isPaymentBoosterEnabled(int $websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_PAYMENT_BOOSTER_ENABLED)
             && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
@@ -36,7 +36,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return bool
      * @throws Mage_Core_Exception
      */
-    public function isFastlaneEnabled($websiteId)
+    public function isFastlaneEnabled(int $websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_FASTLANE_ENABLED)
             && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
@@ -49,7 +49,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return string|null
      * @throws Mage_Core_Exception
      */
-    public function getApiToken($websiteId)
+    public function getApiToken(int $websiteId)
     {
         $encryptedToken = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_TOKEN);
 
@@ -63,7 +63,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return string|null
      * @throws Mage_Core_Exception
      */
-    public function getShopId($websiteId)
+    public function getShopId(int $websiteId)
     {
         return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_SHOP_ID);
     }
@@ -71,11 +71,11 @@ class Bold_CheckoutPaymentBooster_Model_Config
     /**
      * Save Bold shop identifier.
      *
-     * @param string $shopIdentifier
+     * @param string|null $shopIdentifier
      * @param int $websiteId
      * @return void
      */
-    public function setShopId($shopIdentifier, $websiteId)
+    public function setShopId(?string $shopIdentifier, int $websiteId)
     {
         Mage::getConfig()->saveConfig(self::PATH_SHOP_ID, $shopIdentifier, 'websites', $websiteId);
         Mage::getConfig()->cleanCache();
@@ -88,7 +88,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return string
      * @throws Mage_Core_Exception
      */
-    public function getApiUrl($websiteId)
+    public function getApiUrl(int $websiteId)
     {
         return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_URL), '/');
     }
@@ -100,7 +100,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      * @return bool
      * @throws Mage_Core_Exception
      */
-    public function isLogEnabled($websiteId)
+    public function isLogEnabled(int $websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_LOG_ENABLED);
     }

@@ -2,7 +2,7 @@
 <config>
     <modules>
         <Bold_CheckoutPaymentBooster>
-            <version>1.0.0</version>
+            <version>2.0.0</version>
         </Bold_CheckoutPaymentBooster>
     </modules>
     <global>
@@ -17,6 +17,30 @@
             </bold_checkout_payment_booster>
         </models>
     </global>
+    <frontend>
+        <events>
+            <controller_action_predispatch_checkout_onepage_index>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>beforeCheckout</method>
+                    </bold>
+                </observers>
+            </controller_action_predispatch_checkout_onepage_index>
+        </events>
+    </frontend>
+    <adminhtml>
+        <events>
+            <admin_system_config_changed_section_checkout>
+                <observers>
+                    <set_shop_identifier>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>setShopId</method>
+                    </set_shop_identifier>
+                </observers>
+            </admin_system_config_changed_section_checkout>
+        </events>
+    </adminhtml>
     <default>
         <checkout>
             <bold_checkout_payment_booster>

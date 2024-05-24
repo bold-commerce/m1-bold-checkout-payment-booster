@@ -14,7 +14,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopIdentifier
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function get($websiteId)
+    public static function get(int $websiteId)
     {
         $websiteId = $websiteId ?: (int)Mage::app()->getDefaultStoreView()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
@@ -23,22 +23,23 @@ class Bold_CheckoutPaymentBooster_Service_ShopIdentifier
         if ($shopIdentifier) {
             return $shopIdentifier;
         }
-        self::update($websiteId);
+        self::set($websiteId);
 
         return $config->getShopId($websiteId);
     }
 
     /**
-     * Update Bold shop ID.
+     * Set Bold shop ID.
      *
      * @param int $websiteId
      * @throws Mage_Core_Exception
      */
-    public static function update($websiteId)
+    public static function set(int $websiteId)
     {
         $websiteId = $websiteId ?: (int)Mage::app()->getDefaultStoreView()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $config->setShopId(null, $websiteId);
         $apiToken = $config->getApiToken($websiteId);
         $headers = [
             'Authorization: Bearer ' . $apiToken,
@@ -47,6 +48,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopIdentifier
             'Bold-API-Version-Date:' . Bold_CheckoutPaymentBooster_Client::BOLD_API_VERSION_DATE,
         ];
         $url = $config->getApiUrl($websiteId) . self::SHOP_INFO_URI;
+
         $shopInfo = json_decode(
             Bold_CheckoutPaymentBooster_HttpClient::call(
                 'GET',
@@ -56,10 +58,12 @@ class Bold_CheckoutPaymentBooster_Service_ShopIdentifier
                 $headers
             )
         );
+
         if (isset($shopInfo->errors)) {
             $error = current($shopInfo->errors);
             Mage::throwException($error->message);
         }
+
         $shopIdentifier = $shopInfo->shop_identifier;
         $config->setShopId($shopIdentifier, $websiteId);
     }
