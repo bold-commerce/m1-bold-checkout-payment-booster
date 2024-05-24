@@ -17,7 +17,7 @@ class Bold_CheckoutPaymentBooster_Client
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function call(string $method, string $url, int $websiteId, string $data = null)
+    public static function call(string $method, string $url, int $websiteId, ?string $data = null)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);

@@ -16,7 +16,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function call(string $method, string $url, int $websiteId, string $data = null, array $headers = [])
+    public static function call(string $method, string $url, int $websiteId, ?string $data = null, array $headers = [])
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -88,7 +88,7 @@ class Bold_CheckoutPaymentBooster_HttpClient
      * @param string|null $data
      * @return string
      */
-    private static function prepareRequest(string $method, $curl, string $url, string $data = null)
+    private static function prepareRequest(string $method, $curl, string $url, ?string $data = null)
     {
         switch ($method) {
             case "POST":
