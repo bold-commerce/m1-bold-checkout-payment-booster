@@ -17,11 +17,11 @@ class Bold_CheckoutPaymentBooster_Client
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function call($method, $url, $websiteId, $data = null)
+    public static function call(string $method, string $url, int $websiteId, ?string $data = null)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopIdentifier::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
 
         $headers = [
             'Authorization: Bearer ' . $config->getApiToken($websiteId),
