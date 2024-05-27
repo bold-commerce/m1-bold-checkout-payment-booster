@@ -5,7 +5,6 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Order_Init
 {
-    const FLOW_ID = 'Bold-Magento2';
     const INIT_SIMPLE_ORDER_URI = '/checkout_sidekick/{{shopId}}/order';
 
     /**
@@ -16,7 +15,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function init(Mage_Sales_Model_Quote $quote, string $flowId = self::FLOW_ID)
+    public static function init(Mage_Sales_Model_Quote $quote, string $flowId)
     {
         $body = [
             'flow_id' => $flowId,

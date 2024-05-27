@@ -3,7 +3,7 @@
 /**
  * Shop identifier retrieve service.
  */
-class Bold_CheckoutPaymentBooster_Service_ShopIdentifier
+class Bold_CheckoutPaymentBooster_Service_ShopId
 {
     const SHOP_INFO_URI = '/shops/v1/info';
 

@@ -23,7 +23,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
                 return;
             }
-            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote);
+            $flowId = Bold_CheckoutPaymentBooster_Service_FlowId::get($quote);
+            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
         } catch (\Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);

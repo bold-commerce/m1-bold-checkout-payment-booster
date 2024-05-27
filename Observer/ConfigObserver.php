@@ -17,7 +17,7 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
 
         try {
-            Bold_CheckoutPaymentBooster_Service_ShopIdentifier::set($websiteId);
+            Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
         } catch (\Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }

@@ -21,7 +21,7 @@ class Bold_CheckoutPaymentBooster_Client
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopIdentifier::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
 
         $headers = [
             'Authorization: Bearer ' . $config->getApiToken($websiteId),
