@@ -6,7 +6,7 @@
 class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
 {
     /**
-     * Process Bold checkout data.
+     * Init Bold order.
      *
      * @param Varien_Event_Observer $event
      * @return void
@@ -28,7 +28,28 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
             $this->setOrderData($quote->getId(), $checkoutData);
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
+            Mage::log($exception->getMessage(), Zend_Log::CRIT);
+        }
+    }
+
+    /**
+     * Fill Bold order with additional data.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function beforePaymentInformation(Varien_Event_Observer $event)
+    {
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = Mage::getModel('checkout/cart')->getQuote();
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+
+        try {
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote, $boldCheckoutData);
+        } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
     }
