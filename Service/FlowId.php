@@ -19,7 +19,7 @@ class Bold_CheckoutPaymentBooster_Service_FlowId
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
 
         if ($config->isFastlaneEnabled($websiteId)
-            && $quote->getCustomerId()
+            && !$quote->getCustomerId()
         ) {
             return 'Payment-Booster-Fastlane-M1';
         }
