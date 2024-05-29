@@ -91,10 +91,10 @@ class Bold_CheckoutPaymentBooster_HttpClient
     private static function prepareRequest(string $method, $curl, string $url, ?string $data = null)
     {
         switch ($method) {
-            case "POST":
+            case 'POST':
                 self::preparePostRequest($curl, $data);
                 break;
-            case "PUT":
+            case 'PUT':
                 self::preparePutRequest($curl, $data);
                 break;
             case 'PATCH':

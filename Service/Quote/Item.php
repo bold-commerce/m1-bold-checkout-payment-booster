@@ -14,16 +14,16 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
     public static function extract(Mage_Sales_Model_Quote_Item $item)
     {
         return [
-            "quantity" => self::getQuantity($item),
-            "title" => self::getTitle($item),
-            "price" => self::getPrice($item),
-            "weight" => self::getWeight($item),
-            "taxable" => self::isTaxable($item),
-            "image" => self::getImage($item),
-            "requires_shipping" => !$item->getIsVirtual(),
-            "line_item_key" => (string)$item->getItemId(),
-            "sku" => $item->getSku(),
-            "vendor" => self::getVendor($item),
+            'quantity' => self::getQuantity($item),
+            'title' => self::getTitle($item),
+            'price' => self::getPrice($item),
+            'weight' => self::getWeight($item),
+            'taxable' => self::isTaxable($item),
+            'image' => self::getImage($item),
+            'requires_shipping' => !$item->getIsVirtual(),
+            'line_item_key' => (string)$item->getItemId(),
+            'sku' => $item->getSku(),
+            'vendor' => self::getVendor($item),
         ];
     }
 
@@ -71,7 +71,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      */
     private static function getWeight(Mage_Sales_Model_Quote_Item $item)
     {
-        return $item->getWeight();
+        return $item->getWeight(); // TODO: need to return converted weight
     }
 
     /**

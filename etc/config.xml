@@ -44,11 +44,19 @@
                     </bold>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
+            <controller_action_postdispatch_checkout_onepage_saveBilling>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>afterSaveBilling</method>
+                    </bold>
+                </observers>
+            </controller_action_postdispatch_checkout_onepage_saveBilling>
             <controller_action_postdispatch_checkout_onepage_saveShippingMethod>
                 <observers>
                     <bold>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
-                        <method>beforePaymentInformation</method>
+                        <method>afterSaveShippingMethod</method>
                     </bold>
                 </observers>
             </controller_action_postdispatch_checkout_onepage_saveShippingMethod>

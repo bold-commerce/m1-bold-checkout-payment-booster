@@ -5,7 +5,7 @@
  */
 class Bold_CheckoutPaymentBooster_Client
 {
-    const BOLD_API_VERSION_DATE = "2022-10-14";
+    const BOLD_API_VERSION_DATE = '2022-10-14';
 
     /**
      * Perform HTTP request.

@@ -34,24 +34,31 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     }
 
     /**
+     * Fill Bold order with additional data for virtual quote.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function afterSaveBilling(Varien_Event_Observer $event)
+    {
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = Mage::getModel('checkout/cart')->getQuote();
+        if ($quote->isVirtual()) {
+            $this->hydrateOrder($quote);
+        }
+    }
+
+    /**
      * Fill Bold order with additional data.
      *
      * @param Varien_Event_Observer $event
      * @return void
      */
-    public function beforePaymentInformation(Varien_Event_Observer $event)
+    public function afterSaveShippingMethod(Varien_Event_Observer $event)
     {
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
-
-        try {
-            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote, $boldCheckoutData);
-        } catch (Exception $exception) {
-            Mage::log($exception->getMessage(), Zend_Log::CRIT);
-        }
+        $this->hydrateOrder($quote);
     }
 
     /**
@@ -79,5 +86,24 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         ];
 
         Bold_CheckoutPaymentBooster_Service_Order_Data::save($data);
+    }
+
+    /**
+     * Hydrate Bold order.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @return void
+     */
+    private function hydrateOrder(Mage_Sales_Model_Quote $quote): void
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+
+        try {
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote, $boldCheckoutData->public_order_id);
+        } catch (Exception $exception) {
+            Mage::log($exception->getMessage(), Zend_Log::CRIT);
+        }
     }
 }

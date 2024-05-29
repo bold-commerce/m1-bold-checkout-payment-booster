@@ -9,21 +9,25 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
 
     /**
      * Hydrate Bold order.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @param string $publicOrderId
+     * @return void
+     * @throws Mage_Core_Exception
      */
-    public static function hydrate(Mage_Sales_Model_Quote $quote, stdClass $boldCheckoutData)
+    public static function hydrate(Mage_Sales_Model_Quote $quote, string $publicOrderId)
     {
-        $publicOrderId = $boldCheckoutData->public_order_id;
         $apiUri = sprintf(self::HYDRATE_ORDER_URI, $publicOrderId);
 
         $body = [
-            "customer" => self::getCustomer($quote),
-            "billing_address" => self::convertBillingAddress($quote->getBillingAddress()),
-            "cart_items" => self::getCartItems($quote),
-            "taxes" => self::getTaxes($quote),
-            "discounts" => self::getDiscounts($quote),
-            "fees" => self::getFees($quote),
-            "shipping_line" => self::getShippingLine($quote),
-            "totals" => self::getTotals($quote)
+            'customer' => self::getCustomer($quote),
+            'billing_address' => self::convertBillingAddress($quote->getBillingAddress()),
+            'cart_items' => self::getCartItems($quote),
+            'taxes' => self::getTaxes($quote),
+            'discounts' => self::getDiscounts($quote),
+            'fees' => self::getFees($quote),
+            'shipping_line' => self::getShippingLine($quote),
+            'totals' => self::getTotals($quote)
         ];
 
         $response = json_decode(
@@ -54,7 +58,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             'platform_id' => $quote->getCustomerId() ?? null,
             'first_name' => $quote->getCustomerFirstname(),
             'last_name' => $quote->getCustomerLastname(),
-            "email_address" => $quote->getCustomerEmail(),
+            'email_address' => $quote->getCustomerEmail(),
         ];
     }
 
@@ -74,18 +78,18 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             ->getCountryTranslation($countryIsoCode);
 
         return [
-            "first_name" => $address->getFirstname(),
-            "last_name" => $address->getLastname(),
-            "business_name" => $address->getCompany(),
-            "phone_number" => $address->getTelephone(),
-            "address_line_1" => $address->getStreet1(),
-            "address_line_2" => $address->getStreet2(),
-            "city" => $address->getCity(),
-            "province" => $address->getRegion(),
-            "province_code" => $address->getRegionCode(),
-            "country" => $countryName,
-            "country_code" => $address->getCountryId(),
-            "postal_code" => $address->getPostcode(),
+            'first_name' => $address->getFirstname(),
+            'last_name' => $address->getLastname(),
+            'business_name' => $address->getCompany() ?? '',
+            'phone_number' => $address->getTelephone(),
+            'address_line_1' => $address->getStreet1(),
+            'address_line_2' => $address->getStreet2(),
+            'city' => $address->getCity(),
+            'province' => $address->getRegion(),
+            'province_code' => $address->getRegionCode(),
+            'country' => $countryName,
+            'country_code' => $address->getCountryId(),
+            'postal_code' => $address->getPostcode(),
         ];
     }
 
@@ -94,7 +98,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      *
      * @return array
      */
-    public static function getCartItems(Mage_Sales_Model_Quote $quote)
+    private static function getCartItems(Mage_Sales_Model_Quote $quote)
     {
         $items = [];
         foreach ($quote->getAllItems() as $item) {
@@ -109,15 +113,27 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      *
      * @return array
      */
-    public static function getTaxes(Mage_Sales_Model_Quote $quote)
+    private static function getTaxes(Mage_Sales_Model_Quote $quote)
     {
-        return [];
+        $totals = $quote->getTotals();
+        $taxInfo = $totals['tax']['full_info'] ?? [];
+        $taxes = [];
+        foreach ($taxInfo as $tax) {
+            $taxes[] = [
+                'name' => $tax['id'],
+                'value' => self::convertToCents($tax['base_amount']),
+            ];
+        }
+
+        return $taxes;
     }
 
     /**
+     * Retrieve discounts.
+     *
      * @return array
      */
-    public static function getDiscounts(Mage_Sales_Model_Quote $quote)
+    private static function getDiscounts(Mage_Sales_Model_Quote $quote)
     {
         return [];
     }
@@ -127,7 +143,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      *
      * @return array
      */
-    public static function getFees(Mage_Sales_Model_Quote $quote)
+    private static function getFees(Mage_Sales_Model_Quote $quote)
     {
         return [];
     }
@@ -137,9 +153,16 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      *
      * @return array
      */
-    public static function getShippingLine(Mage_Sales_Model_Quote $quote)
+    private static function getShippingLine(Mage_Sales_Model_Quote $quote)
     {
-        return [];
+        if ($quote->isVirtual()) {
+            return [];
+        }
+
+        return [
+            'rate_name' => $quote->getShippingAddress()->getShippingDescription() ?? '',
+            'cost' => self::convertToCents($quote->getShippingAddress()->getShippingAmount()),
+        ];
     }
 
     /**
@@ -147,8 +170,27 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      *
      * @return array
      */
-    public static function getTotals(Mage_Sales_Model_Quote $quote)
+    private static function getTotals(Mage_Sales_Model_Quote $quote)
     {
-        return [];
+        $totals = $quote->getTotals();
+
+        return [
+            'sub_total' => self::convertToCents($totals['subtotal']['value']),
+            'tax_total' => self::convertToCents($totals['tax']['value']),
+            'discount_total' => '',
+            'shipping_total' => self::convertToCents($totals['shipping']['value']),
+            'order_total' => self::convertToCents($totals['grand_total']['value']),
+        ];
+    }
+
+    /**
+     * Converts an amount to cents.
+     *
+     * @param float|string $amount
+     * @return integer
+     */
+    private static function convertToCents($amount)
+    {
+        return (int)round(floatval($amount) * 100);
     }
 }
