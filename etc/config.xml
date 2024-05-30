@@ -82,6 +82,7 @@
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
+                <weight_conversion_rate>1000</weight_conversion_rate>
                 <is_log_enabled>0</is_log_enabled>
             </bold_checkout_payment_booster_advanced>
         </checkout>

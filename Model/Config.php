@@ -16,6 +16,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
 
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
+    const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
 
     /**
@@ -93,6 +94,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function getApiUrl(int $websiteId)
     {
         return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_URL), '/');
+    }
+
+    /**
+     * Retrieve weight unit conversion rate to grams.
+     *
+     * @param int $websiteId
+     * @return float|int
+     * @throws Mage_Core_Exception
+     */
+    public function getWeightConversionRate(int $websiteId)
+    {
+        return (float)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_WEIGHT_CONVERSION_RATE) ?: 1000;
     }
 
     /**

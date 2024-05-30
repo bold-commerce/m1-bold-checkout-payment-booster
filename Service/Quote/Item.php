@@ -10,6 +10,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      *
      * @param Mage_Sales_Model_Quote_Item $item
      * @return array
+     * @throws Mage_Core_Exception
      */
     public static function extract(Mage_Sales_Model_Quote_Item $item)
     {
@@ -68,10 +69,16 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      *
      * @param Mage_Sales_Model_Quote_Item $item
      * @return float
+     * @throws Mage_Core_Exception
      */
     private static function getWeight(Mage_Sales_Model_Quote_Item $item)
     {
-        return $item->getWeight(); // TODO: need to return converted weight
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $conversionRate = $config->getWeightConversionRate((int)$item->getQuote()->getStore()->getWebsiteId());
+        $weight = $item->getWeight();
+
+        return $weight ? round($weight * $conversionRate, 2) : 0;
     }
 
     /**
