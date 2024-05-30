@@ -6,6 +6,17 @@
 class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
 {
     const HYDRATE_ORDER_URI = '/checkout_sidekick/{{shopId}}/order/%s';
+    // list of system totals which need to be skipped during preparing discounts and fees list
+    const SYSTEM_TOTALS = [
+        'subtotal',
+        'tax',
+        'discount',
+        'shipping',
+        'grand_total',
+    ];
+
+    private static $discounts = [];
+    private static $fees = [];
 
     /**
      * Hydrate Bold order.
@@ -20,15 +31,22 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         $checkoutSession = Mage::getSingleton('checkout/session');
         $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
         $publicOrderId = $boldCheckoutData->public_order_id;
+
+        if (!$publicOrderId) {
+            return;
+        }
+
         $apiUri = sprintf(self::HYDRATE_ORDER_URI, $publicOrderId);
+
+        self::getDiscountsAndFees($quote);
 
         $body = [
             'customer' => self::getCustomer($quote),
             'billing_address' => self::convertBillingAddress($quote->getBillingAddress()),
             'cart_items' => self::getCartItems($quote),
             'taxes' => self::getTaxes($quote),
-            'discounts' => self::getDiscounts($quote),
-            'fees' => self::getFees($quote),
+            'discounts' => self::$discounts,
+            'fees' => self::$fees,
             'shipping_line' => self::getShippingLine($quote),
             'totals' => self::getTotals($quote)
         ];
@@ -132,26 +150,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     }
 
     /**
-     * Retrieve discounts.
-     *
-     * @return array
-     */
-    private static function getDiscounts(Mage_Sales_Model_Quote $quote)
-    {
-        return [];
-    }
-
-    /**
-     * Retrieve fees.
-     *
-     * @return array
-     */
-    private static function getFees(Mage_Sales_Model_Quote $quote)
-    {
-        return [];
-    }
-
-    /**
      * Retrieve shipping line.
      *
      * @return array
@@ -169,6 +167,44 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     }
 
     /**
+     * Retrieve discounts and fees.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @return void
+     */
+    private static function getDiscountsAndFees(Mage_Sales_Model_Quote $quote)
+    {
+        $totals = $quote->getTotals();
+
+        if (isset($totals['discount'])) {
+            self::$discounts[] = [
+                'line_text' => $totals['discount']['title'] ?? '',
+                'value' => abs(self::convertToCents($totals['discount']['value'])),
+            ];
+        }
+
+        foreach ($totals as $total) {
+            if (in_array($total['code'], self::SYSTEM_TOTALS) || !$total['value']) {
+                continue;
+            }
+
+            $title = $total['title'] ?? ucfirst(str_replace('_', ' ', $total['code']));
+
+            if ($total['value'] > 0) {
+                self::$fees[] = [
+                    'description' => $title,
+                    'value' => self::convertToCents($total['value']),
+                ];
+            } else {
+                self::$discounts[] = [
+                    'line_text' => $title,
+                    'value' => abs(self::convertToCents($total['value'])),
+                ];
+            }
+        }
+    }
+
+    /**
      * Retrieve totals.
      *
      * @return array
@@ -179,15 +215,27 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
 
         return [
             'sub_total' => self::convertToCents($totals['subtotal']['value']),
-            'tax_total' => self::convertToCents($totals['tax']['value']),
-            'discount_total' => '',
-            'shipping_total' => self::convertToCents($totals['shipping']['value']),
+            'tax_total' => $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
+            'discount_total' => self::getDiscountTotal(),
+            'shipping_total' => $totals['shipping']['value'] ? self::convertToCents($totals['shipping']['value']) : 0,
             'order_total' => self::convertToCents($totals['grand_total']['value']),
         ];
     }
 
     /**
-     * Converts an amount to cents.
+     * Retrieve discount total.
+     *
+     * @return int
+     */
+    private static function getDiscountTotal()
+    {
+        return !empty(self::$discounts)
+            ? array_sum(array_column(self::$discounts, 'value'))
+            : 0;
+    }
+
+    /**
+     * Convert an amount to cents.
      *
      * @param float|string $amount
      * @return integer
