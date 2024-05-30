@@ -11,12 +11,15 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      * Hydrate Bold order.
      *
      * @param Mage_Sales_Model_Quote $quote
-     * @param string $publicOrderId
      * @return void
      * @throws Mage_Core_Exception
      */
-    public static function hydrate(Mage_Sales_Model_Quote $quote, string $publicOrderId)
+    public static function hydrate(Mage_Sales_Model_Quote $quote)
     {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        $publicOrderId = $boldCheckoutData->public_order_id;
         $apiUri = sprintf(self::HYDRATE_ORDER_URI, $publicOrderId);
 
         $body = [

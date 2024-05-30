@@ -96,12 +96,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      */
     private function hydrateOrder(Mage_Sales_Model_Quote $quote): void
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
-
         try {
-            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote, $boldCheckoutData->public_order_id);
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
