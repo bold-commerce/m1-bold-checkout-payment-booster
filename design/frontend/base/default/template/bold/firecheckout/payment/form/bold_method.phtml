@@ -15,16 +15,41 @@
      */
     let BoldOrderData = Class.create();
     BoldOrderData.prototype = {
+        customerRequiredFields: [
+            'first_name',
+            'last_name',
+            'email_address'
+        ],
+        billingAddressRequiredFields: [
+            'first_name',
+            'last_name',
+            'address_line_1',
+            'postal_code',
+            'city',
+            'country',
+            'phone_number'
+        ],
         hydrateOrderPayload: {
-            'customer': {}
+            'customer': {},
+            'billing_address': {}
         },
-
+        /**
+         * Initialize class.
+         *
+         * @returns {*|boolean}
+         */
         initialize: function () {
             const self = this;
             const handler = {
                 set(target, property, value) {
                     target[property] = value;
-                    if (self.validateCustomerPayload(self.hydrateOrderPayload.customer)) {
+                    if (
+                        self.validatePayload(self.hydrateOrderPayload.customer, self.customerRequiredFields) &&
+                        self.validatePayload(
+                            self.hydrateOrderPayload.billing_address,
+                            self.billingAddressRequiredFields
+                        )
+                    ) {
                         self.hydrate();
                     }
                     return true;
@@ -37,15 +62,26 @@
             };
             this.hydrateOrderPayload = new Proxy(this.hydrateOrderPayload, handler);
         },
-
-        validateCustomerPayload: function (customerPayload) {
-            if (!customerPayload.first_name) {
-                console.error('Validation failed: customer first_name is required.');
-                return false;
-            }
-            return true;
+        /**
+         * Validate payload.
+         *
+         * @param payload
+         * @param requiredFields
+         * @returns {boolean}
+         */
+        validatePayload: function (payload, requiredFields) {
+            let isValid = true;
+            requiredFields.each(function (field) {
+                if (!payload[field]) {
+                    isValid = false;
+                    return false;
+                }
+            });
+            return isValid;
         },
-
+        /**
+         * Hydrate Bold order.
+         */
         hydrate: function () {
             // TODO
             console.log(this.hydrateOrderPayload);
@@ -65,13 +101,19 @@
             'email_address': 'billing:email',
         },
         customerPayload: {},
-
+        /**
+         * Initialize class.
+         *
+         * @param boldOrderData
+         */
         initialize: function (boldOrderData) {
             this.boldOrderData = boldOrderData;
             this.updateCustomerPayload();
             this.subscribeToCustomerFieldsChanges();
         },
-
+        /**
+         * Update customer payload.
+         */
         updateCustomerPayload: function () {
             if (this.customerData.email !== '') {
                 this.customerPayload.email_address = this.customerData.email;
@@ -90,7 +132,9 @@
                 }
             );
         },
-
+        /**
+         * Subscribe to customer fields changes.
+         */
         subscribeToCustomerFieldsChanges: function () {
             const self = this;
             Object.values(this.customerFieldsMapper).each(function (selector) {
@@ -105,9 +149,79 @@
             });
         }
     };
+
+    /**
+     * Bold address class.
+     */
+    let BoldAddress = Class.create();
+    BoldAddress.prototype = {
+        allowedCountries: <?php echo $this->getAllowedCountries(); ?>,
+        billingAddressFieldsMapper: {
+            'first_name': 'billing:firstname',
+            'last_name': 'billing:lastname',
+            'business_name': 'billing:company',
+            'phone_number': 'billing:telephone',
+            'address_line_1': 'billing:street1',
+            'address_line_2': 'billing:street2',
+            'city': 'billing:city',
+            'province': 'billing:region',
+            'province_code': 'billing:region_id',
+            "country": "billing:country_id",
+            'country_code': 'billing:country_id',
+            'postal_code': 'billing:postcode'
+        },
+        billingAddressPayload: {},
+        /**
+         * Initialize class.
+         *
+         * @param boldOrderData
+         */
+        initialize: function (boldOrderData) {
+            this.boldOrderData = boldOrderData;
+            this.updateBillingAddressPayload();
+            this.subscribeToBillingAddressFieldsChanges();
+        },
+        /**
+         * Update billing address payload.
+         */
+        updateBillingAddressPayload: function () {
+            Object.keys(this.billingAddressFieldsMapper).forEach(function (key) {
+                let field = this.billingAddressFieldsMapper[key];
+                if ($(field)) {
+                    this.billingAddressPayload[key] = $(field).value;
+                }
+            }.bind(this));
+            this.billingAddressPayload['country'] = this.allowedCountries.find(
+                country => country.value === this.billingAddressPayload.country_code
+            ).label;
+            Object.assign(
+                this.boldOrderData.hydrateOrderPayload,
+                {
+                    'billing_address': this.billingAddressPayload
+                }
+            );
+        },
+        /**
+         * Subscribe to billing address fields changes.
+         */
+        subscribeToBillingAddressFieldsChanges: function () {
+            const self = this;
+            Object.values(this.billingAddressFieldsMapper).each(function (selector) {
+                let field = $(selector);
+                if (field) {
+                    field.observe('change', function () {
+                        setTimeout(function () {
+                            self.updateBillingAddressPayload();
+                        }, 500);
+                    });
+                }
+            });
+        }
+    };
 </script>
 
 <script type="text/javascript">
     const boldOrderData = new BoldOrderData();
     const boldCustomer = new BoldCustomer(boldOrderData);
+    const boldAddress = new BoldAddress(boldOrderData);
 </script>
