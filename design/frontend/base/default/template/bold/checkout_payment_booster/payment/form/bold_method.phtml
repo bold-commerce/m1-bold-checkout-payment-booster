@@ -1,0 +1,17 @@
+<?php
+/**
+ * Bold Payments PIGI iframe template.
+ *
+ * @var Bold_CheckoutPaymentBooster_Block_Form_Payment $this
+ */
+?>
+<div id="bold-payments-container" style="display: none;">
+    <iframe id="PIGI" src="" width="100%" height="0" scrolling="no" frameborder="0"></iframe>
+</div>
+<span class="please-wait" id="bold-payments-iframe-loader" style="display: none;">
+    <img src="<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif') ?>"
+         alt="<?php echo $this->__('Please wait...') ?>"
+         title="<?php echo $this->__('Please wait...') ?>"
+    /> <?php echo $this->__('Please wait...') ?>
+</span>
+<?php // TODO: will be added in INTER-3719 ?>

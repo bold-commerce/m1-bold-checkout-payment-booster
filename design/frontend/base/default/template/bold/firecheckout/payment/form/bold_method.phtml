@@ -1,0 +1,113 @@
+<?php
+/**
+ * Bold Payments PIGI iframe template.
+ *
+ * @var Bold_CheckoutPaymentBooster_Block_Form_Payment $this
+ */
+?>
+<div id="bold-payments-container" style="display: none;">
+    <p>PIGI</p> <!-- TODO: will be added in INTER-3719 -->
+</div>
+
+<script type="text/javascript">
+    /**
+     * Bold order data class.
+     */
+    let BoldOrderData = Class.create();
+    BoldOrderData.prototype = {
+        hydrateOrderPayload: {
+            'customer': {}
+        },
+
+        initialize: function () {
+            const self = this;
+            const handler = {
+                set(target, property, value) {
+                    target[property] = value;
+                    if (self.validateCustomerPayload(self.hydrateOrderPayload.customer)) {
+                        self.hydrate();
+                    }
+                    return true;
+                },
+                get(target, property) {
+                    return typeof target[property] === 'object' && target[property] !== null
+                        ? new Proxy(target[property], this)
+                        : target[property];
+                }
+            };
+            this.hydrateOrderPayload = new Proxy(this.hydrateOrderPayload, handler);
+        },
+
+        validateCustomerPayload: function (customerPayload) {
+            if (!customerPayload.first_name) {
+                console.error('Validation failed: customer first_name is required.');
+                return false;
+            }
+            return true;
+        },
+
+        hydrate: function () {
+            // TODO
+            console.log(this.hydrateOrderPayload);
+            console.log('Hydrate Order');
+        }
+    };
+
+    /**
+     * Bold customer class.
+     */
+    let BoldCustomer = Class.create();
+    BoldCustomer.prototype = {
+        customerData: <?php echo $this->getCustomerData(); ?>,
+        customerFieldsMapper: {
+            'first_name': 'billing:firstname',
+            'last_name': 'billing:lastname',
+            'email_address': 'billing:email',
+        },
+        customerPayload: {},
+
+        initialize: function (boldOrderData) {
+            this.boldOrderData = boldOrderData;
+            this.updateCustomerPayload();
+            this.subscribeToCustomerFieldsChanges();
+        },
+
+        updateCustomerPayload: function () {
+            if (this.customerData.email !== '') {
+                this.customerPayload.email_address = this.customerData.email;
+            }
+            this.customerPayload.platform_id = this.customerData.id;
+            Object.keys(this.customerFieldsMapper).forEach(function (key) {
+                let field = this.customerFieldsMapper[key];
+                if ($(field)) {
+                    this.customerPayload[key] = $(field).value;
+                }
+            }.bind(this));
+            Object.assign(
+                this.boldOrderData.hydrateOrderPayload,
+                {
+                    'customer': this.customerPayload
+                }
+            );
+        },
+
+        subscribeToCustomerFieldsChanges: function () {
+            const self = this;
+            Object.values(this.customerFieldsMapper).each(function (selector) {
+                let field = $(selector);
+                if (field) {
+                    field.observe('change', function () {
+                        setTimeout(function () {
+                            self.updateCustomerPayload();
+                        }, 500);
+                    });
+                }
+            });
+        }
+    };
+</script>
+
+<script type="text/javascript">
+    const boldOrderData = new BoldOrderData();
+    const boldCustomer = new BoldCustomer(boldOrderData);
+</script>

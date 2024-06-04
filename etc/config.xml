@@ -60,6 +60,15 @@
                     </bold>
                 </observers>
             </controller_action_postdispatch_checkout_onepage_saveShippingMethod>
+            <!-- TM_FireCheckout -->
+            <controller_action_predispatch_firecheckout_index_index>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>beforeCheckout</method>
+                    </bold>
+                </observers>
+            </controller_action_predispatch_firecheckout_index_index>
         </events>
     </frontend>
     <adminhtml>
@@ -86,5 +95,12 @@
                 <is_log_enabled>0</is_log_enabled>
             </bold_checkout_payment_booster_advanced>
         </checkout>
+        <payment>
+            <bold>
+                <model>Bold_CheckoutPaymentBooster_Model_Method_Bold</model>
+                <active>1</active>
+                <title>Bold Payments</title>
+            </bold>
+        </payment>
     </default>
 </config>
