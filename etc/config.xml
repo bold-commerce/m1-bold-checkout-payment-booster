@@ -14,8 +14,25 @@
         <models>
             <bold_checkout_payment_booster>
                 <class>Bold_CheckoutPaymentBooster_Model</class>
+                <resourceModel>bold_checkout_payment_booster_resource</resourceModel>
             </bold_checkout_payment_booster>
+            <bold_checkout_payment_booster_resource>
+                <class>Bold_CheckoutPaymentBooster_Model_Resource</class>
+                <deprecatedNode>bold_checkout_payment_booster_mysql4</deprecatedNode>
+                <entities>
+                    <order>
+                        <table>bold_checkout_payment_booster_order</table>
+                    </order>
+                </entities>
+            </bold_checkout_payment_booster_resource>
         </models>
+        <resources>
+            <bold_checkout_payment_booster_setup>
+                <setup>
+                    <module>Bold_CheckoutPaymentBooster</module>
+                </setup>
+            </bold_checkout_payment_booster_setup>
+        </resources>
     </global>
     <frontend>
         <events>
@@ -27,7 +44,25 @@
                     </bold>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
+            <!-- TM_FireCheckout -->
+            <controller_action_predispatch_firecheckout_index_index>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>beforeCheckout</method>
+                    </bold>
+                </observers>
+            </controller_action_predispatch_firecheckout_index_index>
         </events>
+        <routers>
+            <checkoutpaymentbooster>
+                <use>standard</use>
+                <args>
+                    <module>Bold_CheckoutPaymentBooster</module>
+                    <frontName>checkoutpaymentbooster</frontName>
+                </args>
+            </checkoutpaymentbooster>
+        </routers>
     </frontend>
     <adminhtml>
         <events>
@@ -49,8 +84,16 @@
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
+                <weight_conversion_rate>1000</weight_conversion_rate>
                 <is_log_enabled>0</is_log_enabled>
             </bold_checkout_payment_booster_advanced>
         </checkout>
+        <payment>
+            <bold>
+                <model>Bold_CheckoutPaymentBooster_Model_Method_Bold</model>
+                <active>1</active>
+                <title>Bold Payments</title>
+            </bold>
+        </payment>
     </default>
 </config>

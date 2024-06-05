@@ -6,15 +6,18 @@
 class Bold_CheckoutPaymentBooster_Model_Config
 {
     const RESOURCE = 'bold_checkout_payment_booster/config';
+    const LOG_FILE_NAME = 'bold_checkout_payment_booster.log';
+
+    // Main settings
     const PATH_IS_PAYMENT_BOOSTER_ENABLED = 'checkout/bold_checkout_payment_booster/is_payment_booster_enabled';
     const PATH_IS_FASTLANE_ENABLED = 'checkout/bold_checkout_payment_booster/is_fastlane_enabled';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
 
+    // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
+    const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
-
-    const LOG_FILE_NAME = 'bold_checkout_payment_booster.log';
 
     /**
      * Check if the Payment Booster is enabled.
@@ -91,6 +94,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function getApiUrl(int $websiteId)
     {
         return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_URL), '/');
+    }
+
+    /**
+     * Retrieve weight unit conversion rate to grams.
+     *
+     * @param int $websiteId
+     * @return float|int
+     * @throws Mage_Core_Exception
+     */
+    public function getWeightConversionRate(int $websiteId)
+    {
+        return (float)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_WEIGHT_CONVERSION_RATE) ?: 1000;
     }
 
     /**

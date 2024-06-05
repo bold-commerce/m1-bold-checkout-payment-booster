@@ -18,7 +18,7 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
 
         try {
             Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
-        } catch (\Exception $exception) {
+        } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
     }
