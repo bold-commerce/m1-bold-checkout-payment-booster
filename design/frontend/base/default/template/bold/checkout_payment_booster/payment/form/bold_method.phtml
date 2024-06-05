@@ -106,10 +106,7 @@
                 }
             };
             let isRegionRequired = regionsRequired.config.regions_required.indexOf(this.orderPayload.country_id) !== -1;
-            if (isRegionRequired && !this.orderPayload.region_id) {
-                return false;
-            }
-            return !isInvalid;
+            return !(isRegionRequired && !this.orderPayload.region_id);
         },
         /**
          * Check if already hydrated payload differs from new one.
