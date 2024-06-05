@@ -44,22 +44,6 @@
                     </bold>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
-            <controller_action_postdispatch_checkout_onepage_saveBilling>
-                <observers>
-                    <bold>
-                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
-                        <method>afterSaveBilling</method>
-                    </bold>
-                </observers>
-            </controller_action_postdispatch_checkout_onepage_saveBilling>
-            <controller_action_postdispatch_checkout_onepage_saveShippingMethod>
-                <observers>
-                    <bold>
-                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
-                        <method>afterSaveShippingMethod</method>
-                    </bold>
-                </observers>
-            </controller_action_postdispatch_checkout_onepage_saveShippingMethod>
             <!-- TM_FireCheckout -->
             <controller_action_predispatch_firecheckout_index_index>
                 <observers>
@@ -70,6 +54,15 @@
                 </observers>
             </controller_action_predispatch_firecheckout_index_index>
         </events>
+        <routers>
+            <checkoutpaymentbooster>
+                <use>standard</use>
+                <args>
+                    <module>Bold_CheckoutPaymentBooster</module>
+                    <frontName>checkoutpaymentbooster</frontName>
+                </args>
+            </checkoutpaymentbooster>
+        </routers>
     </frontend>
     <adminhtml>
         <events>

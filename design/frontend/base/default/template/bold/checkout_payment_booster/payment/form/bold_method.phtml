@@ -6,12 +6,156 @@
  */
 ?>
 <div id="bold-payments-container" style="display: none;">
-    <iframe id="PIGI" src="" width="100%" height="0" scrolling="no" frameborder="0"></iframe>
+    <p>PIGI</p> <!-- TODO: will be added in INTER-3719 -->
 </div>
-<span class="please-wait" id="bold-payments-iframe-loader" style="display: none;">
-    <img src="<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif') ?>"
-         alt="<?php echo $this->__('Please wait...') ?>"
-         title="<?php echo $this->__('Please wait...') ?>"
-    /> <?php echo $this->__('Please wait...') ?>
-</span>
-<?php // TODO: will be added in INTER-3719 ?>
+
+<script type="text/javascript">
+    /**
+     * Bold order data class.
+     */
+    let BoldOrderData = Class.create();
+    BoldOrderData.prototype = {
+        orderDataFieldMapper: {
+            'address_id': 'billing-address-select',
+            'firstname': 'billing:firstname',
+            'email': 'billing:email',
+            'lastname': 'billing:lastname',
+            'company': 'billing:company',
+            'telephone': 'billing:telephone',
+            'street1': 'billing:street1',
+            'street2': 'billing:street2',
+            'city': 'billing:city',
+            'region_id': 'billing:region_id',
+            'country_id': 'billing:country_id',
+            'postcode': 'billing:postcode'
+        },
+        requiredFields: [
+            'email',
+            'firstname',
+            'lastname',
+            'street1',
+            'postcode',
+            'city',
+            'country_id',
+            'telephone'
+        ],
+        orderPayload: {
+            'address_id': '<?php echo $this->getAddressId() ?>',
+            'email': '<?php echo $this->getCustomerEmail() ?>',
+            'firstname': '<?php echo $this->getFirstName() ?>',
+            'lastname': '<?php echo $this->getLastName() ?>',
+            'company': '<?php echo $this->getCompany() ?>',
+            'telephone': '<?php echo $this->getTelephone() ?>',
+            'street1': '<?php echo $this->getStreet1() ?>',
+            'street2': '<?php echo $this->getStreet2() ?>',
+            'city': '<?php echo $this->getCity() ?>',
+            'region_id': '<?php echo $this->getRegionId() ?>',
+            'country_id': '<?php echo $this->getCountryId() ?>',
+            'postcode': '<?php echo $this->getPostcode() ?>',
+        },
+        /**
+         * Initialize class.
+         *
+         * @returns {*|boolean}
+         */
+        initialize: function () {
+            if (!window.bold) {
+                window.bold = {
+                    orderData: {}
+                };
+            }
+            this.syncData();
+            this.subscribeToFieldsChanges();
+        },
+        subscribeToFieldsChanges: function () {
+            Object.values(this.orderDataFieldMapper).each(function (selector) {
+                let field = $(selector);
+                if (field) {
+                    field.observe('change', () => {
+                        setTimeout(() => {
+                            this.syncData();
+                        }, 500);
+                    });
+                }
+            }.bind(this));
+        },
+        updateOrderDataPayload: function () {
+            Object.keys(this.orderDataFieldMapper).forEach(function (key) {
+                let field = this.orderDataFieldMapper[key];
+                if ($(field)) {
+                    this.orderPayload[key] = $(field).value;
+                }
+            }.bind(this));
+        },
+        /**
+         * Validate payload.
+         *
+         * @returns {boolean}
+         */
+        isPayloadValid: function () {
+            let isInvalid = this.requiredFields.some((field) => {
+                return !this.orderPayload[field];
+
+            });
+            if (isInvalid) {
+                return false;
+            }
+            let regionsRequired = window.countryRegions || {
+                config: {
+                    regions_required: []
+                }
+            };
+            let isRegionRequired = regionsRequired.config.regions_required.indexOf(this.orderPayload.country_id) !== -1;
+            if (isRegionRequired && !this.orderPayload.region_id) {
+                return false;
+            }
+            return !isInvalid;
+        },
+        /**
+         * Check if already hydrated payload differs from new one.
+         *
+         * @returns {boolean}
+         */
+        isPayloadChanged: function () {
+            let isChanged = false;
+            for (let [key, value] of Object.entries(this.orderPayload)) {
+                if (window.bold.orderData[key] !== value) {
+                    isChanged = true;
+                    break;
+                }
+            }
+            return isChanged;
+        },
+        /**
+         * Hydrate Bold order.
+         */
+        syncData: function () {
+            if (Ajax.activeRequestCount > 0) {
+                this.syncData.bind(this).delay(0.1);
+                return;
+            }
+            this.updateOrderDataPayload();
+            if (!this.isPayloadValid()) {
+                return;
+            }
+            if (!this.isPayloadChanged()) {
+                return;
+            }
+            new Ajax.Request('/checkoutpaymentbooster/index/syncOrderData', {
+                method: 'post',
+                parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
+                onSuccess: function () {
+                    window.bold.orderData = Object.assign({}, this.orderPayload);
+                    document.getElementById('bold-payments-container').style.display = 'block';
+                }.bind(this),
+                onFailure: function () {
+                    window.bold.orderData = {};
+                    console.error('Failed to sync order data');
+                }
+            });
+        }
+    };
+
+    const boldOrderData = new BoldOrderData();
+    boldOrderData.initialize();
+</script>

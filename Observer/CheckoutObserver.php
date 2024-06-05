@@ -25,40 +25,19 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
                 return;
             }
             $flowId = Bold_CheckoutPaymentBooster_Service_FlowId::get($quote);
-            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+            // TODO
+            // $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+
+            $checkoutData = new stdClass();
+            $checkoutData->public_order_id = 'test-public-order-id';
+
             $checkoutSession->setBoldCheckoutData($checkoutData);
-            $this->setOrderData($quote->getId(), $checkoutData);
+            if ($quote->getId()) {
+                $this->setOrderData($quote->getId(), $checkoutData);
+            }
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
-    }
-
-    /**
-     * Fill Bold order with additional data for virtual quote.
-     *
-     * @param Varien_Event_Observer $event
-     * @return void
-     */
-    public function afterSaveBilling(Varien_Event_Observer $event)
-    {
-        /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('checkout/cart')->getQuote();
-        if ($quote->isVirtual()) {
-            $this->hydrateOrder($quote);
-        }
-    }
-
-    /**
-     * Fill Bold order with additional data.
-     *
-     * @param Varien_Event_Observer $event
-     * @return void
-     */
-    public function afterSaveShippingMethod(Varien_Event_Observer $event)
-    {
-        /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('checkout/cart')->getQuote();
-        $this->hydrateOrder($quote);
     }
 
     /**
