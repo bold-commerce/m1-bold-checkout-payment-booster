@@ -25,12 +25,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
                 return;
             }
             $flowId = Bold_CheckoutPaymentBooster_Service_FlowId::get($quote);
-            // TODO
-            // $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
-
-            $checkoutData = new stdClass();
-            $checkoutData->public_order_id = 'test-public-order-id';
-
+            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
             if ($quote->getId()) {
                 $this->setOrderData($quote->getId(), $checkoutData);
@@ -65,20 +60,5 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         ];
 
         Bold_CheckoutPaymentBooster_Service_Order_Data::save($data);
-    }
-
-    /**
-     * Hydrate Bold order.
-     *
-     * @param Mage_Sales_Model_Quote $quote
-     * @return void
-     */
-    private function hydrateOrder(Mage_Sales_Model_Quote $quote): void
-    {
-        try {
-            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
-        } catch (Exception $exception) {
-            Mage::log($exception->getMessage(), Zend_Log::CRIT);
-        }
     }
 }

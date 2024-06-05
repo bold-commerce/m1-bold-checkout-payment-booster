@@ -9,6 +9,8 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      * Sync order data action.
      *
      * @return void
+     * @throws Mage_Core_Exception
+     * @throws Throwable
      */
     public function syncOrderDataAction()
     {
@@ -23,10 +25,12 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         if (!$quote->getId()) {
             return;
         }
+
         if (isset($post['address_id']) && $quote->getCustomer()->getId()) {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
             return;
         }
+
         unset($post['form_key']);
         $post['street'] = $post['street2']
             ? $post['street1'] . "\n" . $post['street2']

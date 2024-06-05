@@ -67,6 +67,9 @@
             this.syncData();
             this.subscribeToFieldsChanges();
         },
+        /**
+         * Subscribe to fields changes.
+         */
         subscribeToFieldsChanges: function () {
             Object.values(this.orderDataFieldMapper).each(function (selector) {
                 let field = $(selector);
@@ -79,6 +82,9 @@
                 }
             }.bind(this));
         },
+        /**
+         * Update order data payload.
+         */
         updateOrderDataPayload: function () {
             Object.keys(this.orderDataFieldMapper).forEach(function (key) {
                 let field = this.orderDataFieldMapper[key];
@@ -143,7 +149,6 @@
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
-                    document.getElementById('bold-payments-container').style.display = 'block';
                 }.bind(this),
                 onFailure: function () {
                     window.bold.orderData = {};
