@@ -24,7 +24,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
                 return;
             }
-            $flowId = 'Bold three page';
+            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
             $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
         } catch (Exception $exception) {
