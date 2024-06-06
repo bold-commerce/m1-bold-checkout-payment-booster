@@ -3,7 +3,7 @@
 /**
  * Flow identifier retrieve service.
  */
-class Bold_CheckoutPaymentBooster_Service_FlowId
+class Bold_CheckoutPaymentBooster_Service_Flow
 {
     /**
      * Get Bold flow ID.
@@ -19,11 +19,11 @@ class Bold_CheckoutPaymentBooster_Service_FlowId
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
 
         if ($config->isFastlaneEnabled($websiteId)
-            && !$quote->getCustomerId()
+            && !$quote->getCustomer()->getId()
         ) {
-            return 'Payment-Booster-Fastlane-M1';
+            return 'Payment-Booster-Fastlane-M1';  //todo: check if api should be used instead.
         }
 
-        return 'Payment-Booster-M1';
+        return 'Payment-Booster-M1'; //todo: check if api should be used instead.
     }
 }

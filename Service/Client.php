@@ -3,7 +3,7 @@
 /**
  * Perform requests to Bold Checkout API.
  */
-class Bold_CheckoutPaymentBooster_Client
+class Bold_CheckoutPaymentBooster_Service_Client
 {
     const BOLD_API_VERSION_DATE = '2022-10-14';
 
@@ -17,7 +17,7 @@ class Bold_CheckoutPaymentBooster_Client
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function call(string $method, string $url, int $websiteId, ?string $data = null)
+    public static function call($method, $url, $websiteId, $data = null)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -26,7 +26,6 @@ class Bold_CheckoutPaymentBooster_Client
         $headers = [
             'Authorization: Bearer ' . $config->getApiToken($websiteId),
             'Content-Type: application/json',
-            'User-Agent:' . Bold_CheckoutPaymentBooster_Service_UserAgent::get(),
             'Bold-API-Version-Date:' . self::BOLD_API_VERSION_DATE,
         ];
 
@@ -34,6 +33,6 @@ class Bold_CheckoutPaymentBooster_Client
             . '/'
             . ltrim(str_replace('{{shopId}}', $shopId, $url), '/');
 
-        return Bold_CheckoutPaymentBooster_HttpClient::call($method, $url, $websiteId, $data, $headers);
+        return Bold_CheckoutPaymentBooster_Service_Client_Http::call($method, $url, $websiteId, $data, $headers);
     }
 }
