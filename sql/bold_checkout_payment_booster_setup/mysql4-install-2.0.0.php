@@ -4,91 +4,19 @@
 $installer = $this;
 $installer->startSetup();
 
-/**
- * Create 'bold_checkout_payment_booster_order' table
- */
-$tableName = Bold_CheckoutPaymentBooster_Model_Order::RESOURCE;
-$table = $installer->getConnection()
-    ->newTable($installer->getTable($tableName))
-    ->addColumn(
-        'entity_id',
-        Varien_Db_Ddl_Table::TYPE_INTEGER,
-        null,
-        [
-            'identity' => true,
-            'unsigned' => true,
-            'nullable' => false,
-            'primary' => true,
-        ],
-        'Entity ID'
-    )
-    ->addColumn(
-        'quote_id',
-        Varien_Db_Ddl_Table::TYPE_INTEGER,
-        null,
-        [
-            'unsigned' => true,
-            'nullable' => false,
-        ],
-        'Magento Quote ID'
-    )
-    ->addColumn(
-        'order_id',
-        Varien_Db_Ddl_Table::TYPE_INTEGER,
-        null,
-        [
-            'unsigned' => true,
-            'nullable' => true,
-        ],
-        'Magento Order ID'
-    )
-    ->addColumn(
-        'public_id',
-        Varien_Db_Ddl_Table::TYPE_VARCHAR,
-        '255',
-        [
-            'nullable' => false,
-        ],
-        'Bold Order Public ID'
-    )
-    ->addIndex(
-        $installer->getIdxName(
-            $tableName,
-            [
-                'quote_id',
-                'order_id',
-            ]
-        ),
-        [
-            'quote_id',
-            'order_id',
-        ]
-    )
-    ->addForeignKey(
-        $installer->getFkName(
-            $tableName,
-            'quote_id',
-            'sales/quote',
-            'entity_id'
-        ),
-        'quote_id',
-        $installer->getTable('sales/quote'),
-        'entity_id',
-        Varien_Db_Ddl_Table::ACTION_CASCADE
-    )
-    ->addForeignKey(
-        $installer->getFkName(
-            $tableName,
-            'order_id',
-            'sales/order',
-            'entity_id'
-        ),
-        'order_id',
-        $installer->getTable('sales/order'),
-        'entity_id',
-        Varien_Db_Ddl_Table::ACTION_CASCADE
-    )
-    ->setComment('Bold Order Data');
+$tableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
 
-$installer->getConnection()->createTable($table);
+$sql = <<<SQL
+CREATE TABLE `{$tableName}` (
+    `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Entity ID',
+    `order_id` INT UNSIGNED COMMENT 'Magento Order ID',
+    `public_id` VARCHAR(255) NOT NULL COMMENT 'Bold Order Public ID',
+    PRIMARY KEY (`entity_id`),
+    INDEX `IDX_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_ORDER_ID` (`order_id`),
+    CONSTRAINT FOREIGN KEY (`order_id`) REFERENCES `{$installer->getTable('sales/order')}` (`entity_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Bold Order Data';
+SQL;
+
+$installer->run($sql);
+
 $installer->endSetup();

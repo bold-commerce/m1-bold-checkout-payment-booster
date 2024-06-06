@@ -14,9 +14,8 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function get(int $websiteId)
+    public static function get($websiteId)
     {
-        $websiteId = $websiteId ?: (int)Mage::app()->getDefaultStoreView()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $shopIdentifier = $config->getShopId($websiteId);
@@ -34,9 +33,8 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
      * @param int $websiteId
      * @throws Mage_Core_Exception
      */
-    public static function set(int $websiteId)
+    public static function set($websiteId)
     {
-        $websiteId = $websiteId ?: (int)Mage::app()->getDefaultStoreView()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $config->setShopId(null, $websiteId);
@@ -44,13 +42,12 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
         $headers = [
             'Authorization: Bearer ' . $apiToken,
             'Content-Type: application/json',
-            'User-Agent:' . Bold_CheckoutPaymentBooster_Service_UserAgent::get(),
-            'Bold-API-Version-Date:' . Bold_CheckoutPaymentBooster_Client::BOLD_API_VERSION_DATE,
+            'Bold-API-Version-Date:' . Bold_CheckoutPaymentBooster_Service_Client::BOLD_API_VERSION_DATE,
         ];
         $url = $config->getApiUrl($websiteId) . self::SHOP_INFO_URI;
 
         $shopInfo = json_decode(
-            Bold_CheckoutPaymentBooster_HttpClient::call(
+            Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'GET',
                 $url,
                 $websiteId,

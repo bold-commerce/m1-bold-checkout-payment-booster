@@ -16,6 +16,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     ];
 
     private static $discounts = [];
+
     private static $fees = [];
 
     /**
@@ -48,11 +49,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             'discounts' => self::$discounts,
             'fees' => self::$fees,
             'shipping_line' => self::getShippingLine($quote),
-            'totals' => self::getTotals($quote)
+            'totals' => self::getTotals($quote),
         ];
 
         $response = json_decode(
-            Bold_CheckoutPaymentBooster_Client::call(
+            Bold_CheckoutPaymentBooster_Service_Client::call(
                 'PUT',
                 $apiUri,
                 $quote->getStore()->getWebsiteId(),
@@ -76,7 +77,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getCustomer(Mage_Sales_Model_Quote $quote)
     {
         return [
-            'platform_id' => $quote->getCustomerId() ?? null,
+            'platform_id' => $quote->getCustomerId() ? $quote->getCustomerId() : null,
             'first_name' => $quote->getCustomerFirstname(),
             'last_name' => $quote->getCustomerLastname(),
             'email_address' => $quote->getCustomerEmail(),
@@ -101,7 +102,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         return [
             'first_name' => $address->getFirstname(),
             'last_name' => $address->getLastname(),
-            'business_name' => $address->getCompany() ?? '',
+            'business_name' => $address->getCompany() ? $address->getCompany() : '',
             'phone_number' => $address->getTelephone(),
             'address_line_1' => $address->getStreet1(),
             'address_line_2' => $address->getStreet2(),
@@ -137,7 +138,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getTaxes(Mage_Sales_Model_Quote $quote)
     {
         $totals = $quote->getTotals();
-        $taxInfo = $totals['tax']['full_info'] ?? [];
+        $taxInfo = isset($totals['tax']['full_info']) ? $totals['tax']['full_info'] : [];
         $taxes = [];
         foreach ($taxInfo as $tax) {
             $taxes[] = [
@@ -161,7 +162,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         }
 
         return [
-            'rate_name' => $quote->getShippingAddress()->getShippingDescription() ?? '',
+            'rate_name' => $quote->getShippingAddress()->getShippingDescription() ?: '',
             'cost' => self::convertToCents($quote->getShippingAddress()->getShippingAmount()),
         ];
     }
@@ -178,7 +179,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
 
         if (isset($totals['discount'])) {
             self::$discounts[] = [
-                'line_text' => $totals['discount']['title'] ?? '',
+                'line_text' => isset($totals['discount']['title']) ? $totals['discount']['title'] : '',
                 'value' => abs(self::convertToCents($totals['discount']['value'])),
             ];
         }
@@ -188,7 +189,9 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
                 continue;
             }
 
-            $title = $total['title'] ?? ucfirst(str_replace('_', ' ', $total['code']));
+            $title = isset($total['title'])
+                ? $total['title']
+                : ucfirst(str_replace('_', ' ', $total['code']));
 
             if ($total['value'] > 0) {
                 self::$fees[] = [

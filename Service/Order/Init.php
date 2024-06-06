@@ -15,7 +15,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function init(Mage_Sales_Model_Quote $quote, string $flowId)
+    public static function init(Mage_Sales_Model_Quote $quote, $flowId)
     {
         $body = [
             'flow_id' => $flowId,
@@ -24,7 +24,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
         ];
 
         $orderData = json_decode(
-            Bold_CheckoutPaymentBooster_Client::call(
+            Bold_CheckoutPaymentBooster_Service_Client::call(
                 'POST',
                 self::INIT_SIMPLE_ORDER_URI,
                 $quote->getStore()->getWebsiteId(),
