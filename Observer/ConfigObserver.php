@@ -15,7 +15,6 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
     public function setShopId(Varien_Event_Observer $event)
     {
         $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
-
         try {
             Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
         } catch (Exception $exception) {
