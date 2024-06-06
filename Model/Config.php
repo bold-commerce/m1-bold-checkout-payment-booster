@@ -24,7 +24,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public function isPaymentBoosterEnabled($websiteId)
     {
@@ -37,7 +36,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public function isFastlaneEnabled($websiteId)
     {
@@ -50,7 +48,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string|null
-     * @throws Mage_Core_Exception
      */
     public function getApiToken($websiteId)
     {
@@ -64,7 +61,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string|null
-     * @throws Mage_Core_Exception
      */
     public function getShopId($websiteId)
     {
@@ -89,7 +85,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string
-     * @throws Mage_Core_Exception
      */
     public function getApiUrl($websiteId)
     {
@@ -101,7 +96,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return float|int
-     * @throws Mage_Core_Exception
      */
     public function getWeightConversionRate($websiteId)
     {
@@ -113,7 +107,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public function isLogEnabled($websiteId)
     {
