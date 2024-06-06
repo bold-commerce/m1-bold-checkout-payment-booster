@@ -8,33 +8,27 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
     const AUTHORIZE_PAYMENT_URI = '/checkout/orders/{{shopId}}/%s/payments/auth/full';
 
     /**
-     * @param Mage_Sales_Model_Quote $quote
-     * @param array|null $data
+     * Authorize payment.
+     *
+     * @param string $publicOrderId
+     * @param int $websiteId
+     * @param array $data // can contain "idempotent_key" (optional)
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function full(Mage_Sales_Model_Quote $quote, $data = null)
+    public static function full($publicOrderId, $websiteId, $data = [])
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
-        $publicOrderId = $boldCheckoutData->public_order_id;
-        $errorMessage = Mage::helper('core')->__('Payment Authorization Failure.');
-
-        if (!$publicOrderId) {
-            Mage::throwException($errorMessage);
-        }
-
         $apiUri = sprintf(self::AUTHORIZE_PAYMENT_URI, $publicOrderId);
         $response = json_decode(
             Bold_CheckoutPaymentBooster_Service_Client::call(
                 'POST',
                 $apiUri,
-                $quote->getStore()->getWebsiteId(),
-                $data ? json_encode($data) : null
+                $websiteId,
+                !empty($data) ? json_encode($data) : null
             )
         );
 
+        $errorMessage = Mage::helper('core')->__('Payment Authorization Failure.');
         $errors = isset($response->errors) ? $response->errors : [];
         if ($errors) {
             $logMessage = $errorMessage . PHP_EOL;

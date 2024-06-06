@@ -53,6 +53,14 @@
                     </bold>
                 </observers>
             </controller_action_predispatch_firecheckout_index_index>
+            <checkout_type_onepage_save_order>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>beforeSaveOrder</method>
+                    </bold>
+                </observers>
+            </checkout_type_onepage_save_order>
         </events>
         <routers>
             <checkoutpaymentbooster>
