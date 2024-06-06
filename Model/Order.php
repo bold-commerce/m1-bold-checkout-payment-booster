@@ -7,8 +7,6 @@
  * @method Bold_CheckoutPaymentBooster_Model_Resource_Order getResource()
  * @method int getEntityId()
  * @method $this setEntityId(int $value)
- * @method int getQuoteId()
- * @method $this setQuoteId(int $value)
  * @method int getOrderId()
  * @method $this setOrderId(int $value)
  * @method string getPublicId()

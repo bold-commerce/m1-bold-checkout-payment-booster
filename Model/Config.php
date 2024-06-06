@@ -89,6 +89,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string
+     * @throws Mage_Core_Exception
      */
     public function getApiUrl($websiteId)
     {
@@ -100,6 +101,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return float|int
+     * @throws Mage_Core_Exception
      */
     public function getWeightConversionRate($websiteId)
     {
@@ -111,6 +113,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
+     * @throws Mage_Core_Exception
      */
     public function isLogEnabled($websiteId)
     {

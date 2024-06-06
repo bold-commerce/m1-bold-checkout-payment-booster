@@ -10,6 +10,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      *
      * @param Mage_Sales_Model_Quote_Item $item
      * @return array
+     * @throws Mage_Core_Exception
      */
     public static function extract(Mage_Sales_Model_Quote_Item $item)
     {
@@ -68,6 +69,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      *
      * @param Mage_Sales_Model_Quote_Item $item
      * @return float
+     * @throws Mage_Core_Exception
      */
     private static function getWeight(Mage_Sales_Model_Quote_Item $item)
     {

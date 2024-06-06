@@ -13,7 +13,7 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function full(Mage_Sales_Model_Quote $quote, ?array $data = null)
+    public static function full(Mage_Sales_Model_Quote $quote, $data = null)
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
@@ -27,7 +27,7 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
 
         $apiUri = sprintf(self::AUTHORIZE_PAYMENT_URI, $publicOrderId);
         $response = json_decode(
-            Bold_CheckoutPaymentBooster_Client::call(
+            Bold_CheckoutPaymentBooster_Service_Client::call(
                 'POST',
                 $apiUri,
                 $quote->getStore()->getWebsiteId(),
@@ -35,7 +35,7 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
             )
         );
 
-        $errors = $response->errors ?? [];
+        $errors = isset($response->errors) ? $response->errors : [];
         if ($errors) {
             $logMessage = $errorMessage . PHP_EOL;
             foreach ($errors as $error) {

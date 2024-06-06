@@ -10,7 +10,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      *
      * @param Varien_Event_Observer $event
      * @return void
-     * @throws Throwable
+     * @throws Exception
      */
     public function beforeCheckout(Varien_Event_Observer $event)
     {
@@ -24,7 +24,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
                 return;
             }
-            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::get($quote);
+            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
             $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
         } catch (Exception $exception) {
