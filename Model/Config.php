@@ -24,7 +24,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public function isPaymentBoosterEnabled($websiteId)
     {
@@ -37,7 +36,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public function isFastlaneEnabled($websiteId)
     {
@@ -50,7 +48,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string|null
-     * @throws Mage_Core_Exception
      */
     public function getApiToken($websiteId)
     {
@@ -64,7 +61,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      *
      * @param int $websiteId
      * @return string|null
-     * @throws Mage_Core_Exception
      */
     public function getShopId($websiteId)
     {

@@ -10,7 +10,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      *
      * @return void
      * @throws Mage_Core_Exception
-     * @throws Throwable
+     * @throws Exception
      */
     public function syncOrderDataAction()
     {

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Flow identifier retrieve service.
+ * Bold flow service.
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
@@ -12,7 +12,7 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function get(Mage_Sales_Model_Quote $quote)
+    public static function getId(Mage_Sales_Model_Quote $quote)
     {
         $websiteId = $quote->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
