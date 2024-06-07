@@ -6,7 +6,7 @@
 class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_Front_Action
 {
     /**
-     * Sync order data action.
+     * Hydrate order data to Bold order action.
      *
      * @return void
      * @throws Mage_Core_Exception
@@ -18,20 +18,18 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
             return;
         }
         $post = $this->getRequest()->getPost();
+        unset($post['form_key']);
         if (empty($post)) {
-            return;
+            Mage::throwException('No data provided.');
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         if (!$quote->getId()) {
-            return;
+            Mage::throwException('No quote found.');
         }
-
         if (isset($post['address_id']) && $quote->getCustomer()->getId()) {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
             return;
         }
-
-        unset($post['form_key']);
         $post['street'] = $post['street2']
             ? $post['street1'] . "\n" . $post['street2']
             : $post['street1'];

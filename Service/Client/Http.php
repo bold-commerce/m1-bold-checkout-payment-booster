@@ -14,7 +14,6 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
      * @param string|null $data
      * @param array $headers
      * @return string
-     * @throws Mage_Core_Exception
      */
     public static function call($method, $url, $websiteId, $data = null, array $headers = [])
     {

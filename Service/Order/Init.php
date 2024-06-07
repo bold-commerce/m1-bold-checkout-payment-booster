@@ -32,10 +32,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
             )
         );
 
-        if (isset($orderData->errors)
+        if (isset($orderData->error)
             || !isset($orderData->data->public_order_id)
         ) {
-            Mage::throwException('Cannot initialize order, quote id: ' . $quote->getId());
+            $message = isset($orderData->error->message) ? $orderData->error->message : 'Unknown error';
+            Mage::throwException('Cannot initialize order, Quote ID: ' . $quote->getId() . ', Error: ' . $message);
         }
 
         return $orderData->data;

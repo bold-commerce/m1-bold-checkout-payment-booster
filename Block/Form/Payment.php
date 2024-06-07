@@ -5,6 +5,8 @@
  */
 class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_Form
 {
+    const CHECKOUT_STOREFRONT_API_PATH = '/checkout/storefront/';
+
     /**
      * Billing address.
      *
@@ -144,5 +146,37 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     public function getLastName()
     {
         return $this->billingAddress->getLastname() ?: '';
+    }
+
+    /**
+     * Retrieve Bold payments iframe URL.
+     *
+     * @return string|null
+     */
+    public function getIframeUrl()
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+
+        if (!$boldCheckoutData) {
+            return null;
+        }
+
+        $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
+        try {
+            $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        } catch (Mage_Core_Exception $e) {
+            return null;
+        }
+
+        $publicOrderId = $boldCheckoutData->public_order_id;
+        $jwtToken = $boldCheckoutData->jwt_token;
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $apiUrl = $config->getApiUrl($websiteId);
+
+        return $apiUrl . self::CHECKOUT_STOREFRONT_API_PATH . $shopId . '/'
+            . $publicOrderId . '/payments/iframe?token=' . $jwtToken;
     }
 }
