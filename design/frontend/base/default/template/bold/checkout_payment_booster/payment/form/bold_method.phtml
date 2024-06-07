@@ -24,6 +24,7 @@
         paymentMethodRadioButton: document.getElementById('p_method_bold'),
         iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
         iframeElement: document.getElementById('PIGI'),
+        iframeWindow: null,
         iframeLoader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
@@ -74,6 +75,7 @@
                     orderData: {}
                 };
             }
+            this.subscribeToPIGIEvents()
             this.syncData();
             this.subscribeToFieldsChanges();
             this.subscribeToPaymentMethodChanges();
@@ -224,14 +226,42 @@
          * @private
          */
         subscribeToPaymentMethodChanges: function () {
-            let self = this;
-            let paymentMethodsRadioButtons = document.querySelectorAll(
-                'input[type="radio"][name="payment[method]"]'
-            );
+            let self = this,
+                paymentMethodsRadioButtons = document.querySelectorAll('input[type="radio"][name="payment[method]"]');
             paymentMethodsRadioButtons.forEach(function (radioButton) {
                 radioButton.addEventListener('change', function () {
                     self.paymentMethodRadioButton.checked ? self.showPIGI() : self.hidePIGI();
                 });
+            });
+        },
+        /**
+         * Subscribe to PIGI iframe events.
+         *
+         * @returns {void}
+         * @private
+         */
+        subscribeToPIGIEvents: function () {
+            let self = this;
+            window.addEventListener('message', ({data}) => {
+                let responseType = data.responseType;
+                if (responseType) {
+                    switch (responseType) {
+                        case 'PIGI_UPDATE_HEIGHT':
+                            if (self.iframeElement.height === Math.round(data.payload.height) + 'px') {
+                                return;
+                            }
+                            self.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            break;
+                        case 'PIGI_INITIALIZED':
+                            if (data.payload && data.payload.height) {
+                                self.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            }
+                            this.iframeWindow = self.iframeElement ? self.iframeElement.contentWindow : null;
+                            break;
+                        // TODO: INTER-3720: Handle adding payments to the order
+                        // case 'PIGI_ADD_PAYMENT':
+                    }
+                }
             });
         }
     });
