@@ -47,7 +47,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
      *
      * @param Mage_Sales_Model_Quote $quote
      * @return bool
-     * @throws Mage_Core_Exception
      */
     public static function isAllowed(Mage_Sales_Model_Quote $quote)
     {

@@ -10,7 +10,6 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
      *
      * @param Varien_Event_Observer $event
      * @return void
-     * @throws Mage_Core_Exception
      */
     public function setShopId(Varien_Event_Observer $event)
     {

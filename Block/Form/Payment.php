@@ -25,7 +25,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
-     * Get quote address id.
+     * Get quote address ID.
      *
      * @return string
      */
@@ -39,6 +39,46 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
+     * Get quote customer firstname.
+     *
+     * @return string
+     */
+    public function getFirstName()
+    {
+        return $this->billingAddress->getFirstname() ?: '';
+    }
+
+    /**
+     * Get quote customer lastname.
+     *
+     * @return string
+     */
+    public function getLastName()
+    {
+        return $this->billingAddress->getLastname() ?: '';
+    }
+
+    /**
+     * Get quote customer email.
+     *
+     * @return string
+     */
+    public function getCustomerEmail()
+    {
+        return $this->billingAddress->getEmail() ?: '';
+    }
+
+    /**
+     * Get quote address company.
+     *
+     * @return string
+     */
+    public function getCompany()
+    {
+        return $this->billingAddress->getCompany() ?: '';
+    }
+
+    /**
      * Get quote address street 1.
      *
      * @return string
@@ -46,6 +86,16 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     public function getStreet1()
     {
         return $this->billingAddress->getStreet1() ?: '';
+    }
+
+    /**
+     * Get quote address street 2.
+     *
+     * @return string
+     */
+    public function getStreet2()
+    {
+        return $this->billingAddress->getStreet2() ?: '';
     }
 
     /**
@@ -59,7 +109,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
-     * Get quote address country id.
+     * Get quote address country ID.
      *
      * @return string
      */
@@ -79,7 +129,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
-     * Get quote address region id.
+     * Get quote address region ID.
      *
      * @return string
      */
@@ -89,17 +139,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
-     * Get quote address street 2.
-     *
-     * @return string
-     */
-    public function getStreet2()
-    {
-        return $this->billingAddress->getStreet2() ?: '';
-    }
-
-    /**
-     * Get quote address street.
+     * Get quote address phone number.
      *
      * @return string
      */
@@ -109,47 +149,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
     }
 
     /**
-     * Get quote address company.
-     *
-     * @return string
-     */
-    public function getCompany()
-    {
-        return $this->billingAddress->getCompany() ?: '';
-    }
-
-    /**
-     * Get quote customer email.
-     *
-     * @return string
-     */
-    public function getCustomerEmail()
-    {
-        return $this->billingAddress->getEmail() ?: '';
-    }
-
-    /**
-     * Get quote customer first name.
-     *
-     * @return string
-     */
-    public function getFirstName()
-    {
-        return $this->billingAddress->getFirstname() ?: '';
-    }
-
-    /**
-     * Get quote customer last name.
-     *
-     * @return string
-     */
-    public function getLastName()
-    {
-        return $this->billingAddress->getLastname() ?: '';
-    }
-
-    /**
-     * Retrieve Bold payments iframe URL.
+     * Get Bold payments iframe URL.
      *
      * @return string|null
      */
@@ -173,7 +173,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
         $publicOrderId = $boldCheckoutData->public_order_id;
         $jwtToken = $boldCheckoutData->jwt_token;
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $apiUrl = $config->getApiUrl($websiteId);
 
         return $apiUrl . self::CHECKOUT_STOREFRONT_API_PATH . $shopId . '/'

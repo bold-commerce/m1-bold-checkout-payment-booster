@@ -10,7 +10,6 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      *
      * @param Mage_Sales_Model_Quote $quote
      * @return string
-     * @throws Mage_Core_Exception
      */
     public static function getId(Mage_Sales_Model_Quote $quote)
     {
