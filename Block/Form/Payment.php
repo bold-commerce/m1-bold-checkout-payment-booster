@@ -35,7 +35,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
         if (!$quote->getCustomer()->getId()) {
             return '';
         }
-        return $this->billingAddress->getId() ?: '';
+        return (string)$this->billingAddress->getId() ?: '';
     }
 
     /**
@@ -135,7 +135,7 @@ class Bold_CheckoutPaymentBooster_Block_Form_Payment extends Mage_Payment_Block_
      */
     public function getRegionId()
     {
-        return $this->billingAddress->getRegionId() ?: '';
+        return (string)$this->billingAddress->getRegionId() ?: '';
     }
 
     /**

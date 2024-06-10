@@ -10,7 +10,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      *
      * @param Varien_Event_Observer $event
      * @return void
-     * @throws Exception
      */
     public function beforeCheckout(Varien_Event_Observer $event)
     {
@@ -28,7 +27,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
             $checkoutSession->setBoldCheckoutData($checkoutData);
         } catch (Exception $exception) {
-            Mage::log($exception->getMessage(), Zend_Log::CRIT);
+            $websiteId = $quote->getStore()->getWebsiteId();
+            Bold_CheckoutPaymentBooster_Service_LogManager::log(
+                'ERROR: Initialize order data failed. ' . $exception->getMessage(),
+                $websiteId
+            );
         }
     }
 
@@ -56,8 +59,17 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
 
         $quote = $order->getQuote();
         $websiteId = $quote->getStore()->getWebsiteId();
-        // hydrate bold order before auth payment
-        Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+
+        try {
+            // hydrate bold order before auth payment
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+        } catch (Exception $exception) {
+            Bold_CheckoutPaymentBooster_Service_LogManager::log(
+                'ERROR: Hydrate order data failed. ' . $exception->getMessage(),
+                $websiteId
+            );
+        }
+
         // TODO: check if order total and transactions are correct
         $paymentAuthData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
     }

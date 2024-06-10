@@ -17,23 +17,19 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
      */
     public static function call($method, $url, $websiteId, $data = null, array $headers = [])
     {
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $tracingId = sha1(microtime());
-        if ($config->isLogEnabled($websiteId)) {
-            Mage::log(
-                $tracingId . ': Outgoing Call: ' . $method . ' ' . $url,
-                Zend_Log::DEBUG,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
-                true
-            );
-            Mage::log(
-                $tracingId . ': Outgoing Call Data: ' . $data,
-                Zend_Log::DEBUG,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
-                true
-            );
-        }
+
+        Bold_CheckoutPaymentBooster_Service_LogManager::log(
+            $tracingId . ': Outgoing Call: ' . $method . ' ' . $url,
+            $websiteId,
+            Zend_Log::DEBUG
+        );
+        Bold_CheckoutPaymentBooster_Service_LogManager::log(
+            $tracingId . ': Outgoing Call Data: ' . $data,
+            $websiteId,
+            Zend_Log::DEBUG
+        );
+
         $curl = curl_init();
         $url = self::prepareRequest($method, $curl, $url, $data);
         if ($headers) {
@@ -44,20 +40,18 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
         curl_setopt($curl, CURLOPT_TIMEOUT, 300);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
         $result = curl_exec($curl);
-        if ($config->isLogEnabled($websiteId)) {
-            Mage::log(
-                $tracingId . ': Outgoing call code: ' . curl_getinfo($curl, CURLINFO_HTTP_CODE),
-                Zend_Log::DEBUG,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
-                true
-            );
-            Mage::log(
-                $tracingId . ': Outgoing call result: ' . $result,
-                Zend_Log::DEBUG,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
-                true
-            );
-        }
+
+        Bold_CheckoutPaymentBooster_Service_LogManager::log(
+            $tracingId . ': Outgoing call code: ' . curl_getinfo($curl, CURLINFO_HTTP_CODE),
+            $websiteId,
+            Zend_Log::DEBUG
+        );
+        Bold_CheckoutPaymentBooster_Service_LogManager::log(
+            $tracingId . ': Outgoing call result: ' . $result,
+            $websiteId,
+            Zend_Log::DEBUG
+        );
+
         curl_close($curl);
         try {
             $isJson = json_decode($result);

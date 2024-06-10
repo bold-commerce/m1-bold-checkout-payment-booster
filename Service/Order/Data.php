@@ -10,7 +10,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_Data
      *
      * @param array $data
      * @return void
-     * @throws Exception
      */
     public static function save(array $data)
     {

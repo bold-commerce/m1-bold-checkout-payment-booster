@@ -6,7 +6,6 @@
 class Bold_CheckoutPaymentBooster_Model_Config
 {
     const RESOURCE = 'bold_checkout_payment_booster/config';
-    const LOG_FILE_NAME = 'bold_checkout_payment_booster.log';
 
     // Main settings
     const PATH_IS_PAYMENT_BOOSTER_ENABLED = 'checkout/bold_checkout_payment_booster/is_payment_booster_enabled';

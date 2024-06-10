@@ -39,10 +39,9 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
                     $error->message
                 );
             }
-            Mage::log(
+            Bold_CheckoutPaymentBooster_Service_LogManager::log(
                 $logMessage,
-                Zend_Log::ERR,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+                $websiteId
             );
             Mage::throwException($errorMessage);
         }

@@ -17,7 +17,10 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         try {
             Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
         } catch (Exception $exception) {
-            Mage::log($exception->getMessage(), Zend_Log::CRIT);
+            Bold_CheckoutPaymentBooster_Service_LogManager::log(
+                'ERROR: Bold shop identifier set failed. ' . $exception->getMessage(),
+                $websiteId
+            );
         }
     }
 }

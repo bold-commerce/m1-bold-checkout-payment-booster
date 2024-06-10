@@ -114,6 +114,6 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
      */
     public static function getVendor(Mage_Sales_Model_Quote_Item $item)
     {
-        return ''; //todo: investigate how to get vendor.
+        return ''; // TODO: investigate how to get vendor.
     }
 }
