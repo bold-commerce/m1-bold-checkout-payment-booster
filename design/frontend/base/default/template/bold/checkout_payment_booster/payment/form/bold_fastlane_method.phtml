@@ -9,10 +9,8 @@
     /**
      * Bold fastlane email component.
      */
-    const FastlaneEmail = Class.create({
-        emailField: 'billing:email',
-        email: '<?php echo $this->getCustomerEmail(); ?>',
-        authorizedEmail: null,
+    const BoldFastlane = Class.create({
+        emailField: document.getElementById('billing:email'),
         gatewayData: <?php echo $this->getGatewayData(); ?>,
         paymentContainerId: 'payment_form_bold_fastlane',
         paymentCheckbox: document.getElementById('p_method_bold_fastlane') || {
@@ -33,7 +31,7 @@
                 };
             }
             await this.buildFastlaneInstance()
-            await this.authorize(this.email);
+            await this.authorize();
             this.subscribeToEmailChanges();
             await this.renderPaymentComponent();
             this.paymentCheckbox.addEventListener('change', async () => {
@@ -120,11 +118,10 @@
          * @return {void}
          */
         subscribeToEmailChanges: function () {
-            let field = $(this.emailField);
-            if (field) {
-                field.observe('change', () => {
+            if (this.emailField) {
+                this.emailField.observe('change', () => {
                     setTimeout(async () => {
-                        await this.authorize(field.value);
+                        await this.authorize();
                     }, 500);
                 });
             }
@@ -132,26 +129,21 @@
         /**
          * Authorize user with email.
          *
-         * @param {string|null} email
          * @return {Promise<void>}
          */
-        authorize: async function (email) {
-            if (!email) {
+        authorize: async function () {
+            if (!this.emailField || !Validation.validate(this.emailField)) {
                 return;
             }
-            const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
-            if (!emailPattern.test(email)) {
+            if (window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
-            if (this.authorizedEmail === email) {
-                return;
-            }
-            this.authorizedEmail = email;
-            console.log('Trying authorize with email: ', email);
+            window.bold.fastlane.authorizedEmail = this.emailField.value;
+            console.log('Trying to authorize with email: ', this.emailField.value);
             const {identity} = window.bold.fastlane.instance;
             try {
                 const {customerContextId} = await identity.lookupCustomerByEmail(
-                    email
+                    this.emailField.value
                 );
                 const {authenticationState, profileData} = await identity.triggerAuthenticationFlow(customerContextId);
                 if (authenticationState === 'succeeded') {
@@ -196,24 +188,13 @@
             const fields = {}; //todo: add pre-filled fields.
             const styles = {}; //todo: add styles.
             const paymentContainer = document.getElementById(this.paymentContainerId);
-            if (!this.paymentCheckbox.checked) {
-                if (paymentContainer) {
-                    paymentContainer.style.display = 'none'; // todo: hide payment container.
-                }
-                return;
-            }
             if (paymentContainer && this.paymentCheckbox.checked) {
-                if (window.bold.fastlane.isRendered) {
-                    paymentContainer.style.display = 'block';
-                    return;
-                }
                 console.log('Render Fastlane Payment Component');
                 const component = await window.bold.fastlane.instance.FastlanePaymentComponent({
                     fields,
                     styles,
                 });
                 await component.render(`#${this.paymentContainerId}`);
-                window.bold.fastlane.isRendered = true;
                 return;
             }
             if (this.paymentCheckbox.checked) {
@@ -229,6 +210,6 @@
             }
         }
     });
-    const fastlaneEmailComponent = new FastlaneEmail();
-    fastlaneEmailComponent.initialize();
+
+    const boldFastlaneInstance = new BoldFastlane();
 </script>

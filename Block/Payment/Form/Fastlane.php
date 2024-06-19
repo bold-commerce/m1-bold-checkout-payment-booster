@@ -22,16 +22,6 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
-     * Get quote address id.
-     *
-     * @return string
-     */
-    public function getCustomerEmail()
-    {
-        return $this->quote->getCustomerEmail() ?: '';
-    }
-
-    /**
      * Get payment gateway data.
      *
      * @return string
