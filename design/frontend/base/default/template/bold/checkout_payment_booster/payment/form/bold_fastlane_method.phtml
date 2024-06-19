@@ -1,0 +1,234 @@
+<?php
+/**
+ * Fastlane payment method form.
+ *
+ * @param $this Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane
+ */
+?>
+<script type='text/javascript'>
+    /**
+     * Bold fastlane email component.
+     */
+    const FastlaneEmail = Class.create({
+        emailField: 'billing:email',
+        email: '<?php echo $this->getCustomerEmail(); ?>',
+        authorizedEmail: null,
+        gatewayData: <?php echo $this->getGatewayData(); ?>,
+        paymentContainerId: 'payment_form_bold_fastlane',
+        paymentCheckbox: document.getElementById('p_method_bold_fastlane') || {
+            checked: false,
+            addEventListener: () => {
+            }
+        },
+        /**
+         * Initialize Fastlane instance, authorize email, subscribe to email changes.
+         */
+        initialize: async function () {
+            if (!window.bold) {
+                window.bold = {};
+            }
+            if (!window.bold.fastlane) {
+                window.bold.fastlane = {
+                    instance: null
+                };
+            }
+            await this.buildFastlaneInstance()
+            await this.authorize(this.email);
+            this.subscribeToEmailChanges();
+            await this.renderPaymentComponent();
+            this.paymentCheckbox.addEventListener('change', async () => {
+                await this.renderPaymentComponent();
+            });
+        },
+        /**
+         * Build Fastlane Instance considering gateway type.
+         *
+         * @return {Promise<void>}
+         */
+        buildFastlaneInstance: async function () {
+            if (window.bold.fastlane.instance) {
+                return;
+            }
+            console.log('Build Fastlane Instance');
+            if (this.gatewayData.is_test_mode) {
+                window.localStorage.setItem('axoEnv', 'sandbox');
+                window.localStorage.setItem('fastlaneEnv', 'sandbox');
+            }
+            if (this.gatewayData.type === 'braintree') {
+                await this.buildBraintreeFastlaneInstance();
+            }
+        },
+        /**
+         * Build Fastlane Instance for the Braintree.
+         *
+         * @return {Promise<void>}
+         */
+        buildBraintreeFastlaneInstance: async function () {
+            await this.loadScript(
+                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/client.min.js'
+            );
+            await this.loadScript(
+                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/data-collector.min.js'
+            );
+            await this.loadScript(
+                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/hosted-fields.min.js'
+            );
+            await this.loadScript(
+                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/fastlane.min.js'
+            );
+            const clientInstance = await window.braintree.client.create({
+                authorization: this.gatewayData.client_token,
+            });
+            const dataCollectorInstance = await window.braintree.dataCollector.create(
+                {
+                    client: clientInstance,
+                }
+            );
+            const {deviceData} = dataCollectorInstance;
+            window.bold.fastlane.instance = await window.braintree.fastlane.create({
+                authorization: this.gatewayData.client_token,
+                client: clientInstance,
+                deviceData,
+                styles: {},
+            });
+        },
+        /**
+         * Load given script with attributes.
+         *
+         * @param {string} src
+         * @param {{}} attributes
+         * @return {Promise<unknown>}
+         */
+        loadScript: async function (src, attributes = {}) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                if (attributes.constructor === Object) {
+                    Object.keys(attributes).forEach((key) => {
+                        script.setAttribute(key, attributes[key]);
+                    });
+                }
+                document.head.appendChild(script);
+            });
+        },
+        /**
+         * Subscribe to email field changes and authorize customer with latest email field value.
+         *
+         * @return {void}
+         */
+        subscribeToEmailChanges: function () {
+            let field = $(this.emailField);
+            if (field) {
+                field.observe('change', () => {
+                    setTimeout(async () => {
+                        await this.authorize(field.value);
+                    }, 500);
+                });
+            }
+        },
+        /**
+         * Authorize user with email.
+         *
+         * @param {string|null} email
+         * @return {Promise<void>}
+         */
+        authorize: async function (email) {
+            if (!email) {
+                return;
+            }
+            const emailPattern = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$/;
+            if (!emailPattern.test(email)) {
+                return;
+            }
+            if (this.authorizedEmail === email) {
+                return;
+            }
+            this.authorizedEmail = email;
+            console.log('Trying authorize with email: ', email);
+            const {identity} = window.bold.fastlane.instance;
+            try {
+                const {customerContextId} = await identity.lookupCustomerByEmail(
+                    email
+                );
+                const {authenticationState, profileData} = await identity.triggerAuthenticationFlow(customerContextId);
+                if (authenticationState === 'succeeded') {
+                    window.boldFastlaneProfileData = profileData;
+                    console.log('Authorized with profile Data:', profileData);
+                    if (profileData.shippingAddress) {
+                        this.setShippingAddress(profileData.shippingAddress);
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        },
+        /**
+         * Set Fastlane shipping address as Magento shipping address.
+         *
+         * @param {{}} fastlaneAddress
+         * @return {{}}
+         */
+        setShippingAddress: function (fastlaneAddress) {
+            const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
+            // todo: set magento address to quote and form fields.
+            console.log('Set shipping address:', fastlaneAddress);
+            return magentoAddress;
+        },
+        /**
+         * Convert Fastlane address to Magento address.
+         *
+         * @param fastlaneAddress
+         * @return {{}}
+         */
+        convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
+            // todo: implement address convert logic.
+            return {};
+        },
+        /**
+         * Render Fastlane payment component.
+         *
+         * @return {Promise<void>}
+         */
+        renderPaymentComponent: async function () {
+            const fields = {}; //todo: add pre-filled fields.
+            const styles = {}; //todo: add styles.
+            const paymentContainer = document.getElementById(this.paymentContainerId);
+            if (!this.paymentCheckbox.checked) {
+                if (paymentContainer) {
+                    paymentContainer.style.display = 'none'; // todo: hide payment container.
+                }
+                return;
+            }
+            if (paymentContainer && this.paymentCheckbox.checked) {
+                if (window.bold.fastlane.isRendered) {
+                    paymentContainer.style.display = 'block';
+                    return;
+                }
+                console.log('Render Fastlane Payment Component');
+                const component = await window.bold.fastlane.instance.FastlanePaymentComponent({
+                    fields,
+                    styles,
+                });
+                await component.render(`#${this.paymentContainerId}`);
+                window.bold.fastlane.isRendered = true;
+                return;
+            }
+            if (this.paymentCheckbox.checked) {
+                const paymentContainer = document.createElement('div');
+                paymentContainer.id = this.paymentContainerId;
+                const dd = this.paymentCheckbox.parentElement.nextElementSibling;
+                if (dd) {
+                    dd.appendChild(
+                        paymentContainer
+                    );
+                    await this.renderPaymentComponent();
+                }
+            }
+        }
+    });
+    const fastlaneEmailComponent = new FastlaneEmail();
+    fastlaneEmailComponent.initialize();
+</script>

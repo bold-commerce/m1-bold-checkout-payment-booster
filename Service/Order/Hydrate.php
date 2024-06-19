@@ -34,7 +34,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         $publicOrderId = $boldCheckoutData->public_order_id;
 
         if (!$publicOrderId) {
-            return;
+            Mage::throwException('There is no public order ID in the checkout session.');
         }
 
         $apiUri = sprintf(self::HYDRATE_ORDER_URI, $publicOrderId);
@@ -61,7 +61,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             )
         );
 
-        if (isset($response->errors)) {
+        if (isset($response->errors) || isset($response->error)) {
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId
             );
@@ -77,7 +77,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getCustomer(Mage_Sales_Model_Quote $quote)
     {
         return [
-            'platform_id' => $quote->getCustomerId() ? $quote->getCustomerId() : null,
+            'platform_id' => $quote->getCustomerId() ? (string)$quote->getCustomerId() : null,
             'first_name' => $quote->getCustomerFirstname(),
             'last_name' => $quote->getCustomerLastname(),
             'email_address' => $quote->getCustomerEmail(),

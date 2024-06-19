@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<layout version="0.1.0">
+    <checkout_onepage_index>
+        <reference name="content">
+            <block type="bold_checkout_payment_booster/payment_form_fastlane" name="bold.fastlane.payment" as="bold.fastlane.payment"/>
+        </reference>
+    </checkout_onepage_index>
+</layout>

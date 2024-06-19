@@ -18,7 +18,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
             'quantity' => self::getQuantity($item),
             'title' => self::getTitle($item),
             'price' => self::getPrice($item),
-            'weight' => self::getWeight($item),
+            'weight' => (int)self::getWeight($item),
             'taxable' => self::isTaxable($item),
             'image' => self::getImage($item),
             'requires_shipping' => !$item->getIsVirtual(),
@@ -78,7 +78,7 @@ class Bold_CheckoutPaymentBooster_Service_Quote_Item
         $conversionRate = $config->getWeightConversionRate((int)$item->getQuote()->getStore()->getWebsiteId());
         $weight = $item->getWeight();
 
-        return $weight ? round($weight * $conversionRate, 2) : 0;
+        return $weight * $conversionRate;
     }
 
     /**

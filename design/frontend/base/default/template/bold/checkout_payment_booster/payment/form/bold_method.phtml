@@ -2,19 +2,29 @@
 /**
  * Bold Payments PIGI iframe template.
  *
- * @var Bold_CheckoutPaymentBooster_Block_Form_Payment $this
+ * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold $this
  */
 ?>
-<div id="bold-payments-container" style="display: none;">
-    <p>PIGI</p> <!-- TODO: will be added in INTER-3719 -->
+<div id='bold-payments-container' style='display: none'>
+    <iframe id='PIGI' scrolling='no' width='100%' frameborder='0'></iframe>
 </div>
+<span class='please-wait' id='bold-payments-iframe-loader' style='display:none;'>
+        <img src="<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif') ?>"
+             alt="<?php echo $this->__('Please wait...') ?>"
+             title="<?php echo $this->__('Please wait...') ?>"
+        /> <?php echo $this->__('Please wait...') ?>
+</span>
 
 <script type="text/javascript">
     /**
-     * Bold order data class.
+     * Bold order data sync class.
      */
-    let BoldOrderData = Class.create();
-    BoldOrderData.prototype = {
+    let Bold = Class.create({
+        iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
+        paymentMethodElement: document.getElementById('p_method_bold').parentNode,
+        paymentContainer: document.getElementById('bold-payments-container'),
+        iframeElement: document.getElementById('PIGI'),
+        loader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
             'firstname': 'billing:firstname',
@@ -64,12 +74,10 @@
                     orderData: {}
                 };
             }
+            this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
         },
-        /**
-         * Subscribe to fields changes.
-         */
         subscribeToFieldsChanges: function () {
             Object.values(this.orderDataFieldMapper).each(function (selector) {
                 let field = $(selector);
@@ -82,9 +90,6 @@
                 }
             }.bind(this));
         },
-        /**
-         * Update order data payload.
-         */
         updateOrderDataPayload: function () {
             Object.keys(this.orderDataFieldMapper).forEach(function (key) {
                 let field = this.orderDataFieldMapper[key];
@@ -112,7 +117,10 @@
                 }
             };
             let isRegionRequired = regionsRequired.config.regions_required.indexOf(this.orderPayload.country_id) !== -1;
-            return !(isRegionRequired && !this.orderPayload.region_id);
+            if (isRegionRequired && !this.orderPayload.region_id) {
+                return false;
+            }
+            return !isInvalid;
         },
         /**
          * Check if already hydrated payload differs from new one.
@@ -149,15 +157,52 @@
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
+                    this.showPIGI();
+                }.bind(this),
+                onLoading: function () {
+                    if (this.paymentMethodElement.style.display !== 'none') {
+                        this.loader.style.display = 'block';
+                    }
                 }.bind(this),
                 onFailure: function () {
+                    this.hidePaymentMethod();
                     window.bold.orderData = {};
                     console.error('Failed to sync order data');
-                }
+                }.bind(this),
             });
-        }
-    };
+        },
+        /**
+         * Hide payment method section.
+         */
+        hidePaymentMethod: function () {
+            this.paymentMethodElement.style.display = 'none';
+            this.loader.style.display = 'none';
+        },
+        /**
+         * Refresh Bold order to get the latest cart data and show PIGI iframe.
+         *
+         * @returns {void}
+         * @private
+         */
+        showPIGI: function () {
+            if (!this.iframeElement.src) {
+                this.iframeElement.src = this.iframeUrl;
+            }
+            this.paymentMethodElement.style.display = 'block';
+            this.paymentContainer.style.display = 'block';
+            this.loader.style.display = 'none';
+        },
+        /**
+         * Hide PIGI iframe.
+         *
+         * @returns {void}
+         * @private
+         */
+        hidePIGI: function () {
+            this.paymentContainer.style.display = 'none';
+        },
+    });
+    const boldInstance = new Bold();
+    boldInstance.initialize();
 
-    const boldOrderData = new BoldOrderData();
-    boldOrderData.initialize();
 </script>
