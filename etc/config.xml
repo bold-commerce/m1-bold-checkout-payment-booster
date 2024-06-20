@@ -71,6 +71,13 @@
                 </args>
             </checkoutpaymentbooster>
         </routers>
+        <layout>
+            <updates>
+                <checkoutpaymentbooster>
+                    <file>bold/checkout.xml</file>
+                </checkoutpaymentbooster>
+            </updates>
+        </layout>
     </frontend>
     <adminhtml>
         <events>
@@ -98,10 +105,15 @@
         </checkout>
         <payment>
             <bold>
-                <model>Bold_CheckoutPaymentBooster_Model_Method_Bold</model>
+                <model>Bold_CheckoutPaymentBooster_Model_Payment_Bold</model>
                 <active>1</active>
                 <title>Bold Payments</title>
             </bold>
+            <bold_fastlane>
+                <model>Bold_CheckoutPaymentBooster_Model_Payment_Fastlane</model>
+                <active>1</active>
+                <title>Credit Card</title>
+            </bold_fastlane>
         </payment>
     </default>
 </config>

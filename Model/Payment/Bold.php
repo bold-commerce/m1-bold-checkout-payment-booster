@@ -3,7 +3,7 @@
 /**
  * Bold payment method model.
  */
-class Bold_CheckoutPaymentBooster_Model_Method_Bold extends Mage_Payment_Model_Method_Abstract
+class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_Method_Abstract
 {
     const CODE = 'bold';
 
@@ -15,7 +15,7 @@ class Bold_CheckoutPaymentBooster_Model_Method_Bold extends Mage_Payment_Model_M
     /**
      * @var string
      */
-    protected $_formBlockType = 'bold_checkout_payment_booster/form_payment';
+    protected $_formBlockType = 'bold_checkout_payment_booster/payment_form_bold';
 
     /**
      * @inheritDoc
