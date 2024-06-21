@@ -6,6 +6,7 @@
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payment_Block_Form
 {
     private $clientToken = null;
+
     /**
      * @var Mage_Sales_Model_Quote|null
      */
@@ -19,6 +20,29 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         parent::_construct();
         $this->quote = Mage::getSingleton('checkout/session')->getQuote();
         $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_fastlane_method.phtml');
+    }
+
+    /**
+     * Check if customer is logged in.
+     *
+     * @return int
+     */
+    public function isCustomerLoggedIn()
+    {
+        return (int)Mage::getSingleton('customer/session')->isLoggedIn();
+    }
+
+    /**
+     * Get address container style.
+     *
+     * @return string
+     */
+    public function getAddressContainerStyle()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getFastlaneAddressContainerStyles($websiteId);
     }
 
     /**

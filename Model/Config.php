@@ -17,6 +17,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
     const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
+    const PATH_FASTLANE_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
 
     /**
@@ -100,6 +101,17 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function getWeightConversionRate($websiteId)
     {
         return (float)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_WEIGHT_CONVERSION_RATE) ?: 1000;
+    }
+
+    /**
+     * Retrieve Fastlane address container styles.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public function getFastlaneAddressContainerStyles($websiteId)
+    {
+        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_FASTLANE_STYLES) ?: '';
     }
 
     /**

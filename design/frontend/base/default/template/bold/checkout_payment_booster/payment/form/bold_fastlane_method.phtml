@@ -13,6 +13,7 @@
         emailField: document.getElementById('billing:email'),
         gatewayData: <?php echo $this->getGatewayData(); ?>,
         paymentContainerId: 'payment_form_bold_fastlane',
+        isCustomerLoggedIn: <?php echo $this->isCustomerLoggedIn(); ?>,
         paymentCheckbox: document.getElementById('p_method_bold_fastlane') || {
             checked: false,
             addEventListener: () => {
