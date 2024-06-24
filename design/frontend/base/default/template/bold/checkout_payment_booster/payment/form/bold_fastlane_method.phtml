@@ -161,20 +161,26 @@
             }
             window.bold.fastlane.authorizedEmail = this.emailField.value;
             console.log('Trying to authorize with email: ', this.emailField.value);
-            const {identity} = window.bold.fastlane.instance;
             try {
-                const {customerContextId} = await identity.lookupCustomerByEmail(
-                    this.emailField.value
-                );
-                const {authenticationState, profileData} = await identity.triggerAuthenticationFlow(customerContextId);
-                if (authenticationState === 'succeeded') {
-                    window.boldFastlaneProfileData = profileData;
-                    console.log('Authorized with profile Data:', profileData);
-                    if (profileData.shippingAddress) {
-                        this.setShippingAddress(profileData.shippingAddress);
-                        this.addUpdateAddressButton();
+                const {identity} = window.bold.fastlane.instance;
+                const {customerContextId} = await identity.lookupCustomerByEmail(this.emailField.value);
+                if (customerContextId) {
+                    const {
+                        authenticationState,
+                        profileData
+                    } = await identity.triggerAuthenticationFlow(customerContextId);
+                    if (authenticationState === 'succeeded') {
+                        window.bold.fastlane.memberAuthenticated = true;
+                        window.bold.fastlane.profileData = profileData;
+                        console.log('Authorized with profile Data:', profileData);
+                        if (profileData.shippingAddress) {
+                            this.setShippingAddress(profileData.shippingAddress);
+                            this.addUpdateAddressButton();
+                        }
                     }
+                    return;
                 }
+                window.bold.fastlane.memberAuthenticated = false;
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -268,16 +274,24 @@
          * @return {Promise<void>}
          */
         renderPaymentComponent: async function () {
-            const fields = {}; //todo: add pre-filled fields.
+            const telephone = window.bold.fastlane.profileData.shippingAddress.phoneNumber ?? '';
+            const fields = {
+                phoneNumber: {
+                    prefill: telephone
+                }
+            };
             const styles = {}; //todo: add styles.
             const paymentContainer = document.getElementById(this.paymentContainerId);
             if (paymentContainer && this.paymentCheckbox && this.paymentCheckbox.checked) {
                 console.log('Render Fastlane Payment Component');
-                const component = await window.bold.fastlane.instance.FastlanePaymentComponent({
-                    fields,
-                    styles,
-                });
-                await component.render(`#${this.paymentContainerId}`);
+                const paymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
+                    {
+                        fields,
+                        styles
+                    }
+                );
+                paymentComponent.setShippingAddress(window.bold.fastlane.profileData.shippingAddress);
+                await paymentComponent.render(`#${this.paymentContainerId}`);
                 return;
             }
             if (this.paymentCheckbox && this.paymentCheckbox.checked) {
