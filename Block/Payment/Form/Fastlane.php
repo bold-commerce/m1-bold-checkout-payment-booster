@@ -93,4 +93,25 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         ];
         return json_encode($gatewayData);
     }
+
+    /**
+     * Retrieve Fastlane styles.
+     *
+     * @return string
+     */
+    public function getFastlaneStyles()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $styles = (object)[];
+        if (!$boldCheckoutData) {
+            return json_encode($styles);
+        }
+
+//        TODO: implement styles retrieving from Checkout admin
+//        return isset($boldCheckoutData['data']['initial_data']['alternative_payment_methods'][0]['fastlane_styles'])
+//            ? $boldCheckoutData['data']['initial_data']['alternative_payment_methods'][0]['fastlane_styles']
+//            : [];
+
+        return json_encode($styles);
+    }
 }
