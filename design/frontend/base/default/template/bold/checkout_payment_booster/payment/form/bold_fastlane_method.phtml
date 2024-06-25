@@ -155,6 +155,16 @@
             });
         },
         /**
+         * Select payment method.
+         *
+         * @return {void}
+         */
+        selectPaymentMethod: function () {
+            if (this.paymentCheckbox && window.bold.fastlane.memberAuthenticated === true) {
+                this.paymentCheckbox.checked = true;
+            }
+        },
+        /**
          * Subscribe to email field changes and authorize customer with latest email field value.
          *
          * @return {void}
@@ -301,6 +311,7 @@
          * @return {Promise<void>}
          */
         renderPaymentComponent: async function () {
+            this.selectPaymentMethod();
             const paymentContainer = document.getElementById(this.paymentContainerId);
             if (paymentContainer && this.paymentCheckbox && this.paymentCheckbox.checked) {
                 const telephone = window.bold.fastlane.shippingAddress.phoneNumber ?? '';
