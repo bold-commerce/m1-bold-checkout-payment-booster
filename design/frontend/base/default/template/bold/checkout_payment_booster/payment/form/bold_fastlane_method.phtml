@@ -170,6 +170,11 @@
          * @return {void}
          */
         renderWatermarkComponent: function (watermarkContainerId, afterElement) {
+            const existingWatermarkContainer = document.getElementById(watermarkContainerId);
+            if (existingWatermarkContainer) {
+                existingWatermarkContainer.remove();
+            }
+
             const watermarkContainer = document.createElement('div');
             watermarkContainer.id = watermarkContainerId;
 
@@ -275,10 +280,9 @@
          */
         addUpdateAddressButton: function () {
             const fastlaneAddressContainerId = 'fastlane-address-container';
-            // remove the existing button container
-            const addressButtonContainer = document.getElementById(fastlaneAddressContainerId);
-            if (addressButtonContainer) {
-                addressButtonContainer.remove();
+            const existingFastlaneAddressContainer = document.getElementById(fastlaneAddressContainerId);
+            if (existingFastlaneAddressContainer) {
+                existingFastlaneAddressContainer.remove();
             }
 
             const fastlaneAddressContainer = document.createElement('fieldset');
