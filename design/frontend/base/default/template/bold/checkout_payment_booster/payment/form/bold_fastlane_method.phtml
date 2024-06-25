@@ -337,9 +337,9 @@
             let magentoAddress = {};
             Object.entries(this.shippingAddressFieldsMap).forEach((entry) => {
                 const [key, value] = entry;
-                magentoAddress[key] = document.getElementById(value).value
+                magentoAddress[key] = document.getElementById(value)
                     ? document.getElementById(value).value
-                    : document.getElementById(this.billingAddressFieldsMap[key]).value
+                    : '';
             });
             return {
                 'firstName': magentoAddress.firstname,
