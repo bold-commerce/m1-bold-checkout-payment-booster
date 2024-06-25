@@ -33,7 +33,6 @@
         },
         shippingAddressFieldsMap: {
             'firstname': 'shipping:firstname',
-            'email': 'billing:email',
             'lastname': 'shipping:lastname',
             'company': 'shipping:company',
             'telephone': 'shipping:telephone',
@@ -70,18 +69,67 @@
                     await this.renderPaymentComponent();
                 });
             }
+            if (payment.save) {
+                this.wrapPaymentSave();
+            }
+            if (checkout.save) {
+                this.wrapCheckoutSave();
+            }
+        },
+        /**
+         * Wrap payment save method to process order on Bold side first.
+         *
+         * @return {void}
+         */
+        wrapPaymentSave: function () {
             payment.save = payment.save.wrap(
-                function (originalSaveMethod) {
-                    if (this.paymentCheckbox && this.paymentCheckbox.checked && !this.paymentToken) {
+                function (paymentSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentToken) {
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
                             this.paymentToken = token;
                             this.setAddress(token.paymentSource.card.billingAddress);
-                            return originalSaveMethod();
+                            return paymentSaveMethod();
                         }).catch(() => {
                             return false;
                         })
                     } else {
-                        return originalSaveMethod();
+                        return paymentSaveMethod();
+                    }
+                }.bind(this)
+            );
+        },
+        /**
+         * Wrap checkout save method to process order on Bold side first.
+         *
+         * @return {void}
+         */
+        wrapCheckoutSave: function () {
+            checkout.save = checkout.save.wrap(
+                function (checkoutSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentToken) {
+                        this.fastlanePaymentComponent.getPaymentToken().then((token) => {
+                            this.paymentToken = token;
+                            this.setAddress(token.paymentSource.card.billingAddress);
+                            //todo: add bold process order calls here.
+                            return checkoutSaveMethod();
+                        }).catch(() => {
+                            return false;
+                        })
+                    } else {
+                        //todo: add bold process order calls here.
+                        return checkoutSaveMethod();
                     }
                 }.bind(this)
             );
