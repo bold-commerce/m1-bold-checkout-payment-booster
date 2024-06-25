@@ -77,7 +77,7 @@
             }
         },
         /**
-         * Wrap payment save method to process order on Bold side first.
+         * Wrap payment save method to get PayPal token first.
          *
          * @return {void}
          */
@@ -91,11 +91,14 @@
                         return paymentSaveMethod();
                     }
                     if (!this.paymentToken) {
+                        console.log('Get Fastlane payment token...');
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
+                            console.log('Fastlane payment token:', token);
                             this.paymentToken = token;
                             this.setAddress(token.paymentSource.card.billingAddress);
                             return paymentSaveMethod();
                         }).catch(() => {
+                            console.log('Failed to get Fastlane payment token.');
                             return false;
                         })
                     } else {
@@ -119,15 +122,19 @@
                         return checkoutSaveMethod();
                     }
                     if (!this.paymentToken) {
+                        console.log('Get Fastlane payment token...');
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
+                            console.log('Fastlane payment token:', token);
                             this.paymentToken = token;
                             this.setAddress(token.paymentSource.card.billingAddress);
+                            console.log('Process order on Bold side...');
                             //todo: add bold process order calls here.
                             return checkoutSaveMethod();
                         }).catch(() => {
                             return false;
                         })
                     } else {
+                        console.log('Process order on Bold side...');
                         //todo: add bold process order calls here.
                         return checkoutSaveMethod();
                     }
