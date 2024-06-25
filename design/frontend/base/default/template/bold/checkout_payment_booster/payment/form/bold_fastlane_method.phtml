@@ -131,12 +131,47 @@
             });
         },
         /**
+         * Render Fastlane watermark component.
+         *
+         * @param watermarkContainerId
+         * @param afterElement
+         * @return {void}
+         */
+        renderWatermarkComponent: function (watermarkContainerId, afterElement) {
+            const watermarkContainer = document.createElement('div');
+            watermarkContainer.id = watermarkContainerId;
+
+            const watermarkContainerImg = document.createElement('img');
+            watermarkContainerImg.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
+            watermarkContainerImg.alt = '';
+            watermarkContainer.appendChild(watermarkContainerImg);
+
+            afterElement.insertAdjacentElement('afterend', watermarkContainer);
+
+            window.bold.fastlane.instance.FastlaneWatermarkComponent({
+                includeAdditionalInfo: true
+            }).then((WatermarkComponent) => {
+                WatermarkComponent.render('#' + watermarkContainerId);
+            });
+        },
+        /**
+         * Select payment method.
+         *
+         * @return {void}
+         */
+        selectPaymentMethod: function () {
+            if (this.paymentCheckbox && window.bold.fastlane.memberAuthenticated === true) {
+                this.paymentCheckbox.checked = true;
+            }
+        },
+        /**
          * Subscribe to email field changes and authorize customer with latest email field value.
          *
          * @return {void}
          */
         subscribeToEmailChanges: function () {
             if (this.emailField) {
+                this.renderWatermarkComponent('fastlane-email-watermark-container', this.emailField)
                 this.emailField.observe('change', () => {
                     setTimeout(async () => {
                         await this.authorize();
@@ -161,20 +196,26 @@
             }
             window.bold.fastlane.authorizedEmail = this.emailField.value;
             console.log('Trying to authorize with email: ', this.emailField.value);
-            const {identity} = window.bold.fastlane.instance;
             try {
-                const {customerContextId} = await identity.lookupCustomerByEmail(
-                    this.emailField.value
-                );
-                const {authenticationState, profileData} = await identity.triggerAuthenticationFlow(customerContextId);
-                if (authenticationState === 'succeeded') {
-                    window.boldFastlaneProfileData = profileData;
-                    console.log('Authorized with profile Data:', profileData);
-                    if (profileData.shippingAddress) {
-                        this.setShippingAddress(profileData.shippingAddress);
-                        this.addUpdateAddressButton();
+                const {identity} = window.bold.fastlane.instance;
+                const {customerContextId} = await identity.lookupCustomerByEmail(this.emailField.value);
+                if (customerContextId) {
+                    const {
+                        authenticationState,
+                        profileData
+                    } = await identity.triggerAuthenticationFlow(customerContextId);
+                    if (authenticationState === 'succeeded') {
+                        window.bold.fastlane.memberAuthenticated = true;
+                        window.bold.fastlane.profileData = profileData;
+                        console.log('Authorized with profile Data:', profileData);
+                        if (profileData.shippingAddress) {
+                            this.setShippingAddress(profileData.shippingAddress);
+                            this.addUpdateAddressButton();
+                        }
                     }
+                    return;
                 }
+                window.bold.fastlane.memberAuthenticated = false;
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -187,6 +228,7 @@
          */
         setShippingAddress: function (fastlaneAddress) {
             const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
+            window.bold.fastlane.shippingAddress = fastlaneAddress;
             console.log('Fastlane address:', fastlaneAddress);
             console.log('Magento address:', magentoAddress);
             console.log('Set shipping address');
@@ -214,11 +256,17 @@
          * @return {void}
          */
         addUpdateAddressButton: function () {
+            const fastlaneAddressContainerId = 'fastlane-address-container';
+            // remove the existing button container
+            const addressButtonContainer = document.getElementById(fastlaneAddressContainerId);
+            if (addressButtonContainer) {
+                addressButtonContainer.remove();
+            }
+
             const fastlaneAddressContainer = document.createElement('fieldset');
-            fastlaneAddressContainer.id = 'fastlane-address-container';
+            fastlaneAddressContainer.id = fastlaneAddressContainerId;
             fastlaneAddressContainer.style = '<?php echo $this->getAddressContainerStyle(); ?>';
-            const fastlaneWatermark = document.createElement('div');
-            fastlaneWatermark.id = 'fastlane-address-watermark';
+
             const updateAddressButton = document.createElement('button');
             updateAddressButton.type = 'button';
             updateAddressButton.className = 'button';
@@ -232,15 +280,10 @@
                 });
             });
             fastlaneAddressContainer.appendChild(updateAddressButton);
-            fastlaneAddressContainer.appendChild(fastlaneWatermark);
             if (this.billingAddressForm) {
                 this.billingAddressForm.appendChild(fastlaneAddressContainer);
             }
-            window.bold.fastlane.instance.FastlaneWatermarkComponent({
-                includeAdditionalInfo: true
-            }).then((WatermarkComponent) => {
-                WatermarkComponent.render('#fastlane-address-watermark');
-            });
+            this.renderWatermarkComponent('fastlane-address-watermark', updateAddressButton);
         },
         /**
          * Convert Fastlane address to Magento address.
@@ -268,16 +311,27 @@
          * @return {Promise<void>}
          */
         renderPaymentComponent: async function () {
-            const fields = {}; //todo: add pre-filled fields.
-            const styles = {}; //todo: add styles.
+            this.selectPaymentMethod();
             const paymentContainer = document.getElementById(this.paymentContainerId);
             if (paymentContainer && this.paymentCheckbox && this.paymentCheckbox.checked) {
+                const telephone = window.bold.fastlane.shippingAddress.phoneNumber ?? '';
+                const fields = {
+                    phoneNumber: {
+                        prefill: telephone
+                    }
+                };
+                const styles = {}; //todo: add styles.
                 console.log('Render Fastlane Payment Component');
-                const component = await window.bold.fastlane.instance.FastlanePaymentComponent({
-                    fields,
-                    styles,
-                });
-                await component.render(`#${this.paymentContainerId}`);
+                const paymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
+                    {
+                        fields,
+                        styles
+                    }
+                );
+                if (window.bold.fastlane.shippingAddress) {
+                    paymentComponent.setShippingAddress(window.bold.fastlane.shippingAddress);
+                }
+                await paymentComponent.render(`#${this.paymentContainerId}`);
                 return;
             }
             if (this.paymentCheckbox && this.paymentCheckbox.checked) {
