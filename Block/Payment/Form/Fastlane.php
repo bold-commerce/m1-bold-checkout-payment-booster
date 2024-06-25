@@ -23,13 +23,16 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
-     * Check if customer is logged in.
+     * Check if fastlane payment method is available.
      *
      * @return int
      */
-    public function isCustomerLoggedIn()
+    public function isAvailable()
     {
-        return (int)Mage::getSingleton('customer/session')->isLoggedIn();
+        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
+        $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
+        $isAvailable = !Mage::getSingleton('customer/session')->isLoggedIn() && $fastlane->isAvailable($this->quote);
+        return (int)$isAvailable;
     }
 
     /**
