@@ -15,7 +15,7 @@
         paymentContainerId: 'payment_form_bold_fastlane',
         isAvailable: <?php echo $this->isAvailable(); ?>,
         fastlanePaymentComponent: null,
-        paymentToken: {},
+        paymentToken: null,
         paymentCheckbox: null,
         billingAddressForm: null,
         billingAddressFieldsMap: {
@@ -72,7 +72,7 @@
             }
             payment.save = payment.save.wrap(
                 function (originalSaveMethod) {
-                    if (this.paymentCheckbox && this.paymentCheckbox.checked) {
+                    if (this.paymentCheckbox && this.paymentCheckbox.checked && !this.paymentToken) {
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
                             this.paymentToken = token;
                             this.setAddress(token.paymentSource.card.billingAddress);
@@ -261,19 +261,7 @@
             console.log('Fastlane address:', fastlaneAddress);
             console.log('Magento address:', magentoAddress);
             Object.keys(this.billingAddressFieldsMap).forEach((field) => {
-                if (magentoAddress[field]) {
-                    if (field === 'region_id') {
-                        if (window.billingRegionUpdater) {
-                            if (window.billingRegionUpdater.regions[magentoAddress.country_id]) {
-                                Object.entries(window.billingRegionUpdater.regions[magentoAddress.country_id]).each((region) => {
-                                    if (region[1].code === magentoAddress.region_id) {
-                                        document.getElementById(this.billingAddressFieldsMap[field]).value = region[0];
-                                    }
-                                })
-                            }
-                        }
-                        return;
-                    }
+                if (magentoAddress[field] && document.getElementById(this.billingAddressFieldsMap[field])) {
                     document.getElementById(this.billingAddressFieldsMap[field]).value = magentoAddress[field];
                 }
             });
@@ -320,6 +308,15 @@
          * @return {{}}
          */
         convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
+            let magentoAddressRegionId = null;
+            if (window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]) {
+                Object.entries(window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]).each((region) => {
+                    const [regionId, regionData] = region;
+                    if (regionData.code === fastlaneAddress.region) {
+                        magentoAddressRegionId = regionId;
+                    }
+                })
+            }
             return {
                 'firstname': fastlaneAddress.firstName,
                 'lastname': fastlaneAddress.lastName,
@@ -328,7 +325,7 @@
                 'street1': fastlaneAddress.streetAddress,
                 'street2': fastlaneAddress.extendedAddress || '',
                 'city': fastlaneAddress.locality,
-                'region_id': fastlaneAddress.region,
+                'region_id': magentoAddressRegionId,
                 'postcode': fastlaneAddress.postalCode,
                 'country_id': fastlaneAddress.countryCodeAlpha2,
             };
@@ -336,11 +333,20 @@
         getShippingAddress: function () {
             let magentoAddress = {};
             Object.entries(this.shippingAddressFieldsMap).forEach((entry) => {
-                const [key, value] = entry;
-                magentoAddress[key] = document.getElementById(value)
-                    ? document.getElementById(value).value
+                const [key, idSelector] = entry;
+                magentoAddress[key] = document.getElementById(idSelector)
+                    ? document.getElementById(idSelector).value
                     : '';
             });
+            let regionCode = '';
+            if (window.shippingRegionUpdater.regions[magentoAddress.country_id]) {
+                Object.entries(window.shippingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
+                    const [regionId, regionData] = entry;
+                    if (regionId === magentoAddress.region_id) {
+                        regionCode = regionData.code;
+                    }
+                });
+            }
             return {
                 'firstName': magentoAddress.firstname,
                 'lastName': magentoAddress.lastname,
@@ -349,7 +355,7 @@
                 'streetAddress': magentoAddress.street1,
                 'extendedAddress': magentoAddress.street2,
                 'locality': magentoAddress.city,
-                'region': magentoAddress.region_id,
+                'region': regionCode,
                 'postalCode': magentoAddress.postcode,
                 'countryCodeAlpha2': magentoAddress.country_id,
             };
@@ -381,6 +387,7 @@
                 }
                 const shippingAddress = this.getShippingAddress();
                 if (shippingAddress) {
+                    console.log('Set Fastlane shipping address: ', shippingAddress);
                     this.fastlanePaymentComponent.setShippingAddress(shippingAddress);
                 }
                 await this.fastlanePaymentComponent.render(`#${this.paymentContainerId}`);
