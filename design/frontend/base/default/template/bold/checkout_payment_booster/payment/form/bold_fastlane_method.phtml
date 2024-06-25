@@ -95,6 +95,15 @@
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
                             console.log('Fastlane payment token:', token);
                             this.paymentToken = token;
+
+                            const paymentForm = document.getElementById(payment.form);
+                            if (paymentForm) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'payment[token]';
+                                hiddenInput.value = token.id;
+                                paymentForm.appendChild(hiddenInput);
+                            }
                             this.setAddress(token.paymentSource.card.billingAddress);
                             return paymentSaveMethod();
                         }).catch(() => {
