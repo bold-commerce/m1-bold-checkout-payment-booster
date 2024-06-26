@@ -23,13 +23,16 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
-     * Check if customer is logged in.
+     * Check if fastlane payment method is available.
      *
      * @return int
      */
-    public function isCustomerLoggedIn()
+    public function isAvailable()
     {
-        return (int)Mage::getSingleton('customer/session')->isLoggedIn();
+        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
+        $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
+        $isAvailable = !Mage::getSingleton('customer/session')->isLoggedIn() && $fastlane->isAvailable($this->quote);
+        return (int)$isAvailable;
     }
 
     /**
@@ -89,5 +92,24 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
 
         ];
         return json_encode($gatewayData);
+    }
+
+    /**
+     * Retrieve Fastlane styles.
+     *
+     * @return string
+     */
+    public function getFastlaneStyles()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $styles = (object)[];
+        if (!$boldCheckoutData) {
+            return json_encode($styles);
+        }
+
+        // TODO: Need to implement styles retrieving from Checkout admin
+        // (for now there is no ability to get this information if order was created using checkout_sidekick)
+
+        return json_encode($styles);
     }
 }

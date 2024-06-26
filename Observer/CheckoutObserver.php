@@ -49,7 +49,10 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         $paymentMethod = $order->getPayment()->getMethod();
 
         if (!$publicOrderId
-            || $paymentMethod !== Bold_CheckoutPaymentBooster_Model_Method_Bold::CODE
+            || in_array($paymentMethod, [
+                Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
+                Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
+            ])
         ) {
             return;
         }
