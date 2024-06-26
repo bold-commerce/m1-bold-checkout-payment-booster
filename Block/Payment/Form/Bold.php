@@ -174,4 +174,18 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         $apiUrl = $config->getApiUrl($websiteId);
         return $apiUrl . self::PATH . $shopId . '/' . $orderId . '/payments/iframe?token=' . $jwtToken;
     }
+
+    /**
+     * Check if Bold payment method is available.
+     *
+     * @return int
+     */
+    public function isAvailable()
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Bold $bold */
+        $bold = Mage::getModel('bold_checkout_payment_booster/payment_bold');
+        $isAvailable = $bold->isAvailable($this->quote);
+
+        return (int)$isAvailable;
+    }
 }
