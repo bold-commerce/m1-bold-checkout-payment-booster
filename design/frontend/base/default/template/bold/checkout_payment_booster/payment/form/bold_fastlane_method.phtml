@@ -34,7 +34,6 @@
         },
         shippingAddressFieldsMap: {
             'firstname': 'shipping:firstname',
-            'email': 'billing:email',
             'lastname': 'shipping:lastname',
             'company': 'shipping:company',
             'telephone': 'shipping:telephone',
@@ -71,18 +70,87 @@
                     await this.renderPaymentComponent();
                 });
             }
+            if (payment.save) {
+                this.wrapPaymentSave();
+            }
+            if (checkout.save) {
+                this.wrapCheckoutSave();
+            }
+        },
+        /**
+         * Wrap payment save method to get PayPal token first.
+         *
+         * @return {void}
+         */
+        wrapPaymentSave: function () {
             payment.save = payment.save.wrap(
-                function (originalSaveMethod) {
-                    if (this.paymentCheckbox && this.paymentCheckbox.checked && !this.paymentToken) {
+                function (paymentSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentToken) {
+                        console.log('Get Fastlane payment token...');
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
+                            console.log('Fastlane payment token:', token);
                             this.paymentToken = token;
+
+                            const paymentForm = document.getElementById(payment.form);
+                            if (paymentForm) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'payment[token]';
+                                hiddenInput.value = token.id;
+                                paymentForm.appendChild(hiddenInput);
+                            }
                             this.setAddress(token.paymentSource.card.billingAddress);
-                            return originalSaveMethod();
+                            return paymentSaveMethod();
+                        }).catch(() => {
+                            console.log('Failed to get Fastlane payment token.');
+                            return false;
+                        })
+                    } else {
+                        return paymentSaveMethod();
+                    }
+                }.bind(this)
+            );
+        },
+        /**
+         * Wrap checkout save method to process order on Bold side first.
+         *
+         * @return {void}
+         */
+        wrapCheckoutSave: function () {
+            checkout.save = checkout.save.wrap(
+                function (checkoutSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentToken) {
+                        console.log('Get Fastlane payment token...');
+                        this.fastlanePaymentComponent.getPaymentToken().then((token) => {
+                            console.log('Fastlane payment token:', token);
+                            this.paymentToken = token;
+                            const paymentForm = document.getElementById(payment.form);
+                            if (paymentForm) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'payment[token]';
+                                hiddenInput.value = token.id;
+                                paymentForm.appendChild(hiddenInput);
+                            }
+                            this.setAddress(token.paymentSource.card.billingAddress);
+                            return checkoutSaveMethod();
                         }).catch(() => {
                             return false;
                         })
                     } else {
-                        return originalSaveMethod();
+                        return checkoutSaveMethod();
                     }
                 }.bind(this)
             );
