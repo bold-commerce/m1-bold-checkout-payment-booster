@@ -93,4 +93,23 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         ];
         return json_encode($gatewayData);
     }
+
+    /**
+     * Retrieve Fastlane styles.
+     *
+     * @return string
+     */
+    public function getFastlaneStyles()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $styles = (object)[];
+        if (!$boldCheckoutData) {
+            return json_encode($styles);
+        }
+
+        // TODO: Need to implement styles retrieving from Checkout admin
+        // (for now there is no ability to get this information if order was created using checkout_sidekick)
+
+        return json_encode($styles);
+    }
 }

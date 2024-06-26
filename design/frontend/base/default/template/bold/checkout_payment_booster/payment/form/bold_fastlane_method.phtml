@@ -12,6 +12,7 @@
     const BoldFastlane = Class.create({
         emailField: document.getElementById('billing:email'),
         gatewayData: <?php echo $this->getGatewayData(); ?>,
+        fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
         paymentContainerId: 'payment_form_bold_fastlane',
         isAvailable: <?php echo $this->isAvailable(); ?>,
         fastlanePaymentComponent: null,
@@ -199,11 +200,12 @@
                 }
             );
             const {deviceData} = dataCollectorInstance;
+            const styles = this.fastlaneStyles || {};
             window.bold.fastlane.instance = await window.braintree.fastlane.create({
                 authorization: this.gatewayData.client_token,
                 client: clientInstance,
-                deviceData,
-                styles: {},
+                deviceData: deviceData,
+                styles: styles,
             });
         },
         /**
@@ -236,6 +238,11 @@
          * @return {void}
          */
         renderWatermarkComponent: function (watermarkContainerId, afterElement) {
+            const existingWatermarkContainer = document.getElementById(watermarkContainerId);
+            if (existingWatermarkContainer) {
+                existingWatermarkContainer.remove();
+            }
+
             const watermarkContainer = document.createElement('div');
             watermarkContainer.id = watermarkContainerId;
 
@@ -341,10 +348,9 @@
          */
         addUpdateAddressButton: function () {
             const fastlaneAddressContainerId = 'fastlane-address-container';
-            // remove the existing button container
-            const addressButtonContainer = document.getElementById(fastlaneAddressContainerId);
-            if (addressButtonContainer) {
-                addressButtonContainer.remove();
+            const existingFastlaneAddressContainer = document.getElementById(fastlaneAddressContainerId);
+            if (existingFastlaneAddressContainer) {
+                existingFastlaneAddressContainer.remove();
             }
 
             const fastlaneAddressContainer = document.createElement('fieldset');
@@ -443,7 +449,7 @@
                         prefill: telephone
                     }
                 };
-                const styles = {}; //todo: add styles.
+                const styles = this.fastlaneStyles || {};
                 console.log('Render Fastlane Payment Component');
                 if (this.fastlanePaymentComponent === null) {
                     this.fastlanePaymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
