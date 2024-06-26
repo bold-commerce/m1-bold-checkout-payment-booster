@@ -107,10 +107,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
             return json_encode($styles);
         }
 
-//        TODO: implement styles retrieving from Checkout admin
-//        return isset($boldCheckoutData['data']['initial_data']['alternative_payment_methods'][0]['fastlane_styles'])
-//            ? $boldCheckoutData['data']['initial_data']['alternative_payment_methods'][0]['fastlane_styles']
-//            : [];
+        // TODO: Need to implement styles retrieving from Checkout admin
+        // (for now there is no ability to get this information if order was created using checkout_sidekick)
 
         return json_encode($styles);
     }
