@@ -10,6 +10,7 @@
      * Bold fastlane payment component.
      */
     const BoldFastlane = Class.create({
+        loaderImageUrl: '<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif'); ?>',
         emailField: document.getElementById('billing:email'),
         gatewayData: <?php echo $this->getGatewayData(); ?>,
         fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
@@ -48,6 +49,7 @@
          * Initialize Fastlane instance, authorize email, subscribe to email changes.
          */
         initialize: async function () {
+            console.count('initialize');
             if (!this.isAvailable) {
                 return;
             }
@@ -83,6 +85,7 @@
          * @return {void}
          */
         wrapPaymentSave: function () {
+            console.count('wrapPaymentSave');
             payment.save = payment.save.wrap(
                 function (paymentSaveMethod) {
                     if (!this.paymentCheckbox) {
@@ -123,6 +126,7 @@
          * @return {void}
          */
         wrapCheckoutSave: function () {
+            console.count('wrapCheckoutSave');
             checkout.save = checkout.save.wrap(
                 function (checkoutSaveMethod) {
                     if (!this.paymentCheckbox) {
@@ -161,6 +165,7 @@
          * @return {Promise<void>}
          */
         buildFastlaneInstance: async function () {
+            console.count('buildFastlaneInstance');
             if (window.bold.fastlane.instance) {
                 return;
             }
@@ -179,6 +184,7 @@
          * @return {Promise<void>}
          */
         buildBraintreeFastlaneInstance: async function () {
+            console.count('buildBraintreeFastlaneInstance');
             await this.loadScript(
                 'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/client.min.js'
             );
@@ -216,6 +222,7 @@
          * @return {Promise<unknown>}
          */
         loadScript: async function (src, attributes = {}) {
+            console.count('loadScript');
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
@@ -238,6 +245,7 @@
          * @return {void}
          */
         renderWatermarkComponent: function (watermarkContainerId, afterElement) {
+            console.count('renderWatermarkComponent');
             const existingWatermarkContainer = document.getElementById(watermarkContainerId);
             if (existingWatermarkContainer) {
                 existingWatermarkContainer.remove();
@@ -260,11 +268,43 @@
             });
         },
         /**
+         * Show/Hide loader.
+         *
+         * @param afterElement
+         * @param shouldDisplay
+         */
+        toggleLoader: function (afterElement, shouldDisplay) {
+            console.count('toggleLoader');
+            if (shouldDisplay) {
+                const loaderContainer = document.createElement('span');
+                loaderContainer.id = afterElement.id + '-loader';
+                loaderContainer.className = 'please-wait';
+                loaderContainer.style.display = 'block';
+
+                const loaderContainerImg = document.createElement('img');
+                loaderContainerImg.src = this.loaderImageUrl;
+                loaderContainerImg.className = 'v-middle';
+                loaderContainerImg.alt = '';
+                loaderContainer.appendChild(loaderContainerImg);
+
+                const loaderText = document.createTextNode('Loading, please wait...');
+                loaderContainer.appendChild(loaderText);
+
+                afterElement.insertAdjacentElement('afterend', loaderContainer);
+            } else {
+                const loaderContainer = document.getElementById(afterElement.id + '-loader');
+                if (loaderContainer) {
+                    loaderContainer.remove();
+                }
+            }
+        },
+        /**
          * Select payment method.
          *
          * @return {void}
          */
         selectPaymentMethod: function () {
+            console.count('selectPaymentMethod');
             if (this.paymentCheckbox && window.bold.fastlane.memberAuthenticated === true) {
                 this.paymentCheckbox.checked = true;
             }
@@ -275,6 +315,7 @@
          * @return {void}
          */
         subscribeToEmailChanges: function () {
+            console.count('subscribeToEmailChanges');
             if (this.emailField) {
                 this.renderWatermarkComponent('fastlane-email-watermark-container', this.emailField)
                 this.emailField.observe('change', () => {
@@ -290,6 +331,7 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
+            console.count('authorize');
             if (!this.emailField || !this.emailField.value) {
                 return;
             }
@@ -301,6 +343,7 @@
             }
             window.bold.fastlane.authorizedEmail = this.emailField.value;
             console.log('Trying to authorize with email: ', this.emailField.value);
+            this.toggleLoader(this.emailField, true);
             try {
                 const {identity} = window.bold.fastlane.instance;
                 const {customerContextId} = await identity.lookupCustomerByEmail(this.emailField.value);
@@ -317,8 +360,10 @@
                             this.addUpdateAddressButton();
                         }
                     }
+                    this.toggleLoader(this.emailField, false);
                     return;
                 }
+                this.toggleLoader(this.emailField, false);
                 window.bold.fastlane.memberAuthenticated = false;
             } catch (error) {
                 console.error('Error:', error);
@@ -331,6 +376,7 @@
          * @return {void}
          */
         setAddress: function (fastlaneAddress) {
+            console.count('setAddress');
             const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
             console.log('Set billing address...');
             console.log('Fastlane address:', fastlaneAddress);
@@ -347,6 +393,7 @@
          * @return {void}
          */
         addUpdateAddressButton: function () {
+            console.count('addUpdateAddressButton');
             const fastlaneAddressContainerId = 'fastlane-address-container';
             const existingFastlaneAddressContainer = document.getElementById(fastlaneAddressContainerId);
             if (existingFastlaneAddressContainer) {
@@ -382,6 +429,7 @@
          * @return {{}}
          */
         convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
+            console.count('convertFastlaneAddressToMagentoAddress');
             let magentoAddressRegionId = null;
             if (window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]) {
                 Object.entries(window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]).each((region) => {
@@ -404,7 +452,13 @@
                 'country_id': fastlaneAddress.countryCodeAlpha2,
             };
         },
+        /**
+         * Retrieve shipping address.
+         *
+         * @returns {{firstName: (string|*), lastName: (string|*), phoneNumber: (string|*), streetAddress: (string|*), postalCode: (string|*), locality: (string|*), company: (string|*), extendedAddress: (string|*), region: string, countryCodeAlpha2: (string|*)}}
+         */
         getShippingAddress: function () {
+            console.count('getShippingAddress');
             let magentoAddress = {};
             Object.entries(this.shippingAddressFieldsMap).forEach((entry) => {
                 const [key, idSelector] = entry;
@@ -440,6 +494,7 @@
          * @return {Promise<void>}
          */
         renderPaymentComponent: async function () {
+            console.count('renderPaymentComponent');
             this.selectPaymentMethod();
             const paymentContainer = document.getElementById(this.paymentContainerId);
             if (paymentContainer && this.paymentCheckbox && this.paymentCheckbox.checked) {
