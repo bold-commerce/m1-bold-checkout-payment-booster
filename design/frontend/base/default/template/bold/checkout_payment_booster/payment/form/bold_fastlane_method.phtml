@@ -5,7 +5,7 @@
  * @var $this Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane
  */
 ?>
-<div id='bold-fastlane-payment-container' style='display: none;'></div>
+<div id='payment_form_bold_fastlane' style='display: none;'></div>
 <script type='text/javascript'>
     /**
      * Bold fastlane payment component.
@@ -15,13 +15,12 @@
         emailField: document.getElementById('billing:email'),
         gatewayData: <?php echo $this->getGatewayData(); ?>,
         fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
-        paymentContainerId: 'bold-fastlane-payment-container',
+        paymentContainerId: 'payment_form_bold_fastlane',
         fastlaneAddressContainerId: 'fastlane-address-container',
         isAvailable: <?php echo $this->isAvailable(); ?>,
         fastlanePaymentComponent: null,
         paymentToken: null,
         paymentCheckbox: null,
-        paymentContainer: null,
         billingAddressFieldsMap: {
             'firstname': 'billing:firstname',
             'email': 'billing:email',
@@ -63,9 +62,9 @@
                     instance: null
                 };
             }
+            this.paymentCheckbox = document.getElementById('p_method_bold_fastlane');
             await this.buildFastlaneInstance()
             this.subscribeToEmailChanges();
-            this.subscribeToPaymentMethodChanges();
             this.renderPaymentContainer();
             if (payment.save) {
                 this.wrapPaymentSave();
@@ -300,27 +299,10 @@
          */
         selectPaymentMethod: function () {
             console.count('selectPaymentMethod');
-            if (this.paymentCheckbox && this.paymentContainer) {
+            if (this.paymentCheckbox) {
                 this.paymentCheckbox.checked = true;
-                this.paymentContainer.style.display = 'block';
+                payment.switchMethod('bold_fastlane');
             }
-        },
-        /**
-         * Subscribe to change payment method to render payment component.
-         */
-        subscribeToPaymentMethodChanges: function () {
-            console.count('subscribeToPaymentMethodChanges');
-            const self = this;
-            this.paymentCheckbox = document.getElementById('p_method_bold_fastlane');
-            this.paymentContainer = document.getElementById(this.paymentContainerId);
-            const paymentMethodsRadioButtons = document.querySelectorAll('input[type="radio"][name="payment[method]"]');
-            paymentMethodsRadioButtons.forEach(function (radioButton) {
-                radioButton.addEventListener('change', function () {
-                    self.paymentCheckbox.checked
-                        ? self.paymentContainer.style.display = 'block'
-                        : self.paymentContainer.style.display = 'none';
-                });
-            });
         },
         /**
          * Subscribe to email field changes and authorize customer with latest email field value.
