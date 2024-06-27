@@ -20,12 +20,8 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Bold_CheckoutPa
     /**
      * @inheritDoc
      */
-    public function isAvailable($quote = null)
+    public function isEnabled($quote = null)
     {
-        $isAvailable = parent::isAvailable($quote);
-        if (!$isAvailable) {
-            return false;
-        }
         /** @var Mage_Sales_Model_Quote|null $quote */
         $websiteId = $quote ? $quote->getStore()->getWebsiteId() : Mage::app()->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
@@ -33,5 +29,4 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Bold_CheckoutPa
 
         return $config->isFastlaneEnabled($websiteId) && !Mage::getSingleton('customer/session')->isLoggedIn();
     }
-
 }

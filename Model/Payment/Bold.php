@@ -25,6 +25,23 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
         if ($quote && $quote->getIsMultiShipping()) {
             return false;
         }
-        return Mage::getSingleton('checkout/session')->getBoldCheckoutData() !== null;
+        return Mage::getSingleton('checkout/session')->getBoldCheckoutData() !== null && $this->isEnabled($quote);
+    }
+
+    /**
+     * Check if payment method is enabled.
+     *
+     * @param $quote
+     * @return bool
+     * @throws Mage_Core_Model_Store_Exception
+     */
+    protected function isEnabled($quote = null)
+    {
+        $websiteId = $quote ? $quote->getStore()->getWebsiteId() : Mage::app()->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+
+        return $config->isPaymentBoosterEnabled($websiteId)
+            && (Mage::getSingleton('customer/session')->isLoggedIn() || !$config->isFastlaneEnabled($websiteId));
     }
 }

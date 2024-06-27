@@ -23,6 +23,7 @@
         iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         paymentContainer: document.getElementById('bold-payments-container'),
+        isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
         loader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
@@ -69,6 +70,9 @@
          * @returns {*|boolean}
          */
         initialize: function () {
+            if (!this.isAvailable) {
+                return;
+            }
             if (!window.bold) {
                 window.bold = {
                     orderData: {}
@@ -128,6 +132,9 @@
          * @returns {boolean}
          */
         isPayloadChanged: function () {
+            if (!window.bold.orderData) {
+                return true;
+            }
             let isChanged = false;
             for (let [key, value] of Object.entries(this.orderPayload)) {
                 if (window.bold.orderData[key] !== value) {
