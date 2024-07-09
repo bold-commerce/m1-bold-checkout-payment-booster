@@ -6,6 +6,42 @@
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
     /**
+     * Get Bold flows.
+     *
+     * @param int $websiteId
+     * @return array
+     */
+    public static function getList($websiteId)
+    {
+        return Bold_CheckoutPaymentBooster_Service_Client::get(
+            '/checkout/shop/{{shopId}}/flows',
+            $websiteId
+        )->data->flows;
+    }
+
+    public static function disableFlow($websiteId, $flowId)
+    {
+        return Bold_CheckoutPaymentBooster_Service_Client::delete(
+            '/checkout/shop/{{shopId}}/flows/' . $flowId,
+            $websiteId
+        );
+    }
+
+    /**
+     * Get available Bold flows.
+     *
+     * @param int $websiteId
+     * @return array
+     */
+    public static function getAvailable($websiteId)
+    {
+        return Bold_CheckoutPaymentBooster_Service_Client::get(
+            '/checkout/shop/{{shopId}}/flows/available',
+            $websiteId
+        )->data->flows;
+    }
+
+    /**
      * Get Bold flow ID.
      *
      * @param Mage_Sales_Model_Quote $quote
@@ -21,9 +57,9 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         if ($config->isFastlaneEnabled($websiteId)
             && !$quote->getCustomer()->getId()
         ) {
-            return 'Payment-Booster-Fastlane-M1';  //todo: check if api should be used instead.
+            return 'Bold three page';  //todo: check if api should be used instead.
         }
 
-        return 'Payment-Booster-M1'; //todo: check if api should be used instead.
+        return 'Bold three page'; //todo: check if api should be used instead.
     }
 }

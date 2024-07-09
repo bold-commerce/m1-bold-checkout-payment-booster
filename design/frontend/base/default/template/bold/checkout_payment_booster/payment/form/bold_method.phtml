@@ -154,9 +154,11 @@
             }
             this.updateOrderDataPayload();
             if (!this.isPayloadValid()) {
+                console.log('Payload is invalid');
                 return;
             }
             if (!this.isPayloadChanged()) {
+                console.log('Payload is not changed');
                 return;
             }
             new Ajax.Request('/checkoutpaymentbooster/index/syncOrderData', {
@@ -198,15 +200,6 @@
             this.paymentMethodElement.style.display = 'block';
             this.paymentContainer.style.display = 'block';
             this.loader.style.display = 'none';
-        },
-        /**
-         * Hide PIGI iframe.
-         *
-         * @returns {void}
-         * @private
-         */
-        hidePIGI: function () {
-            this.paymentContainer.style.display = 'none';
         },
     });
     const boldInstance = new Bold();

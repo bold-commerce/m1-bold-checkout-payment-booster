@@ -14,6 +14,12 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
      */
     private $billingAddress = null;
 
+    public function getPublicOrderId()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        return $boldCheckoutData->public_order_id;
+    }
+
     /**
      * @inheritDoc
      */

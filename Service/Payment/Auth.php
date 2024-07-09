@@ -19,13 +19,10 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
     public static function full($publicOrderId, $websiteId, $data = [])
     {
         $apiUri = sprintf(self::AUTHORIZE_PAYMENT_URI, $publicOrderId);
-        $response = json_decode(
-            Bold_CheckoutPaymentBooster_Service_Client::call(
-                'POST',
-                $apiUri,
-                $websiteId,
-                !empty($data) ? json_encode($data) : null
-            )
+        $response = Bold_CheckoutPaymentBooster_Service_Client::post(
+            $apiUri,
+            $websiteId,
+            $data
         );
 
         $errorMessage = Mage::helper('core')->__('Payment Authorization Failure.');

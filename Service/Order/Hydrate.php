@@ -51,16 +51,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             'shipping_line' => self::getShippingLine($quote),
             'totals' => self::getTotals($quote),
         ];
-
-        $response = json_decode(
-            Bold_CheckoutPaymentBooster_Service_Client::call(
-                'PUT',
-                $apiUri,
-                $quote->getStore()->getWebsiteId(),
-                json_encode($body)
-            )
+        $response = Bold_CheckoutPaymentBooster_Service_Client::put(
+            $apiUri,
+            $quote->getStore()->getWebsiteId(),
+            json_encode($body)
         );
-
         if (isset($response->errors) || isset($response->error)) {
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId

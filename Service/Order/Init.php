@@ -22,14 +22,13 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
             'order_type' => 'simple_order',
             'cart_id' => $quote->getId(),
         ];
-
-        $orderData = json_decode(
-            Bold_CheckoutPaymentBooster_Service_Client::call(
-                'POST',
-                self::INIT_SIMPLE_ORDER_URI,
-                $quote->getStore()->getWebsiteId(),
-                json_encode($body)
-            )
+        //$flows = Bold_CheckoutPaymentBooster_Service_Flow::getList($quote->getStore()->getWebsiteId());
+        //$flowId = 'Meta-flow';
+        //$response = Bold_CheckoutPaymentBooster_Service_Flow::disableFlow($quote->getStore()->getWebsiteId(), $flowId);
+        $orderData = Bold_CheckoutPaymentBooster_Service_Client::post(
+            self::INIT_SIMPLE_ORDER_URI,
+            $quote->getStore()->getWebsiteId(),
+            $body
         );
 
         if (isset($orderData->error)

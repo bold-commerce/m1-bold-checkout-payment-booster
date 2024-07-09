@@ -80,8 +80,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
                 $method,
                 $url,
                 $websiteId,
-                json_encode($data),
-                $headers
+                $headers,
+                json_encode($data)
             );
             $this->clientToken = json_decode($response)->data->createClientToken->clientToken;
         }
