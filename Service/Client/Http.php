@@ -11,11 +11,11 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
      * @param string $method
      * @param string $url
      * @param int $websiteId
-     * @param string|null $data
      * @param array $headers
+     * @param string|null $body
      * @return string
      */
-    public static function call($method, $url, $websiteId, $data = null, array $headers = [])
+    public static function call($method, $url, $websiteId, array $headers, $body = null)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -28,14 +28,14 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
                 true
             );
             Mage::log(
-                $tracingId . ': Outgoing Call Data: ' . $data,
+                $tracingId . ': Outgoing Call Data: ' . $body,
                 Zend_Log::DEBUG,
                 Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
                 true
             );
         }
         $curl = curl_init();
-        $url = self::prepareRequest($method, $curl, $url, $data);
+        $url = self::prepareRequest($method, $curl, $url, $body);
         if ($headers) {
             curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
         }

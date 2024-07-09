@@ -87,6 +87,10 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setShopId</method>
                     </set_shop_identifier>
+                    <update_pigi_styles>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>sendPigiStyles</method>
+                    </update_pigi_styles>
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>

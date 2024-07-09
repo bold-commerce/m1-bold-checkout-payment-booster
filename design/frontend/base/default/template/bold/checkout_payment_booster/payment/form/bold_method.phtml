@@ -5,7 +5,7 @@
  * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold $this
  */
 ?>
-<div id='bold-payments-container' style='display: none'>
+<div id='payment_form_bold' style='display: none'>
     <iframe id='PIGI' scrolling='no' width='100%' frameborder='0'></iframe>
 </div>
 <span class='please-wait' id='bold-payments-iframe-loader' style='display:none;'>
@@ -25,6 +25,7 @@
         paymentContainer: document.getElementById('bold-payments-container'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
+        iframeWindow: null,
         loader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
@@ -78,6 +79,7 @@
                     orderData: {}
                 };
             }
+            this.subscribeToPIGI();
             this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
@@ -154,9 +156,11 @@
             }
             this.updateOrderDataPayload();
             if (!this.isPayloadValid()) {
+                console.log('Payload is invalid');
                 return;
             }
             if (!this.isPayloadChanged()) {
+                console.log('Payload is not changed');
                 return;
             }
             new Ajax.Request('/checkoutpaymentbooster/index/syncOrderData', {
@@ -182,6 +186,7 @@
          * Hide payment method section.
          */
         hidePaymentMethod: function () {
+            console.log('Hiding payment method');
             this.paymentMethodElement.style.display = 'none';
             this.loader.style.display = 'none';
         },
@@ -192,6 +197,7 @@
          * @private
          */
         showPIGI: function () {
+            console.log('Showing PIGI');
             if (!this.iframeElement.src) {
                 this.iframeElement.src = this.iframeUrl;
             }
@@ -199,17 +205,39 @@
             this.paymentContainer.style.display = 'block';
             this.loader.style.display = 'none';
         },
-        /**
-         * Hide PIGI iframe.
-         *
-         * @returns {void}
-         * @private
-         */
-        hidePIGI: function () {
-            this.paymentContainer.style.display = 'none';
+        subscribeToPIGI() {
+            window.addEventListener('message', ({data}) => {
+                const responseType = data.responseType;
+                const addPaymentAction = {actionType: 'PIGI_ADD_PAYMENT'};
+                if (responseType) {
+                    switch (responseType) {
+                        case 'PIGI_UPDATE_HEIGHT':
+                            if (this.iframeElement.height === Math.round(data.payload.height) + 'px') {
+                                return;
+                            }
+                            console.log('Updating iframe height');
+                            this.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            break;
+                        case 'PIGI_INITIALIZED':
+                            console.log('PIGI initialized');
+                            this.iframeWindow = this.iframeElement.contentWindow;
+                            if (data.payload && data.payload.height && this.iframeElement) {
+                                this.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            }
+                            break;
+                        case 'PIGI_ADD_PAYMENT':
+                            console.log('Adding payment');
+                            if (!data.payload.success) {
+                                console.error('Failed to add payment');
+                                this.paymentType = null;
+                                return;
+                            }
+                            this.paymentType = data.payload.paymentType;
+                            alert('Payment added with payment type: ' + this.paymentType);
+                    }
+                }
+            });
         },
     });
     const boldInstance = new Bold();
-    boldInstance.initialize();
-
 </script>

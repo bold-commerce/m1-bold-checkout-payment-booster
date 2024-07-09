@@ -51,7 +51,6 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
                 'GET',
                 $url,
                 $websiteId,
-                null,
                 $headers
             )
         );

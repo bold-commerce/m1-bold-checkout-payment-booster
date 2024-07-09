@@ -21,4 +21,36 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
     }
+
+    /**
+     * Send PIGI styles to the Bold.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function sendPigiStyles(Varien_Event_Observer $event)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
+        if (!$config->isPaymentBoosterEnabled($websiteId)) {
+            return;
+        }
+        try {
+            $savedValue = $config->getPaymentCss($websiteId);
+            $newRules = $savedValue
+                ? preg_replace('/\s+/', ' ', unserialize($savedValue))
+                : Bold_CheckoutPaymentBooster_Service_PIGI::getDefaultCss();
+            $savedStyles = Bold_CheckoutPaymentBooster_Service_PIGI::getStyles($websiteId);
+            $oldRules = isset($savedStyles->css_rules[0]->cssText) ? $savedStyles->css_rules[0]->cssText : '';
+            if ($oldRules !== $newRules) {
+                Bold_CheckoutPaymentBooster_Service_PIGI::updateStyles(
+                    $websiteId,
+                    Bold_CheckoutPaymentBooster_Service_PIGI::build([$newRules])
+                );
+            }
+        } catch (Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::ERR);
+        }
+    }
 }

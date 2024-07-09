@@ -76,6 +76,15 @@
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ The conversion rate between weight unit and grams. ]]></comment>
                         </weight_conversion_rate>
+                        <pigi_styles translate="label">
+                            <label>Payment Booster Payments Styles</label>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_type>textarea</frontend_type>
+                            <backend_model>bold_checkout_payment_booster/system_config_backend_payment_css</backend_model>
+                            <comment><![CDATA[Add custom styling to the payment section of your checkout.]]></comment>
+                        </pigi_styles>
                         <fastlane_address_container_styles>
                             <label>PayPal Fastlane Address Container Styles</label>
                             <frontend_type>textarea</frontend_type>
