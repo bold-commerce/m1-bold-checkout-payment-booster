@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Bold flow service.
+ * Bold flows service.
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
@@ -19,6 +19,13 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         )->data->flows;
     }
 
+    /**
+     * Disable given Bold flow.
+     *
+     * @param int $websiteId
+     * @param string $flowId
+     * @return stdClass
+     */
     public static function disableFlow($websiteId, $flowId)
     {
         return Bold_CheckoutPaymentBooster_Service_Client::delete(
@@ -42,11 +49,10 @@ class Bold_CheckoutPaymentBooster_Service_Flow
     }
 
     /**
-     * Get Bold flow ID.
+     * Get Bold flow ID for given quote.
      *
      * @param Mage_Sales_Model_Quote $quote
      * @return string
-     * @throws Mage_Core_Exception
      */
     public static function getId(Mage_Sales_Model_Quote $quote)
     {

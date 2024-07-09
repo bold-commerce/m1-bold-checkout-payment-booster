@@ -22,6 +22,12 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         }
     }
 
+    /**
+     * Send PIGI styles to the Bold.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
     public function sendPigiStyles(Varien_Event_Observer $event)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */

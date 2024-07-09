@@ -134,6 +134,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
      */
     public function getPaymentCss($websiteId)
     {
-        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_PAYMENT_CSS);
+        return (string)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_PAYMENT_CSS);
     }
 }
