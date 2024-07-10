@@ -26,6 +26,7 @@
         isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
         iframeWindow: null,
+        paymentCheckbox: null,
         loader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
@@ -79,10 +80,13 @@
                     orderData: {}
                 };
             }
+            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.subscribeToPIGI();
             this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
+            this.waitForPaymentInitialization();
+            this.waitForCheckoutInitialization();
         },
         subscribeToFieldsChanges: function () {
             Object.values(this.orderDataFieldMapper).each(function (selector) {
@@ -127,6 +131,32 @@
                 return false;
             }
             return !isInvalid;
+        },
+        waitForCheckoutInitialization: function () {
+            const intervalId = setInterval(() => {
+                if (typeof checkout !== 'undefined' && checkout.save) {
+                    console.log('Payment Booster. Checkout is initialized.');
+                    this.wrapCheckoutSave();
+                    clearInterval(intervalId);
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(intervalId);
+                console.log('Payment Booster. Stopped waiting for checkout to initialize.');
+            }, 10000);
+        },
+        waitForPaymentInitialization: function () {
+            const intervalId = setInterval(() => {
+                if (typeof payment !== 'undefined' && payment.save) {
+                    console.log('Payment Booster, Payment is initialized.');
+                    this.wrapPaymentSave();
+                    clearInterval(intervalId);
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(intervalId);
+                console.log('Payment Booster. Stopped waiting for payment to initialize.');
+            }, 10000);
         },
         /**
          * Check if already hydrated payload differs from new one.
@@ -183,6 +213,46 @@
             });
         },
         /**
+         * Wrap checkout save method to process order on Bold side first.
+         *
+         * @return {void}
+         */
+        wrapCheckoutSave: function () {
+            checkout.save = checkout.save.wrap(
+                function (checkoutSaveMethod) {
+                    debugger;
+                    if (!this.paymentCheckbox) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentType) {
+                        console.error('Payment type is not set. Sending payment request to PIGI.');
+                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
+                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
+                        this.iframeWindow.postMessage(clearAction, '*');
+                        this.iframeWindow.postMessage(action, '*');
+                    } else {
+                        console.log('Payment type is set. Saving checkout.');
+                        return checkoutSaveMethod();
+                    }
+                }.bind(this)
+            );
+        },
+        /**
+         * Wrap payment save method to get PayPal token first.
+         *
+         * @return {void}
+         */
+        wrapPaymentSave: function () {
+            payment.save = payment.save.wrap(
+                function (paymentSaveMethod) {
+                    alert('Saving payment');
+                }.bind(this)
+            );
+        },
+        /**
          * Hide payment method section.
          */
         hidePaymentMethod: function () {
@@ -208,7 +278,6 @@
         subscribeToPIGI() {
             window.addEventListener('message', ({data}) => {
                 const responseType = data.responseType;
-                const addPaymentAction = {actionType: 'PIGI_ADD_PAYMENT'};
                 if (responseType) {
                     switch (responseType) {
                         case 'PIGI_UPDATE_HEIGHT':
@@ -233,6 +302,7 @@
                                 return;
                             }
                             this.paymentType = data.payload.paymentType;
+                            payment.save();
                             alert('Payment added with payment type: ' + this.paymentType);
                     }
                 }

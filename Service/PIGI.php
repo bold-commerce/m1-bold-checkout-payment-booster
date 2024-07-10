@@ -14,7 +14,7 @@ class Bold_CheckoutPaymentBooster_Service_PIGI
      * @param array $mediaRules
      * @return array
      */
-    public static function build(array $cssRules = [], array $mediaRules = [])
+    public static function buildStylesPayload(array $cssRules = [], array $mediaRules = [])
     {
         $bodyToSend = [];
         foreach ($cssRules as $rule) {
@@ -75,7 +75,7 @@ class Bold_CheckoutPaymentBooster_Service_PIGI
      * @return void
      * @throws Mage_Core_Exception
      */
-    public static function updateStyles($websiteId, $styles)
+    public static function updateStyles($websiteId, array $styles)
     {
         $result = Bold_CheckoutPaymentBooster_Service_Client::post(self::PAYMENT_CSS_API_URI, $websiteId, $styles);
         $errors = isset($result->errors) ? $result->errors : [];
