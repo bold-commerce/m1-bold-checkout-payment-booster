@@ -220,7 +220,6 @@
         wrapCheckoutSave: function () {
             checkout.save = checkout.save.wrap(
                 function (checkoutSaveMethod) {
-                    debugger;
                     if (!this.paymentCheckbox) {
                         return checkoutSaveMethod();
                     }
@@ -228,7 +227,7 @@
                         return checkoutSaveMethod();
                     }
                     if (!this.paymentType) {
-                        console.error('Payment type is not set. Sending payment request to PIGI.');
+                        console.log('Payment type is not set. Sending payment request to PIGI.');
                         const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
                         const action = {actionType: 'PIGI_ADD_PAYMENT'};
                         this.iframeWindow.postMessage(clearAction, '*');
@@ -303,7 +302,6 @@
                             }
                             this.paymentType = data.payload.paymentType;
                             payment.save();
-                            alert('Payment added with payment type: ' + this.paymentType);
                     }
                 }
             });

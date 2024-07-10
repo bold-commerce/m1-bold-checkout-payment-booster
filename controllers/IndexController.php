@@ -36,10 +36,11 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
     }
 
     /**
+     * Add post data to quote billing address.
+     *
      * @param Mage_Sales_Model_Quote $quote
      * @param array $post
      * @return void
-     * @throws Throwable
      */
     public function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
     {

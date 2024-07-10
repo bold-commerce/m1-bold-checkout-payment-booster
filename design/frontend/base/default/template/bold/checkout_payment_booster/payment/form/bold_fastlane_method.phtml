@@ -106,7 +106,6 @@
         wrapPaymentSave: function () {
             payment.save = payment.save.wrap(
                 function (paymentSaveMethod) {
-                    debugger;
                     if (!this.paymentCheckbox) {
                         return paymentSaveMethod();
                     }
@@ -147,7 +146,6 @@
         wrapCheckoutSave: function () {
             checkout.save = checkout.save.wrap(
                 function (checkoutSaveMethod) {
-                    debugger;
                     if (!this.paymentCheckbox) {
                         return checkoutSaveMethod();
                     }
@@ -159,9 +157,16 @@
                         this.fastlanePaymentComponent.getPaymentToken().then((token) => {
                             console.log('Fastlane payment token:', token);
                             this.paymentToken = token;
+
+                            const paymentForm = document.getElementById(payment.form);
+                            if (paymentForm) {
+                                const hiddenInput = document.createElement('input');
+                                hiddenInput.type = 'hidden';
+                                hiddenInput.name = 'payment[token]';
+                                hiddenInput.value = token.id;
+                                paymentForm.appendChild(hiddenInput);
+                            }
                             this.setAddress(token.paymentSource.card.billingAddress);
-                            console.log('Process order on Bold side...');
-                            //todo: add bold process order calls here.
                             return checkoutSaveMethod();
                         }).catch(() => {
                             return false;
