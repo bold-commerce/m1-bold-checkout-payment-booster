@@ -44,6 +44,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         $body = [
             'customer' => self::getCustomer($quote),
             'billing_address' => self::convertBillingAddress($quote->getBillingAddress()),
+            'shipping_address' => self::convertBillingAddress($quote->getBillingAddress()),
             'cart_items' => self::getCartItems($quote),
             'taxes' => self::getTaxes($quote),
             'discounts' => self::$discounts,
@@ -56,6 +57,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             $quote->getStore()->getWebsiteId(),
             json_encode($body)
         );
+        Mage::log(json_encode($body), Zend_Log::DEBUG, 'hydrate.log', true);
         if (isset($response->errors) || isset($response->error)) {
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId

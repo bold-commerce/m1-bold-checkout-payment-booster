@@ -19,6 +19,9 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData(null);
+        if ($quote->getPayment()->getMethod() === 'bold_fastlane') {
+            $this->processFastlaneOrder($quote);
+        }
 
         try {
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
@@ -49,7 +52,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         $paymentMethod = $order->getPayment()->getMethod();
 
         if (!$publicOrderId
-            || in_array($paymentMethod, [
+            || !in_array($paymentMethod, [
                 Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
                 Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
             ])
@@ -63,5 +66,10 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
         // TODO: check if order total and transactions are correct
         $paymentAuthData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+    }
+
+    private function processFastlaneOrder(Mage_Sales_Model_Quote $quote)
+    {
+
     }
 }

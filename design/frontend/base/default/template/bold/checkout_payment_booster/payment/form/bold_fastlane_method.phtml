@@ -238,7 +238,7 @@
         },
         buildPpcpFastlaneInstance: async function () {
             const debugMode = this.gatewayData.is_test_mode ? '&debug=true' : '';
-            await loadScript(
+            await this.loadScript(
                 `https://www.paypal.com/sdk/js?client-id=${this.gatewayData.client_id}&components=fastlane${debugMode}`,
                 {
                     'data-user-id-token': this.gatewayData.client_token,
@@ -476,25 +476,30 @@
         convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
             console.count('convertFastlaneAddressToMagentoAddress');
             let magentoAddressRegionId = null;
-            if (window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]) {
-                Object.entries(window.billingRegionUpdater.regions[fastlaneAddress.countryCodeAlpha2]).each((region) => {
+            const fastlaneCountryCode = fastlaneAddress.countryCodeAlpha2 || fastlaneAddress.address?.countryCode;
+            const fastlaneRegionCode = fastlaneAddress.region || fastlaneAddress.address?.adminArea1;
+            if (window.billingRegionUpdater.regions[fastlaneCountryCode]) {
+                Object.entries(window.billingRegionUpdater.regions[fastlaneCountryCode]).each((region) => {
                     const [regionId, regionData] = region;
-                    if (regionData.code === fastlaneAddress.region) {
+                    if (regionData.code === fastlaneRegionCode) {
                         magentoAddressRegionId = regionId;
                     }
                 })
             }
+            const telephone = typeof fastlaneAddress.phoneNumber === 'string'
+                ? fastlaneAddress.phoneNumber
+                : fastlaneAddress.phoneNumber?.countryCode + fastlaneAddress.phoneNumber?.nationalNumber;
             return {
-                'firstname': fastlaneAddress.firstName,
-                'lastname': fastlaneAddress.lastName,
+                'firstname': fastlaneAddress.firstName || fastlaneAddress.name?.firstName,
+                'lastname': fastlaneAddress.lastName || fastlaneAddress.name?.lastName,
                 'company': fastlaneAddress.company,
-                'telephone': fastlaneAddress.phoneNumber,
-                'street1': fastlaneAddress.streetAddress,
-                'street2': fastlaneAddress.extendedAddress || '',
-                'city': fastlaneAddress.locality,
+                'telephone': telephone,
+                'street1': fastlaneAddress.streetAddress || fastlaneAddress.address?.addressLine1,
+                'street2': fastlaneAddress.extendedAddress || fastlaneAddress.address?.addressLine2,
+                'city': fastlaneAddress.locality || fastlaneAddress.address?.adminArea2,
                 'region_id': magentoAddressRegionId,
-                'postcode': fastlaneAddress.postalCode,
-                'country_id': fastlaneAddress.countryCodeAlpha2,
+                'postcode': fastlaneAddress.postalCode || fastlaneAddress.address?.postalCode,
+                'country_id': fastlaneCountryCode,
             };
         },
         /**
