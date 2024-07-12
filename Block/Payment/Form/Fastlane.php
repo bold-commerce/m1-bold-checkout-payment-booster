@@ -6,6 +6,7 @@
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payment_Block_Form
 {
     const PAYPAL_FASTLANE_CLIENT_TOKEN_URL = 'checkout/orders/{{shopId}}/%s/paypal_fastlane/client_token';
+    const PATH = '/checkout/storefront/';
 
     /**
      * @var Mage_Sales_Model_Quote|null
@@ -99,5 +100,45 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         // (for now there is no ability to get this information if order was created using checkout_sidekick)
 
         return json_encode($styles);
+    }
+
+    /**
+     * Retrieve Bold Storefront API URL.
+     *
+     * @return string|null
+     */
+    public function getBoldApiUrl()
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return null;
+        }
+        $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
+        try {
+            $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        } catch (Mage_Core_Exception $e) {
+            return null;
+        }
+        $orderId = $boldCheckoutData->public_order_id;
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $apiUrl = $config->getApiUrl($websiteId);
+        return $apiUrl . self::PATH . $shopId . '/' . $orderId . '/';
+    }
+
+    /**
+     * Retrieve JWT token.
+     *
+     * @return string|null
+     */
+    public function getJwtToken()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return null;
+        }
+        return $boldCheckoutData->jwt_token;
     }
 }

@@ -10,7 +10,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      *
      * @return void
      */
-    public function syncOrderDataAction()
+    public function hydrateOrderDataAction()
     {
         if (!$this->_validateFormKey()) {
             return;
@@ -36,13 +36,32 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
     }
 
     /**
+     * Get cart data action.
+     *
+     * @return void
+     */
+    public function getCartDataAction()
+    {
+        if (!$this->_validateFormKey()) {
+            return;
+        }
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        $cartData = [
+            'grand_total' => $quote->getGrandTotal() * 100,
+            'quote_currency_code' => $quote->getQuoteCurrencyCode(),
+        ];
+
+        $this->getResponse()->setBody(json_encode($cartData));
+    }
+
+    /**
      * Add post data to quote billing address.
      *
      * @param Mage_Sales_Model_Quote $quote
      * @param array $post
      * @return void
      */
-    public function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
+    private function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
     {
         $quote->getBillingAddress()->addData($post)->save();
         if (!$quote->getCustomerEmail()) {
