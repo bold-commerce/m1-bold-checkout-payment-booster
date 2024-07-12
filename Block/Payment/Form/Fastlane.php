@@ -5,7 +5,7 @@
  */
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payment_Block_Form
 {
-    private $clientToken = null;
+    const PAYPAL_FASTLANE_CLIENT_TOKEN_URL = 'checkout/orders/{{shopId}}/%s/paypal_fastlane/client_token';
 
     /**
      * @var Mage_Sales_Model_Quote|null
@@ -52,46 +52,34 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
      * Get payment gateway data.
      *
      * @return string
+     * @throws Mage_Core_Exception
      */
     public function getGatewayData()
     {
-        // todo: replace with bold api call
-        if (!$this->clientToken) {
-            $method = 'POST';
-            $url = 'https://payments.sandbox.braintree-api.com/graphql';
-            $websiteId = $this->quote->getStore()->getWebsiteId();
-            $publicKey = 'wr8c486x5vn2trzj'; // only for testing
-            $privateKey = '5c034bc43e3c60cdf6b1ccff5f5d7d48'; // only for testing
-            $headers = [
-                'Content-Type: application/json',
-                'Authorization: Basic ' . base64_encode("$publicKey:$privateKey"),
-                'Braintree-Version: 2019-01-01',
-            ];
-            $data = [
-                'query' => '
-            mutation {
-                createClientToken {
-                    clientToken
-                }
-            }
-        ',
-            ];
-            $response = Bold_CheckoutPaymentBooster_Service_Client_Http::call(
-                $method,
-                $url,
-                $websiteId,
-                $headers,
-                json_encode($data)
-            );
-            $this->clientToken = json_decode($response)->data->createClientToken->clientToken;
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        $session = Mage::getSingleton('checkout/session');
+        $publicOrderId = isset($session->getBoldCheckoutData()->public_order_id)
+            ? $session->getBoldCheckoutData()->public_order_id
+            : null;
+        if (!$publicOrderId) {
+            return json_encode([]);
         }
-        $gatewayData = [
-            'is_test_mode' => true,
-            'type' => 'braintree',
-            'client_token' => $this->clientToken,
-
-        ];
-        return json_encode($gatewayData);
+        $apiUrl = sprintf(self::PAYPAL_FASTLANE_CLIENT_TOKEN_URL, $publicOrderId);
+        $baseUrl = Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB);
+        $domain = preg_replace('#^https?://|/$#', '', $baseUrl);
+        $response = Bold_CheckoutPaymentBooster_Service_Client::post(
+            $apiUrl,
+            $websiteId,
+            [
+                'domains' => [
+                    $domain,
+                ],
+            ]
+        );
+        if (isset($response->errors)) {
+            Mage::throwException('Something went wrong while fetching the Fastlane gateway data.');
+        }
+        return json_encode($response->data);
     }
 
     /**

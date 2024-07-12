@@ -31,7 +31,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
     /**
      * Check if payment method is enabled.
      *
-     * @param $quote
+     * @param Mage_Sales_Model_Quote|null $quote
      * @return bool
      * @throws Mage_Core_Model_Store_Exception
      */

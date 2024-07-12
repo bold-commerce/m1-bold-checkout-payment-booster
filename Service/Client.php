@@ -36,7 +36,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      * @param string $url
      * @param int $websiteId
      * @param array|null $body
-     * @return string
+     * @return stdClass
      * @throws Mage_Core_Exception
      */
     public static function post($url, $websiteId, array $body = null)
@@ -60,7 +60,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      *
      * @param string $url
      * @param int $websiteId
-     * @return string
+     * @return stdClass
      * @throws Mage_Core_Exception
      */
     public static function put($url, $websiteId, $body)

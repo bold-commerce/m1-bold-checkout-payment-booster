@@ -188,4 +188,34 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
 
         return (int)$isAvailable;
     }
+
+    /**
+     * Check if Fastlane payment method is available.
+     *
+     * @return int
+     */
+    public function isFastlaneAvailable()
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $bold */
+        $bold = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
+        $isAvailable = $bold->isAvailable($this->quote);
+
+        return (int)$isAvailable;
+    }
+
+    /**
+     * Get alternative payment methods.
+     *
+     * @return string
+     */
+    public function getAlternativePaymentMethods()
+    {
+        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return json_encode([]);
+        }
+        return isset($boldCheckoutData->initial_data_alternative_payment_methods)
+            ? json_encode($boldCheckoutData->initial_data->alternative_payment_methods)
+            : json_encode([]);
+    }
 }

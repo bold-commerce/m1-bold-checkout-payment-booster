@@ -51,10 +51,10 @@
          * Initialize Fastlane instance, subscribe to email changes.
          */
         initialize: async function () {
-            console.count('initialize');
-            if (!this.isAvailable) {
+            if (!this.isAvailable || !this.gatewayData) {
                 return;
             }
+            console.count('initialize');
             if (!window.bold) {
                 window.bold = {};
             }
@@ -196,6 +196,9 @@
             if (this.gatewayData.type === 'braintree') {
                 await this.buildBraintreeFastlaneInstance();
             }
+            if (this.gatewayData.type === 'ppcp') {
+                await this.buildPpcpFastlaneInstance();
+            }
         },
         /**
          * Build Fastlane Instance for the Braintree.
@@ -232,6 +235,17 @@
                 deviceData: deviceData,
                 styles: styles,
             });
+        },
+        buildPpcpFastlaneInstance: async function () {
+            const debugMode = this.gatewayData.is_test_mode ? '&debug=true' : '';
+            await loadScript(
+                `https://www.paypal.com/sdk/js?client-id=${this.gatewayData.client_id}&components=fastlane${debugMode}`,
+                {
+                    'data-user-id-token': this.gatewayData.client_token,
+                    'data-client-metadata-id': 'Magento2',
+                }
+            );
+            window.bold.fastlane.instance = await window.paypal.Fastlane();
         },
         /**
          * Load given script with attributes.
