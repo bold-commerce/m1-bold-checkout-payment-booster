@@ -106,6 +106,11 @@
             }
             return true;
         },
+        /**
+         * Subscribe to fields changes for order hydration.
+         *
+         * @returns {void}
+         */
         subscribeToFieldsChanges: function () {
             Object.values(this.orderDataFieldMapper).each(function (selector) {
                 let field = $(selector);
@@ -118,6 +123,11 @@
                 }
             }.bind(this));
         },
+        /**
+         * Update order data payload for order hydration call.
+         *
+         * @returns {void}
+         */
         updateOrderDataPayload: function () {
             Object.keys(this.orderDataFieldMapper).forEach(function (key) {
                 let field = this.orderDataFieldMapper[key];
@@ -127,7 +137,7 @@
             }.bind(this));
         },
         /**
-         * Validate payload.
+         * Validate order data payload for hydration.
          *
          * @returns {boolean}
          */
@@ -150,30 +160,36 @@
             }
             return !isInvalid;
         },
+        /**
+         * Wait for checkout to initialize.
+         *
+         * @returns {void}
+         */
         waitForCheckoutInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof checkout !== 'undefined' && checkout.save) {
-                    console.log('Payment Booster. Checkout is initialized.');
                     this.wrapCheckoutSave();
                     clearInterval(intervalId);
                 }
             }, 100);
             setTimeout(() => {
                 clearInterval(intervalId);
-                console.log('Payment Booster. Stopped waiting for checkout to initialize.');
             }, 10000);
         },
+        /**
+         * Wait for payment to initialize.
+         *
+         * @returns {void}
+         */
         waitForPaymentInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof payment !== 'undefined' && payment.save) {
-                    console.log('Payment Booster, Payment is initialized.');
                     this.wrapPaymentSave();
                     clearInterval(intervalId);
                 }
             }, 100);
             setTimeout(() => {
                 clearInterval(intervalId);
-                console.log('Payment Booster. Stopped waiting for payment to initialize.');
             }, 10000);
         },
         /**
@@ -211,11 +227,12 @@
                 console.log('Payload is not changed');
                 return;
             }
-            new Ajax.Request('/checkoutpaymentbooster/index/syncOrderData', {
+            new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
+                    this.loader.style.display = 'none';
                     this.showPIGI();
                 }.bind(this),
                 onLoading: function () {
@@ -244,14 +261,14 @@
                     if (!this.paymentCheckbox.checked) {
                         return checkoutSaveMethod();
                     }
+                    checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
-                        console.log('Payment type is not set. Sending payment request to PIGI.');
                         const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
                         const action = {actionType: 'PIGI_ADD_PAYMENT'};
                         this.iframeWindow.postMessage(clearAction, '*');
                         this.iframeWindow.postMessage(action, '*');
                     } else {
-                        console.log('Payment type is set. Saving checkout.');
+                        checkout.setLoadWaiting(false);
                         return checkoutSaveMethod();
                     }
                 }.bind(this)
@@ -265,7 +282,22 @@
         wrapPaymentSave: function () {
             payment.save = payment.save.wrap(
                 function (paymentSaveMethod) {
-                    alert('Saving payment');
+                    if (!this.paymentCheckbox) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return paymentSaveMethod();
+                    }
+                    checkout.setLoadWaiting('payment', true);
+                    if (!this.paymentType) {
+                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
+                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
+                        this.iframeWindow.postMessage(clearAction, '*');
+                        this.iframeWindow.postMessage(action, '*');
+                    } else {
+                        checkout.setLoadWaiting(false);
+                        return paymentSaveMethod();
+                    }
                 }.bind(this)
             );
         },
@@ -314,12 +346,14 @@
                         case 'PIGI_ADD_PAYMENT':
                             console.log('Adding payment');
                             if (!data.payload.success) {
+                                checkout.setLoadWaiting(false);
                                 console.error('Failed to add payment');
                                 this.paymentType = null;
                                 return;
                             }
                             this.paymentType = data.payload.paymentType;
                             if (checkout.save) {
+                                checkout.setLoadWaiting(false);
                                 checkout.save();
                                 return;
                             }

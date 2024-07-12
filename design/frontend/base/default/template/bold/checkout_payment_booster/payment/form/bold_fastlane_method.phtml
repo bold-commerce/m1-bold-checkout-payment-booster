@@ -292,37 +292,6 @@
             });
         },
         /**
-         * Show/Hide loader.
-         *
-         * @param afterElement
-         * @param shouldDisplay
-         */
-        toggleLoader: function (afterElement, shouldDisplay) {
-            console.count('toggleLoader');
-            if (shouldDisplay) {
-                const loaderContainer = document.createElement('span');
-                loaderContainer.id = afterElement.id + '-loader';
-                loaderContainer.className = 'please-wait';
-                loaderContainer.style.display = 'block';
-
-                const loaderContainerImg = document.createElement('img');
-                loaderContainerImg.src = this.loaderImageUrl;
-                loaderContainerImg.className = 'v-middle';
-                loaderContainerImg.alt = '';
-                loaderContainer.appendChild(loaderContainerImg);
-
-                const loaderText = document.createTextNode('Loading, please wait...');
-                loaderContainer.appendChild(loaderText);
-
-                afterElement.insertAdjacentElement('afterend', loaderContainer);
-            } else {
-                const loaderContainer = document.getElementById(afterElement.id + '-loader');
-                if (loaderContainer) {
-                    loaderContainer.remove();
-                }
-            }
-        },
-        /**
          * Select payment method.
          *
          * @return {void}
@@ -356,7 +325,6 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
-            console.count('authorize');
             if (!this.emailField || !this.emailField.value) {
                 return;
             }
@@ -366,30 +334,30 @@
             if (window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
+            checkout.setLoadWaiting('billing', true);
             window.bold.fastlane.authorizedEmail = this.emailField.value;
-            console.log('Trying to authorize with email: ', this.emailField.value);
-            this.toggleLoader(this.emailField, true);
             try {
                 const {identity} = window.bold.fastlane.instance;
                 const {customerContextId} = await identity.lookupCustomerByEmail(this.emailField.value);
+                checkout.setLoadWaiting(false);
                 if (customerContextId) {
                     const {
                         authenticationState,
                         profileData
                     } = await identity.triggerAuthenticationFlow(customerContextId);
                     if (authenticationState === 'succeeded') {
+                        checkout.setLoadWaiting('billing', true);
                         window.bold.fastlane.memberAuthenticated = true;
                         console.log('Authorized with profile Data:', profileData);
                         if (profileData.shippingAddress) {
                             this.setAddress(profileData.shippingAddress);
                             this.addAddressButton();
                         }
+                        checkout.setLoadWaiting(false);
                     }
-                    this.toggleLoader(this.emailField, false);
                     return;
                 }
                 this.removeAddressButton();
-                this.toggleLoader(this.emailField, false);
                 window.bold.fastlane.memberAuthenticated = false;
             } catch (error) {
                 console.error('Error:', error);
