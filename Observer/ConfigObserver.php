@@ -18,7 +18,11 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         try {
             Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
         } catch (Exception $exception) {
-            Mage::log($exception->getMessage(), Zend_Log::CRIT);
+            Mage::log(
+                $exception->getMessage(),
+                Zend_Log::CRIT,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
         }
     }
 
@@ -43,14 +47,19 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
                 : Bold_CheckoutPaymentBooster_Service_PIGI::getDefaultCss();
             $savedStyles = Bold_CheckoutPaymentBooster_Service_PIGI::getStyles($websiteId);
             $oldRules = isset($savedStyles->css_rules[0]->cssText) ? $savedStyles->css_rules[0]->cssText : '';
-            if ($oldRules !== $newRules) {
-                Bold_CheckoutPaymentBooster_Service_PIGI::updateStyles(
-                    $websiteId,
-                    Bold_CheckoutPaymentBooster_Service_PIGI::build([$newRules])
-                );
+            if ($oldRules === $newRules) {
+                return;
             }
+            Bold_CheckoutPaymentBooster_Service_PIGI::updateStyles(
+                $websiteId,
+                Bold_CheckoutPaymentBooster_Service_PIGI::buildStylesPayload([$newRules])
+            );
         } catch (Exception $e) {
-            Mage::log($e->getMessage(), Zend_Log::ERR);
+            Mage::log(
+                $e->getMessage(),
+                Zend_Log::ERR,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
         }
     }
 }

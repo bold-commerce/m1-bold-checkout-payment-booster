@@ -19,7 +19,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData(null);
-
         try {
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
                 return;
@@ -47,16 +46,13 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
         $publicOrderId = $boldCheckoutData->public_order_id;
         $paymentMethod = $order->getPayment()->getMethod();
-
-        if (!$publicOrderId
-            || in_array($paymentMethod, [
-                Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
-                Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
-            ])
-        ) {
+        $methodsToProcess = [
+            Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
+            Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
+        ];
+        if (!in_array($paymentMethod, $methodsToProcess)) {
             return;
         }
-
         $quote = $order->getQuote();
         $websiteId = $quote->getStore()->getWebsiteId();
         // hydrate bold order before auth payment

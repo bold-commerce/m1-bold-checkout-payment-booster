@@ -9,9 +9,8 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      * Hydrate order data to Bold order action.
      *
      * @return void
-     * @throws Mage_Core_Exception
      */
-    public function syncOrderDataAction()
+    public function hydrateOrderDataAction()
     {
         if (!$this->_validateFormKey()) {
             return;
@@ -32,7 +31,47 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $post['street'] = $post['street2']
             ? $post['street1'] . "\n" . $post['street2']
             : $post['street1'];
-        $quote->getBillingAddress()->addData($post)->save();
+        $this->addAddressDataToQuote($quote, $post);
         Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+    }
+
+    /**
+     * Get cart data action.
+     *
+     * @return void
+     */
+    public function getCartDataAction()
+    {
+        if (!$this->_validateFormKey()) {
+            return;
+        }
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        $cartData = [
+            'grand_total' => $quote->getGrandTotal() * 100,
+            'quote_currency_code' => $quote->getQuoteCurrencyCode(),
+        ];
+
+        $this->getResponse()->setBody(json_encode($cartData));
+    }
+
+    /**
+     * Add post data to quote billing address.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @param array $post
+     * @return void
+     */
+    private function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
+    {
+        $quote->getBillingAddress()->addData($post)->save();
+        if (!$quote->getCustomerEmail()) {
+            $quote->setCustomerEmail($quote->getBillingAddress()->getEmail());
+        }
+        if (!$quote->getCustomerFirstname()) {
+            $quote->setCustomerFirstname($quote->getBillingAddress()->getFirstname());
+        }
+        if (!$quote->getCustomerLastname()) {
+            $quote->setCustomerLastname($quote->getBillingAddress()->getLastname());
+        }
     }
 }

@@ -23,9 +23,12 @@
         iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         paymentContainer: document.getElementById('bold-payments-container'),
-        isAvailable: <?php echo $this->isAvailable(); ?>,
+        available: <?php echo $this->isAvailable(); ?>,
+        fastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
+        alternativePaymentMethods: <?php echo $this->getAlternativePaymentMethods(); ?>,
         iframeElement: document.getElementById('PIGI'),
         iframeWindow: null,
+        paymentCheckbox: null,
         loader: document.getElementById('bold-payments-iframe-loader'),
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
@@ -71,7 +74,8 @@
          * @returns {*|boolean}
          */
         initialize: function () {
-            if (!this.isAvailable) {
+            this.hidePaymentMethod();
+            if (!this.isAvailable()) {
                 return;
             }
             if (!window.bold) {
@@ -79,11 +83,34 @@
                     orderData: {}
                 };
             }
+            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.subscribeToPIGI();
-            this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
+            this.waitForPaymentInitialization();
+            this.waitForCheckoutInitialization();
         },
+        /**
+         * Validate if payment method is available.
+         *
+         * @return {*|boolean}
+         */
+        isAvailable: function () {
+            if (!this.available) {
+                return false;
+            }
+            if (this.fastlaneAvailable && this.alternativePaymentMethods.length > 0) {
+                return this.alternativePaymentMethods.some(function (method) {
+                    return method.type === 'braintree-paypal' || method.type === 'paypal_commerce_platform';
+                });
+            }
+            return true;
+        },
+        /**
+         * Subscribe to fields changes for order hydration.
+         *
+         * @returns {void}
+         */
         subscribeToFieldsChanges: function () {
             Object.values(this.orderDataFieldMapper).each(function (selector) {
                 let field = $(selector);
@@ -96,6 +123,11 @@
                 }
             }.bind(this));
         },
+        /**
+         * Update order data payload for order hydration call.
+         *
+         * @returns {void}
+         */
         updateOrderDataPayload: function () {
             Object.keys(this.orderDataFieldMapper).forEach(function (key) {
                 let field = this.orderDataFieldMapper[key];
@@ -105,7 +137,7 @@
             }.bind(this));
         },
         /**
-         * Validate payload.
+         * Validate order data payload for hydration.
          *
          * @returns {boolean}
          */
@@ -127,6 +159,38 @@
                 return false;
             }
             return !isInvalid;
+        },
+        /**
+         * Wait for checkout to initialize.
+         *
+         * @returns {void}
+         */
+        waitForCheckoutInitialization: function () {
+            const intervalId = setInterval(() => {
+                if (typeof checkout !== 'undefined' && checkout.save) {
+                    this.wrapCheckoutSave();
+                    clearInterval(intervalId);
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(intervalId);
+            }, 10000);
+        },
+        /**
+         * Wait for payment to initialize.
+         *
+         * @returns {void}
+         */
+        waitForPaymentInitialization: function () {
+            const intervalId = setInterval(() => {
+                if (typeof payment !== 'undefined' && payment.save) {
+                    this.wrapPaymentSave();
+                    clearInterval(intervalId);
+                }
+            }, 100);
+            setTimeout(() => {
+                clearInterval(intervalId);
+            }, 10000);
         },
         /**
          * Check if already hydrated payload differs from new one.
@@ -163,11 +227,12 @@
                 console.log('Payload is not changed');
                 return;
             }
-            new Ajax.Request('/checkoutpaymentbooster/index/syncOrderData', {
+            new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
+                    this.loader.style.display = 'none';
                     this.showPIGI();
                 }.bind(this),
                 onLoading: function () {
@@ -181,6 +246,60 @@
                     console.error('Failed to sync order data');
                 }.bind(this),
             });
+        },
+        /**
+         * Wrap checkout save method to process order on Bold side first.
+         *
+         * @return {void}
+         */
+        wrapCheckoutSave: function () {
+            checkout.save = checkout.save.wrap(
+                function (checkoutSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return checkoutSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return checkoutSaveMethod();
+                    }
+                    checkout.setLoadWaiting('payment', true);
+                    if (!this.paymentType) {
+                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
+                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
+                        this.iframeWindow.postMessage(clearAction, '*');
+                        this.iframeWindow.postMessage(action, '*');
+                    } else {
+                        checkout.setLoadWaiting(false);
+                        return checkoutSaveMethod();
+                    }
+                }.bind(this)
+            );
+        },
+        /**
+         * Wrap payment save method to get PayPal token first.
+         *
+         * @return {void}
+         */
+        wrapPaymentSave: function () {
+            payment.save = payment.save.wrap(
+                function (paymentSaveMethod) {
+                    if (!this.paymentCheckbox) {
+                        return paymentSaveMethod();
+                    }
+                    if (!this.paymentCheckbox.checked) {
+                        return paymentSaveMethod();
+                    }
+                    checkout.setLoadWaiting('payment', true);
+                    if (!this.paymentType) {
+                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
+                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
+                        this.iframeWindow.postMessage(clearAction, '*');
+                        this.iframeWindow.postMessage(action, '*');
+                    } else {
+                        checkout.setLoadWaiting(false);
+                        return paymentSaveMethod();
+                    }
+                }.bind(this)
+            );
         },
         /**
          * Hide payment method section.
@@ -208,7 +327,6 @@
         subscribeToPIGI() {
             window.addEventListener('message', ({data}) => {
                 const responseType = data.responseType;
-                const addPaymentAction = {actionType: 'PIGI_ADD_PAYMENT'};
                 if (responseType) {
                     switch (responseType) {
                         case 'PIGI_UPDATE_HEIGHT':
@@ -228,12 +346,18 @@
                         case 'PIGI_ADD_PAYMENT':
                             console.log('Adding payment');
                             if (!data.payload.success) {
+                                checkout.setLoadWaiting(false);
                                 console.error('Failed to add payment');
                                 this.paymentType = null;
                                 return;
                             }
                             this.paymentType = data.payload.paymentType;
-                            alert('Payment added with payment type: ' + this.paymentType);
+                            if (checkout.save) {
+                                checkout.setLoadWaiting(false);
+                                checkout.save();
+                                return;
+                            }
+                            payment.save();
                     }
                 }
             });
