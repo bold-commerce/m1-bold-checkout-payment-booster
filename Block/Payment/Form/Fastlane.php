@@ -5,7 +5,6 @@
  */
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payment_Block_Form
 {
-    const PAYPAL_FASTLANE_CLIENT_TOKEN_URL = 'checkout/orders/{{shopId}}/%s/paypal_fastlane/client_token';
     const PATH = '/checkout/storefront/';
 
     /**
@@ -32,8 +31,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
         $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
-        $isAvailable = !Mage::getSingleton('customer/session')->isLoggedIn() && $fastlane->isAvailable($this->quote);
-        return (int)$isAvailable;
+        return (int)$fastlane->isAvailable($this->quote);
     }
 
     /**
@@ -53,34 +51,12 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
      * Get payment gateway data.
      *
      * @return string
-     * @throws Mage_Core_Exception
      */
     public function getGatewayData()
     {
-        $websiteId = $this->quote->getStore()->getWebsiteId();
-        $session = Mage::getSingleton('checkout/session');
-        $publicOrderId = isset($session->getBoldCheckoutData()->public_order_id)
-            ? $session->getBoldCheckoutData()->public_order_id
-            : null;
-        if (!$publicOrderId) {
-            return json_encode([]);
-        }
-        $apiUrl = sprintf(self::PAYPAL_FASTLANE_CLIENT_TOKEN_URL, $publicOrderId);
-        $baseUrl = Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB);
-        $domain = preg_replace('#^https?://|/$#', '', $baseUrl);
-        $response = Bold_CheckoutPaymentBooster_Service_Client::post(
-            $apiUrl,
-            $websiteId,
-            [
-                'domains' => [
-                    $domain,
-                ],
-            ]
+        return json_encode(
+            Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData()
         );
-        if (isset($response->errors)) {
-            Mage::throwException('Something went wrong while fetching the Fastlane gateway data.');
-        }
-        return json_encode($response->data);
     }
 
     /**
@@ -90,7 +66,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
      */
     public function getFastlaneStyles()
     {
-        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         $styles = (object)[];
         if (!$boldCheckoutData) {
             return json_encode($styles);
@@ -111,7 +87,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         if (!$boldCheckoutData) {
             return null;
         }
@@ -135,7 +111,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
      */
     public function getJwtToken()
     {
-        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         if (!$boldCheckoutData) {
             return null;
         }

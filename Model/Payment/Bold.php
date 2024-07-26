@@ -22,10 +22,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function isAvailable($quote = null)
     {
-        if ($quote && $quote->getIsMultiShipping()) {
-            return false;
-        }
-        return Mage::getSingleton('checkout/session')->getBoldCheckoutData() !== null && $this->isEnabled($quote);
+        return Bold_CheckoutPaymentBooster_Service_Bold::isAvailable();
     }
 
     /**

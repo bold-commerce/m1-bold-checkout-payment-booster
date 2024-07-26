@@ -28,23 +28,17 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      */
     public static function hydrate(Mage_Sales_Model_Quote $quote)
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         $publicOrderId = $boldCheckoutData->public_order_id;
-
         if (!$publicOrderId) {
             Mage::throwException('There is no public order ID in the checkout session.');
         }
-
         $apiUri = sprintf(self::HYDRATE_ORDER_URI, $publicOrderId);
-
         self::getDiscountsAndFees($quote);
-
         $body = [
             'customer' => self::getCustomer($quote),
-            'billing_address' => self::convertBillingAddress($quote->getBillingAddress()),
-            'shipping_address' => self::convertBillingAddress($quote->getBillingAddress()),
+            'billing_address' => self::convertQuoteAddress($quote->getBillingAddress()),
+            'shipping_address' => self::convertQuoteAddress($quote->getShippingAddress()),
             'cart_items' => self::getCartItems($quote),
             'taxes' => self::getTaxes($quote),
             'discounts' => self::$discounts,
@@ -82,12 +76,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     }
 
     /**
-     * Convert billing address to appropriate format.
+     * Convert quote billing|shipping address to appropriate format.
      *
      * @param Mage_Sales_Model_Quote_Address $address
      * @return array
      */
-    private static function convertBillingAddress(Mage_Sales_Model_Quote_Address $address)
+    private static function convertQuoteAddress(Mage_Sales_Model_Quote_Address $address)
     {
         $countryIsoCode = Mage::getModel('directory/country')
             ->load($address->getCountryId())

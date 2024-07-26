@@ -3,7 +3,7 @@
 /**
  * Bold fastlane payment method model.
  */
-class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Bold_CheckoutPaymentBooster_Model_Payment_Bold
+class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Model_Method_Abstract
 {
     const CODE = 'bold_fastlane';
 
@@ -26,7 +26,14 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Bold_CheckoutPa
         $websiteId = $quote ? $quote->getStore()->getWebsiteId() : Mage::app()->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->isFastlaneEnabled($websiteId);
+    }
 
-        return $config->isFastlaneEnabled($websiteId) && !Mage::getSingleton('customer/session')->isLoggedIn();
+    /**
+     * @inheritDoc
+     */
+    public function isAvailable($quote = null)
+    {
+        return Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData() !== null;
     }
 }

@@ -16,16 +16,20 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     {
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $checkoutSession->setBoldCheckoutData(null);
         try {
             if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
                 return;
             }
-            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
-            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
-            $checkoutSession->setBoldCheckoutData($checkoutData);
+            Bold_CheckoutPaymentBooster_Service_Bold::loadBoldCheckoutData($quote);
+            $checkoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
+            $publicOrderId = $checkoutData ? $checkoutData->public_order_id : null;
+            if (!$publicOrderId) {
+                return;
+            }
+            Bold_CheckoutPaymentBooster_Service_Fastlane::loadGatewayData(
+                $publicOrderId,
+                (int)$quote->getStore()->getWebsiteId()
+            );
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
@@ -42,8 +46,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         $publicOrderId = $boldCheckoutData->public_order_id;
         $paymentMethod = $order->getPayment()->getMethod();
         $methodsToProcess = [

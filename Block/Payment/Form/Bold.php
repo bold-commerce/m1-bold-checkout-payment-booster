@@ -157,7 +157,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = $checkoutSession->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         if (!$boldCheckoutData) {
             return null;
         }
@@ -184,7 +184,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Payment_Bold $bold */
         $bold = Mage::getModel('bold_checkout_payment_booster/payment_bold');
-        $isAvailable = $bold->isAvailable($this->quote);
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        $isAvailable = $bold->isAvailable($quote);
 
         return (int)$isAvailable;
     }
@@ -196,9 +197,10 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
      */
     public function isFastlaneAvailable()
     {
-        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $bold */
-        $bold = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
-        $isAvailable = $bold->isAvailable($this->quote);
+        /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
+        $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        $isAvailable = $fastlane->isAvailable($quote);
 
         return (int)$isAvailable;
     }
@@ -210,7 +212,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
      */
     public function getAlternativePaymentMethods()
     {
-        $boldCheckoutData = Mage::getSingleton('checkout/session')->getBoldCheckoutData();
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
         if (!$boldCheckoutData) {
             return json_encode([]);
         }

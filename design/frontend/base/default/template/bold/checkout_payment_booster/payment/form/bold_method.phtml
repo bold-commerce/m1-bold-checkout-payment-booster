@@ -74,19 +74,19 @@
          * @returns {*|boolean}
          */
         initialize: function () {
-            this.hidePaymentMethod();
-            if (!this.isAvailable()) {
-                return;
-            }
             if (!window.bold) {
                 window.bold = {
                     orderData: {}
                 };
             }
-            this.paymentCheckbox = document.getElementById('p_method_bold');
-            this.subscribeToPIGI();
+            this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
+            if (!this.isAvailable()) {
+                return;
+            }
+            this.paymentCheckbox = document.getElementById('p_method_bold');
+            this.subscribeToPIGI();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
         },
