@@ -94,6 +94,13 @@
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>
+        <layout>
+            <updates>
+                <bold_checkout_payment_booster>
+                    <file>bold/checkout_payment_booster.xml</file>
+                </bold_checkout_payment_booster>
+            </updates>
+        </layout>
     </adminhtml>
     <default>
         <checkout>

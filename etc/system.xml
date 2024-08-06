@@ -3,6 +3,12 @@
     <sections>
         <checkout>
             <groups>
+                <bold_checkout_payment_booster_onboarding>
+                    <sort_order>0</sort_order>
+                    <show_in_default>0</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <frontend_model>bold_checkout_payment_booster/adminhtml_system_config_form_fieldset_onboarding</frontend_model>
+                </bold_checkout_payment_booster_onboarding>
                 <bold_checkout_payment_booster translate="label">
                     <label>Bold Checkout Payment Booster Extension</label>
                     <frontend_type>text</frontend_type>
