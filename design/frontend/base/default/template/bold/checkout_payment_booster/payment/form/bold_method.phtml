@@ -227,6 +227,7 @@
                 console.log('Payload is not changed');
                 return;
             }
+            console.log('Hydrating order data...', this.orderPayload);
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
@@ -335,6 +336,9 @@
                             }
                             console.log('Updating iframe height');
                             this.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            if (this.fastlaneAvailable) {
+                                this.iframeWindow.postMessage({ actionType: 'PIGI_HIDE_CREDIT_CARD_OPTION' }, '*');
+                            }
                             break;
                         case 'PIGI_INITIALIZED':
                             console.log('PIGI initialized');

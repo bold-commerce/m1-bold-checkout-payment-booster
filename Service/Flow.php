@@ -63,7 +63,7 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         if ($config->isFastlaneEnabled($websiteId)
             && !$quote->getCustomer()->getId()
         ) {
-            return 'Bold three page';  //todo: check if api should be used instead.
+            return 'paypal_fastlane_3_page';  //todo: check if api should be used instead.
         }
 
         return 'Bold three page'; //todo: check if api should be used instead.

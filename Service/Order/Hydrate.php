@@ -14,6 +14,16 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         'shipping',
         'grand_total',
     ];
+    private static $requiredFields = [
+        'city',
+        'firstname',
+        'street',
+        'lastname',
+        'telephone',
+        'postcode',
+        'region',
+        'region_id',
+    ];
 
     private static $discounts = [];
 
@@ -37,8 +47,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         self::getDiscountsAndFees($quote);
         $body = [
             'customer' => self::getCustomer($quote),
-            'billing_address' => self::convertQuoteAddress($quote->getBillingAddress()),
-            'shipping_address' => self::convertQuoteAddress($quote->getShippingAddress()),
+            'billing_address' => self::convertQuoteAddress($quote, 'billing'),
+            'shipping_address' => self::convertQuoteAddress($quote, 'shipping'),
             'cart_items' => self::getCartItems($quote),
             'taxes' => self::getTaxes($quote),
             'discounts' => self::$discounts,
@@ -78,11 +88,20 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     /**
      * Convert quote billing|shipping address to appropriate format.
      *
-     * @param Mage_Sales_Model_Quote_Address $address
+     * @param Mage_Sales_Model_Quote $quote
      * @return array
      */
-    private static function convertQuoteAddress(Mage_Sales_Model_Quote_Address $address)
+    private static function convertQuoteAddress(Mage_Sales_Model_Quote $quote, $type)
     {
+        $billingAddress = $quote->getbillingAddress();
+        $shippingAddress = $quote->getShippingAddress();
+        $address = $type === 'billing' ? $billingAddress : $shippingAddress;
+        foreach (self::$requiredFields as $field) {
+            if (!$address->getData($field)) {
+                $address = $billingAddress->getData($field) ? $billingAddress : $shippingAddress;
+                break;
+            }
+        }
         $countryIsoCode = Mage::getModel('directory/country')
             ->load($address->getCountryId())
             ->getIso2Code();
