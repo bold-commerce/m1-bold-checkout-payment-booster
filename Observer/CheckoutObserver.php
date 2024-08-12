@@ -17,12 +17,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
         try {
-            if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
-                return;
-            }
-            Bold_CheckoutPaymentBooster_Service_Bold::loadBoldCheckoutData($quote);
-            $checkoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-            $publicOrderId = $checkoutData ? $checkoutData->public_order_id : null;
+            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             if (!$publicOrderId) {
                 return;
             }
@@ -46,8 +42,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $publicOrderId = $boldCheckoutData->public_order_id;
         $paymentMethod = $order->getPayment()->getMethod();
         $methodsToProcess = [
             Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
@@ -60,7 +54,40 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         $websiteId = $quote->getStore()->getWebsiteId();
         // hydrate bold order before auth payment
         Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
         // TODO: check if order total and transactions are correct
-        $paymentAuthData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+        Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+    }
+
+    /**
+     * Save Bold order data to database after order has been placed on Magento side.
+     *
+     * After Magento order has been placed, we have order id and can save Bold order data(public id) to database.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function afterSaveOrder(Varien_Event_Observer $event)
+    {
+        /** @var Mage_Sales_Model_Order $order */
+        $order = $event->getEvent()->getOrder();
+        $methodsToProcess = [
+            Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
+            Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
+        ];
+        if (!in_array($order->getPayment()->getMethod(), $methodsToProcess)) {
+            return;
+        }
+        try {
+            /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
+            $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
+            $extOrderData->setOrderId($order->getEntityId());
+            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
+            $extOrderData->save();
+            Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
+            Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+        } catch (\Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::CRIT);
+        }
     }
 }

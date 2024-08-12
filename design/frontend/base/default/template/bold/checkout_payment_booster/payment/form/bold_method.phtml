@@ -22,6 +22,7 @@
     let Bold = Class.create({
         iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
+        awaitingRefreshBeforePlacingOrder: false,
         paymentContainer: document.getElementById('bold-payments-container'),
         available: <?php echo $this->isAvailable(); ?>,
         fastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
@@ -149,7 +150,7 @@
             if (isInvalid) {
                 return false;
             }
-            let regionsRequired = window.countryRegions || {
+            let regionsRequired = window.shippingRegionUpdater || {
                 config: {
                     regions_required: []
                 }
@@ -264,10 +265,9 @@
                     }
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
-                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
-                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
-                        this.iframeWindow.postMessage(clearAction, '*');
-                        this.iframeWindow.postMessage(action, '*');
+                        this.awaitingRefreshBeforePlacingOrder = true;
+                        this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
+                        this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
                         checkout.setLoadWaiting(false);
                         return checkoutSaveMethod();
@@ -291,10 +291,9 @@
                     }
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
-                        const clearAction = {actionType: 'PIGI_CLEAR_ERROR_MESSAGES'};
-                        const action = {actionType: 'PIGI_ADD_PAYMENT'};
-                        this.iframeWindow.postMessage(clearAction, '*');
-                        this.iframeWindow.postMessage(action, '*');
+                        this.awaitingRefreshBeforePlacingOrder = true;
+                        this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
+                        this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
                         checkout.setLoadWaiting(false);
                         return paymentSaveMethod();
@@ -345,6 +344,12 @@
                             this.iframeWindow = this.iframeElement.contentWindow;
                             if (data.payload && data.payload.height && this.iframeElement) {
                                 this.iframeElement.height = Math.round(data.payload.height) + 'px';
+                            }
+                            break;
+                        case 'PIGI_REFRESH_ORDER':
+                            if (this.awaitingRefreshBeforePlacingOrder) {
+                                this.iframeWindow.postMessage({actionType: 'PIGI_ADD_PAYMENT'}, '*');
+                                this.awaitingRefreshBeforePlacingOrder = false;
                             }
                             break;
                         case 'PIGI_ADD_PAYMENT':

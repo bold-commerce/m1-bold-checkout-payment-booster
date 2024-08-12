@@ -10,14 +10,11 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      *
      * @param Mage_Sales_Model_Quote $quote
      */
-    public static function loadBoldCheckoutData(Mage_Sales_Model_Quote $quote)
+    public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
         $websiteId = (int)$quote->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        if (!$config->isPaymentBoosterEnabled($websiteId)) {
-            return;
-        }
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData(null);
@@ -27,6 +24,16 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         $checkoutSession->setBoldCheckoutData($checkoutData);
+    }
+
+    /**
+     * Clear Bold checkout data in checkout session.
+     */
+    public static function clearBoldCheckoutData()
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $checkoutSession->setBoldCheckoutData(null);
     }
 
     /**
@@ -42,13 +49,32 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     }
 
     /**
+     * Get public order id.
+     *
+     * @return string|null
+     */
+    public static function getPublicOrderId()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        return $checkoutData ? $checkoutData->public_order_id : null;
+    }
+
+    /**
      * Check if Bold payment method is available.
      *
      * @return bool
      */
     public static function isAvailable()
     {
+        $websiteId = Mage::app()->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $isEnabled = $config->isPaymentBoosterEnabled($websiteId);
+        if (!$isEnabled) {
+            return false;
+        }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         return self::getBoldCheckoutData() !== null && $quote && !$quote->getIsMultiShipping();
     }
+
 }

@@ -5,6 +5,9 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
+    const BOLD = 'Bold three page';
+    const FASTLANE = 'paypal_fastlane_3_page';
+
     /**
      * Get Bold flows.
      *
@@ -59,13 +62,16 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         $websiteId = $quote->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-
-        if ($config->isFastlaneEnabled($websiteId)
-            && !$quote->getCustomer()->getId()
-        ) {
-            return 'paypal_fastlane_3_page';  //todo: check if api should be used instead.
+        $flows = self::getList($websiteId);
+        $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
+        if (!$isFastlaneEnabled) {
+            return self::BOLD;
         }
-
-        return 'Bold three page'; //todo: check if api should be used instead.
+        foreach ($flows as $flow) {
+            if ($flow->flow_id === self::FASTLANE) {
+                return self::FASTLANE;
+            }
+        }
+        return self::BOLD;
     }
 }
