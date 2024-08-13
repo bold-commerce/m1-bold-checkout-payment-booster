@@ -1,9 +1,7 @@
 <?php
 
 /**
- * Capture bold payment service.
- *
- * phpcs:disable Zend.NamingConventions.ValidVariableName.NotCamelCaps
+ * Bold payment service.
  */
 class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
 {
