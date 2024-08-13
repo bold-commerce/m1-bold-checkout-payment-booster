@@ -44,6 +44,14 @@
                     </bold>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
+            <checkout_submit_all_after>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>afterSaveOrder</method>
+                    </bold>
+                </observers>
+            </checkout_submit_all_after>
             <!-- TM_FireCheckout -->
             <controller_action_predispatch_firecheckout_index_index>
                 <observers>

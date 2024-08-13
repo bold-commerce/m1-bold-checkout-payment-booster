@@ -15,6 +15,7 @@
 class Bold_CheckoutPaymentBooster_Model_Order extends Mage_Core_Model_Abstract
 {
     const RESOURCE = 'bold_checkout_payment_booster/order';
+    const ORDER_ID = 'order_id';
 
     /**
      * @inheritDoc
