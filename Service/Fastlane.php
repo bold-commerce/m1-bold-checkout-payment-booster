@@ -61,7 +61,18 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
         $websiteId = (int)Mage::app()->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        if (!$config->isFastlaneEnabled($websiteId)) {
+            return false;
+        }
+        if (Mage::getSingleton('customer/session')->isLoggedIn()) {
+            return false;
+        }
+        foreach (Bold_CheckoutPaymentBooster_Service_Flow::getList($websiteId) as $flow) {
+            if ($flow->flow_id === Bold_CheckoutPaymentBooster_Service_Flow::FASTLANE) {
+                return true;
+            }
+        }
 
-        return $config->isFastlaneEnabled($websiteId) && !Mage::getSingleton('customer/session')->isLoggedIn();
+        return false;
     }
 }

@@ -8,6 +8,8 @@ class Bold_CheckoutPaymentBooster_Service_Flow
     const BOLD = 'Bold three page';
     const FASTLANE = 'paypal_fastlane_3_page';
 
+    private static $flowList = [];
+
     /**
      * Get Bold flows.
      *
@@ -16,10 +18,14 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      */
     public static function getList($websiteId)
     {
-        return Bold_CheckoutPaymentBooster_Service_Client::get(
+        if (self::$flowList) {
+            return self::$flowList;
+        }
+        self::$flowList = Bold_CheckoutPaymentBooster_Service_Client::get(
             '/checkout/shop/{{shopId}}/flows',
             $websiteId
         )->data->flows;
+        return self::$flowList;
     }
 
     /**
