@@ -7,11 +7,17 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
 {
     const PAYPAL_FASTLANE_CLIENT_TOKEN_URL = 'checkout/orders/{{shopId}}/%s/paypal_fastlane/client_token';
 
+    /**
+     * Load Fastlane Gateway data.
+     *
+     * @param string $publicOrderId
+     * @param int $websiteId
+     */
     public static function loadGatewayData($publicOrderId, $websiteId)
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
-        $checkoutSession->setBotFastlaneGatewayData(null);
+        $checkoutSession->setBoldFastlaneGatewayData(null);
         if (!self::isAvailable()) {
             return;
         }
@@ -30,7 +36,7 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
         if (isset($response->errors)) {
             return;
         }
-        $checkoutSession->setBotFastlaneGatewayData($response->data);
+        $checkoutSession->setBoldFastlaneGatewayData($response->data);
     }
 
     /**
@@ -42,7 +48,7 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
-        return $checkoutSession->getBotFastlaneGatewayData();
+        return $checkoutSession->getBoldFastlaneGatewayData();
     }
 
     /**
