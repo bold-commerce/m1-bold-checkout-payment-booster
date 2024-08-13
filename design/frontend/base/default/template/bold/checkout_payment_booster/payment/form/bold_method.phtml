@@ -270,7 +270,7 @@
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
                         checkout.setLoadWaiting(false);
-                        return checkoutSaveMethod();
+                        checkoutSaveMethod();
                     }
                 }.bind(this)
             );
@@ -296,7 +296,7 @@
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
                         checkout.setLoadWaiting(false);
-                        return paymentSaveMethod();
+                        paymentSaveMethod();
                     }
                 }.bind(this)
             );
