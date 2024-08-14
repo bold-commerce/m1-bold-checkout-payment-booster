@@ -719,7 +719,8 @@
             if (!walletPayResult.ok) {
                 return Promise.reject('An error occurred while processing your payment. Please try again.');
             }
-            this.fastlanePaymentToken = walletPayResult.data?.payment_data?.id;
+            const walletPayJson = await walletPayResult.json();
+            this.fastlanePaymentToken = walletPayJson.data?.payment_data?.id;
             const cartData = await new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
@@ -735,7 +736,7 @@
             const paymentPayload = {
                 'gateway_public_id': this.gatewayData.gateway_public_id,
                 'currency': cartData.quote_currency_code,
-                'token': this.paymentToken.id
+                'token':this.fastlanePaymentToken
             }
             await fetch(this.boldApiUrl + 'payments', {
                 method: 'POST',
