@@ -266,6 +266,10 @@
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
                         this.awaitingRefreshBeforePlacingOrder = true;
+                        if (!this.iframeWindow) {
+                            checkout.setLoadWaiting(false);
+                            return checkoutSaveMethod();
+                        }
                         this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
@@ -291,6 +295,10 @@
                     }
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
+                        if (!this.iframeWindow) {
+                            checkout.setLoadWaiting(false);
+                            return paymentSaveMethod();
+                        }
                         this.awaitingRefreshBeforePlacingOrder = true;
                         this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
