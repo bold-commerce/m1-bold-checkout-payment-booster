@@ -23,6 +23,16 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
+     * Get public order ID.
+     *
+     * @return string
+     */
+    public function getPublicOrderId()
+    {
+        return Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+    }
+
+    /**
      * Check if fastlane payment method is available.
      *
      * @return int

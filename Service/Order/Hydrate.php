@@ -14,6 +14,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         'shipping',
         'grand_total',
     ];
+
     private static $requiredFields = [
         'city',
         'firstname',
@@ -38,8 +39,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      */
     public static function hydrate(Mage_Sales_Model_Quote $quote)
     {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $publicOrderId = $boldCheckoutData->public_order_id;
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
         if (!$publicOrderId) {
             Mage::throwException('There is no public order ID in the checkout session.');
         }
@@ -59,9 +59,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         $response = Bold_CheckoutPaymentBooster_Service_Client::put(
             $apiUri,
             $quote->getStore()->getWebsiteId(),
-            json_encode($body)
+            $body
         );
-        Mage::log(json_encode($body), Zend_Log::DEBUG, 'hydrate.log', true);
         if (isset($response->errors) || isset($response->error)) {
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId
