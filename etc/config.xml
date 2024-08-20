@@ -33,6 +33,16 @@
                 </setup>
             </bold_checkout_payment_booster_setup>
         </resources>
+        <events>
+            <sales_order_save_commit_after>
+                <observers>
+                    <bold>
+                        <class>Bold_CheckoutPaymentBooster_Observer_OrderObserver</class>
+                        <method>fulfillOrderItems</method>
+                    </bold>
+                </observers>
+            </sales_order_save_commit_after>
+        </events>
     </global>
     <frontend>
         <events>

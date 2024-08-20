@@ -55,8 +55,10 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         // hydrate bold order before auth payment
         Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
         $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        // TODO: check if order total and transactions are correct
-        Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+        $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+        $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
+        $order->getPayment()->setIsTransactionClosed(0);
+        $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
     }
 
     /**
