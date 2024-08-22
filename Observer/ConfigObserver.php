@@ -27,6 +27,26 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
     }
 
     /**
+     * Set RSA configuration.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function setRsaConfig(Varien_Event_Observer $event)
+    {
+        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
+        try {
+            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::setRsaConfig($websiteId);
+        } catch (Exception $exception) {
+            Mage::log(
+                $exception->getMessage(),
+                Zend_Log::CRIT,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
+        }
+    }
+
+    /**
      * Send PIGI styles to the Bold.
      *
      * @param Varien_Event_Observer $event

@@ -1,0 +1,37 @@
+<?php
+
+class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
+{
+    const URL = 'checkout/shop/{{shopId}}/rsa_config';
+
+    /**
+     * Set RSA configuration.
+     *
+     * @param int $websiteId
+     * @return void
+     * @throws Mage_Core_Exception
+     */
+    public static function setRsaConfig($websiteId)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $sharedSecret = $config->getSharedSecret($websiteId);
+        $body = [
+            'url' => Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB),
+            'shared_secret' => $sharedSecret,
+        ];
+        $result = Bold_CheckoutPaymentBooster_Service_Client::post(self::URL, $websiteId, $body);
+        $code = isset($result->errors[0]->code) ? $result->errors[0]->code : null;
+        if (!$code) {
+            return;
+        }
+        if ($code !== '02-89') {
+            Mage::throwException($result->errors[0]->message);
+        }
+        $result = Bold_CheckoutPaymentBooster_Service_Client::patch(self::URL, $websiteId, $body);
+        $errorMessage = isset($result->errors[0]->message) ? $result->errors[0]->message : null;
+        if ($errorMessage) {
+            Mage::throwException($errorMessage);
+        }
+    }
+}
