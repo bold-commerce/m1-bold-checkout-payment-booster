@@ -3,6 +3,7 @@
 class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
 {
     const URL = 'checkout/shop/{{shopId}}/rsa_config';
+    const ALREADY_CREATED_CODE = '02-89';
 
     /**
      * Set RSA configuration.
@@ -25,7 +26,7 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         if (!$code) {
             return;
         }
-        if ($code !== '02-89') {
+        if ($code !== self::ALREADY_CREATED_CODE) { // RSA configuration already exists and needs to be updated.
             Mage::throwException($result->errors[0]->message);
         }
         $result = Bold_CheckoutPaymentBooster_Service_Client::patch(self::URL, $websiteId, $body);
