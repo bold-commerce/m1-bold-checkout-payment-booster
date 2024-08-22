@@ -105,6 +105,10 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setShopId</method>
                     </set_shop_identifier>
+                    <set_rsa_config>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>setRsaConfig</method>
+                    </set_rsa_config>
                     <update_pigi_styles>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>sendPigiStyles</method>
