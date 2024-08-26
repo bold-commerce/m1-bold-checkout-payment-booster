@@ -151,7 +151,7 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
         );
         $this->logRequest(
             $tracingId,
-            $tracingId . ': ' . $request->getRawBody(),
+            'Body: ' . $request->getRawBody(),
             $websiteId
         );
         $response = $this->getFront()->getResponse();
@@ -183,8 +183,8 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
             );
         }
         $request->setDispatched();
-        $this->logRequest($tracingId, $response->getHttpResponseCode(), $websiteId);
-        $body = $response->getBody();
+        $this->logRequest($tracingId, 'Result Code: ' . $response->getHttpResponseCode(), $websiteId);
+        $body = 'Result Body: ' . $response->getBody();
         $logMessage = strlen($body) > 500
             ? substr($body, 0, 200) . ' ... ' . substr($body, -200, 200)
             : $body;
@@ -228,7 +228,7 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
             return;
         }
         Mage::log(
-            $tracingId . ': ' . $message,
+            $tracingId . ': Incoming Call: ' . $message,
             Zend_Log::DEBUG,
             'bold_checkout_payment_booster.log',
             true
@@ -257,7 +257,7 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
             base64_encode(
                 hash_hmac(
                     'sha256',
-                    $request->getHeader('X-HMAC-Timestamp'),
+                    'x-hmac-timestamp: ' . $request->getHeader('X-HMAC-Timestamp'),
                     $sharedSecret,
                     true
                 )
