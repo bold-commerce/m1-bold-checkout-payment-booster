@@ -252,7 +252,6 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
         if (!$signature) {
             return false;
         }
-
         return hash_equals(
             base64_encode(
                 hash_hmac(
