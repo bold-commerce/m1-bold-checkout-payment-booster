@@ -141,5 +141,30 @@
                 <title>Credit Card</title>
             </bold_fastlane>
         </payment>
+        <web>
+            <routers>
+                <bold>
+                    <class>Bold_CheckoutPaymentBooster_Model_Router</class>
+                </bold>
+            </routers>
+        </web>
     </default>
+
+    <rest>
+        <V1>
+            <shops>
+                <_shopIdentifier>
+                    <orders>
+                        <_publicOrderId>
+                            <payments>
+                                <POST>
+                                    <handler>Bold_CheckoutPaymentBooster_Api_Order_Payment::update</handler>
+                                </POST>
+                            </payments>
+                        </_publicOrderId>
+                    </orders>
+                </_shopIdentifier>
+            </shops>
+        </V1>
+    </rest>
 </config>

@@ -21,6 +21,6 @@ class Bold_CheckoutPaymentBooster_Observer_OrderObserver
         if (!$boldConfig->isPaymentBoosterEnabled($websiteId)) {
             return;
         }
-        Bold_CheckoutPaymentBooster_Api__Order_Items::fulfilItems($order);
+        Bold_CheckoutPaymentBooster_Api_Order_Items::fulfilItems($order);
     }
 }

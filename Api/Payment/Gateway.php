@@ -24,7 +24,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     public static function capture(Varien_Object $payment, $amount)
     {
         $order = $payment->getOrder();
-        self::saveIsDelayedCapture($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCapture($order);
         if ((float)$order->getGrandTotal() === (float)$amount) {
             $payment->setTransactionId(self::captureFull($order))
                 ->setShouldCloseParentTransaction(true);
@@ -48,7 +48,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
-        self::saveIsDelayedCapture($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCancel($order);
         Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancelVoid(
             $order,
             Bold_CheckoutPaymentBooster_Api_Payment_Gateway::CANCEL
@@ -66,7 +66,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
-        self::saveIsDelayedCapture($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformCancel($order);
         self::cancelVoid(
             $order,
             Bold_CheckoutPaymentBooster_Api_Payment_Gateway::VOID
@@ -85,6 +85,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformRefund($order);
         $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
         $amount = Mage::app()->getStore()->roundPrice($amount);
         if ($orderGrandTotal <= $amount) {
@@ -351,21 +352,5 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
         foreach ($transactionAdditionalInfo as $key => $value) {
             $order->getPayment()->setTransactionAdditionalInfo($key, $value);
         }
-    }
-
-    /**
-     * Save order uses delayed payment capture.
-     *
-     * @param Mage_Sales_Model_Order $order
-     * @return void
-     * @throws Exception
-     */
-    private static function saveIsDelayedCapture(Mage_Sales_Model_Order $order)
-    {
-        /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
-        $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
-        $extOrderData->load($order->getEntityId(), Bold_CheckoutPaymentBooster_Model_Order::ORDER_ID);
-        $extOrderData->setIsDelayedCapture(1);
-        $extOrderData->save();
     }
 }

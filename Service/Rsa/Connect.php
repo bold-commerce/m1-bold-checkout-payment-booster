@@ -18,7 +18,7 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $sharedSecret = $config->getSharedSecret($websiteId);
         $body = [
-            'url' => Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB),
+            'url' => Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB) . 'rest/V1',
             'shared_secret' => $sharedSecret,
         ];
         $result = Bold_CheckoutPaymentBooster_Service_Client::post(self::URL, $websiteId, $body);
