@@ -12,14 +12,14 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $checkoutSession->setBoldCheckoutData(null);
+        self::clearBoldCheckoutData();
         if (!self::isAvailable()) {
             return;
         }
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);
     }
 

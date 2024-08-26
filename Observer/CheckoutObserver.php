@@ -78,6 +78,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
         ];
         if (!in_array($order->getPayment()->getMethod(), $methodsToProcess)) {
+            Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+            Bold_CheckoutPaymentBooster_Service_Fastlane::clearGatewayData();
             return;
         }
         try {
@@ -88,7 +90,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             $extOrderData->save();
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
-        } catch (\Exception $e) {
+            Bold_CheckoutPaymentBooster_Service_Fastlane::clearGatewayData();
+        } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
         }
     }

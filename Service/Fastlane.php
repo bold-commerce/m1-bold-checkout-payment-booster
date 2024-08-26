@@ -15,9 +15,7 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
      */
     public static function loadGatewayData($publicOrderId, $websiteId)
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $checkoutSession->setBoldFastlaneGatewayData(null);
+        self::clearGatewayData();
         if (!self::isAvailable()) {
             return;
         }
@@ -36,7 +34,21 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
         if (isset($response->errors)) {
             return;
         }
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldFastlaneGatewayData($response->data);
+    }
+
+    /**
+     * Remove Fastlane Gateway data from checkout session.
+     *
+     * @return void
+     */
+    public static function clearGatewayData()
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $checkoutSession->setBoldFastlaneGatewayData(null);
     }
 
     /**
