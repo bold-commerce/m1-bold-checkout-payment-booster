@@ -24,9 +24,7 @@
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         awaitingRefreshBeforePlacingOrder: false,
         paymentContainer: document.getElementById('bold-payments-container'),
-        available: <?php echo $this->isAvailable(); ?>,
-        fastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
-        alternativePaymentMethods: <?php echo $this->getAlternativePaymentMethods(); ?>,
+        isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
         iframeWindow: null,
         paymentCheckbox: null,
@@ -87,14 +85,6 @@
             this.subscribeToPIGI();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
-        },
-        /**
-         * Check if PIGI is available.
-         *
-         * @return {*|boolean}
-         */
-        isAvailable: function () {
-            return this.available && !this.fastlaneAvailable;
         },
         /**
          * Subscribe to fields changes for order hydration.
@@ -313,7 +303,7 @@
          * @private
          */
         showPIGI: function () {
-            if (!this.isAvailable()) {
+            if (!this.isAvailable) {
                 return;
             }
             console.log('Showing PIGI');

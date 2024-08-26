@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Bold service.
+ * Bold checkout service.
  */
 class Bold_CheckoutPaymentBooster_Service_Bold
 {
@@ -12,13 +12,10 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
-        $websiteId = (int)$quote->getStore()->getWebsiteId();
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData(null);
-        if (!$config->isPaymentBoosterEnabled($websiteId)) {
+        if (!self::isAvailable()) {
             return;
         }
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
@@ -49,6 +46,17 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     }
 
     /**
+     * Get JWT token.
+     *
+     * @return string|null
+     */
+    public static function getJwtToken()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        return $checkoutData ? $checkoutData->jwt_token : null;
+    }
+
+    /**
      * Get public order id.
      *
      * @return string|null
@@ -60,11 +68,11 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     }
 
     /**
-     * Check if Bold payment method is available.
+     * Check if Bold payment methods are available.
      *
      * @return bool
      */
-    public static function isAvailable()
+    private static function isAvailable()
     {
         $websiteId = Mage::app()->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
@@ -74,7 +82,6 @@ class Bold_CheckoutPaymentBooster_Service_Bold
             return false;
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
-        return self::getBoldCheckoutData() !== null && $quote && !$quote->getIsMultiShipping();
+        return $quote && !$quote->getIsMultiShipping();
     }
-
 }

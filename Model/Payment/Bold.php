@@ -72,7 +72,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function isAvailable($quote = null)
     {
-        return Bold_CheckoutPaymentBooster_Service_Bold::isAvailable();
+        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
     }
 
     /**

@@ -58,9 +58,12 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
      */
     private static function isAvailable()
     {
-        $websiteId = (int)Mage::app()->getStore()->getWebsiteId();
+        if (!Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData()) {
+            return false;
+        }
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $websiteId = (int)Mage::app()->getStore()->getWebsiteId();
         if (!$config->isFastlaneEnabled($websiteId)) {
             return false;
         }

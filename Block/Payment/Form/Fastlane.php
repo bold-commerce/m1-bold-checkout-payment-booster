@@ -18,18 +18,10 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     protected function _construct()
     {
         parent::_construct();
-        $this->quote = Mage::getSingleton('checkout/session')->getQuote();
-        $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_fastlane_method.phtml');
-    }
-
-    /**
-     * Get public order ID.
-     *
-     * @return string
-     */
-    public function getPublicOrderId()
-    {
-        return Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+        if ($this->isAvailable()) {
+            $this->quote = Mage::getSingleton('checkout/session')->getQuote();
+            $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_fastlane_method.phtml');
+        }
     }
 
     /**
@@ -97,8 +89,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     {
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        if (!$boldCheckoutData) {
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+        if (!$publicOrderId) {
             return null;
         }
         $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
@@ -107,11 +99,10 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         } catch (Mage_Core_Exception $e) {
             return null;
         }
-        $orderId = $boldCheckoutData->public_order_id;
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $apiUrl = $config->getApiUrl($websiteId);
-        return $apiUrl . self::PATH . $shopId . '/' . $orderId . '/';
+        return $apiUrl . self::PATH . $shopId . '/' . $publicOrderId . '/';
     }
 
     /**
@@ -121,10 +112,6 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
      */
     public function getJwtToken()
     {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        if (!$boldCheckoutData) {
-            return null;
-        }
-        return $boldCheckoutData->jwt_token;
+        return Bold_CheckoutPaymentBooster_Service_Bold::getJwtToken();
     }
 }
