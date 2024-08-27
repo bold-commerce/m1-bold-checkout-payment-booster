@@ -59,6 +59,9 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
             $error = current($shopInfo->errors);
             Mage::throwException($error->message);
         }
+        if (isset($shopInfo->error)) {
+            Mage::throwException($shopInfo->error_description);
+        }
 
         $shopIdentifier = $shopInfo->shop_identifier;
         $config->setShopId($shopIdentifier, $websiteId);
