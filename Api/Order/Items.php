@@ -3,7 +3,7 @@
 /**
  * Update order information on bold side service.
  */
-class Bold_CheckoutPaymentBooster_Api__Order_Items
+class Bold_CheckoutPaymentBooster_Api_Order_Items
 {
     /**
      * Update order line items fulfilment status.

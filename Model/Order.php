@@ -11,6 +11,12 @@
  * @method $this setOrderId(int $value)
  * @method string getPublicId()
  * @method $this setPublicId(string $value)
+ * @method int getIsPlatformCapture()
+ * @method $this setIsPlatformCapture(int $value)
+ * @method int getIsPlatformRefund()
+ * @method $this setIsPlatformRefund(int $value)
+ * @method int getIsPlatformCancel()
+ * @method $this setIsPlatformCancel(int $value)
  */
 class Bold_CheckoutPaymentBooster_Model_Order extends Mage_Core_Model_Abstract
 {

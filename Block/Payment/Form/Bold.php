@@ -185,9 +185,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         /** @var Bold_CheckoutPaymentBooster_Model_Payment_Bold $bold */
         $bold = Mage::getModel('bold_checkout_payment_booster/payment_bold');
         $quote = Mage::getSingleton('checkout/session')->getQuote();
-        $isAvailable = $bold->isAvailable($quote);
-
-        return (int)$isAvailable;
+        return (int)($bold->isAvailable($quote) && !$this->isFastlaneAvailable());
     }
 
     /**
@@ -195,7 +193,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
      *
      * @return int
      */
-    public function isFastlaneAvailable()
+    private function isFastlaneAvailable()
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
         $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
@@ -203,21 +201,5 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         $isAvailable = $fastlane->isAvailable($quote);
 
         return (int)$isAvailable;
-    }
-
-    /**
-     * Get alternative payment methods.
-     *
-     * @return string
-     */
-    public function getAlternativePaymentMethods()
-    {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        if (!$boldCheckoutData) {
-            return json_encode([]);
-        }
-        return isset($boldCheckoutData->initial_data_alternative_payment_methods)
-            ? json_encode($boldCheckoutData->initial_data->alternative_payment_methods)
-            : json_encode([]);
     }
 }

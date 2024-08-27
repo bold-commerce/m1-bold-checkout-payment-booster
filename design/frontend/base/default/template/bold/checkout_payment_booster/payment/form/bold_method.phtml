@@ -24,9 +24,7 @@
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         awaitingRefreshBeforePlacingOrder: false,
         paymentContainer: document.getElementById('bold-payments-container'),
-        available: <?php echo $this->isAvailable(); ?>,
-        fastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
-        alternativePaymentMethods: <?php echo $this->getAlternativePaymentMethods(); ?>,
+        isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
         iframeWindow: null,
         paymentCheckbox: null,
@@ -80,32 +78,13 @@
                     orderData: {}
                 };
             }
+            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
-            if (!this.isAvailable()) {
-                return;
-            }
-            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.subscribeToPIGI();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
-        },
-        /**
-         * Validate if payment method is available.
-         *
-         * @return {*|boolean}
-         */
-        isAvailable: function () {
-            if (!this.available) {
-                return false;
-            }
-            if (this.fastlaneAvailable && this.alternativePaymentMethods.length > 0) {
-                return this.alternativePaymentMethods.some(function (method) {
-                    return method.type === 'braintree-paypal' || method.type === 'paypal_commerce_platform';
-                });
-            }
-            return true;
         },
         /**
          * Subscribe to fields changes for order hydration.
@@ -324,6 +303,9 @@
          * @private
          */
         showPIGI: function () {
+            if (!this.isAvailable) {
+                return;
+            }
             console.log('Showing PIGI');
             if (!this.iframeElement.src) {
                 this.iframeElement.src = this.iframeUrl;
@@ -344,7 +326,7 @@
                             console.log('Updating iframe height');
                             this.iframeElement.height = Math.round(data.payload.height) + 'px';
                             if (this.fastlaneAvailable) {
-                                this.iframeWindow.postMessage({ actionType: 'PIGI_HIDE_CREDIT_CARD_OPTION' }, '*');
+                                this.iframeWindow.postMessage({actionType: 'PIGI_HIDE_CREDIT_CARD_OPTION'}, '*');
                             }
                             break;
                         case 'PIGI_INITIALIZED':
