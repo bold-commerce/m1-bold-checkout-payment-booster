@@ -54,10 +54,15 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
                 $headers
             )
         );
-
+        if (!$shopInfo) {
+            Mage::throwException('Failed to get shop info');
+        }
         if (isset($shopInfo->errors)) {
             $error = current($shopInfo->errors);
             Mage::throwException($error->message);
+        }
+        if (isset($shopInfo->error)) {
+            Mage::throwException($shopInfo->error_description);
         }
 
         $shopIdentifier = $shopInfo->shop_identifier;
