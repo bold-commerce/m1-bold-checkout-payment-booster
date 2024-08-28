@@ -149,4 +149,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
         $encryptedSharedSecret = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_SHARED_SECRET);
         return Mage::helper('core')->decrypt($encryptedSharedSecret);
     }
+
+    /**
+     * Save generated shared secret.
+     *
+     * @param string|null $sharedSecret
+     * @param int $websiteId
+     * @return void
+     */
+    public function setSharedSecret($sharedSecret, $websiteId)
+    {
+        $sharedSecret = Mage::helper('core')->encrypt($sharedSecret);
+        Mage::getConfig()->saveConfig(self::PATH_SHARED_SECRET, $sharedSecret, 'websites', $websiteId);
+        Mage::getConfig()->cleanCache();
+    }
 }
