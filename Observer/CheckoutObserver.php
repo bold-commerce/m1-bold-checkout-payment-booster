@@ -53,12 +53,17 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         $quote = $order->getQuote();
         $websiteId = $quote->getStore()->getWebsiteId();
         // hydrate bold order before auth payment
-        Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
-        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
-        $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
-        $order->getPayment()->setIsTransactionClosed(0);
-        $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
+        try {
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+            $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+            $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
+            $order->getPayment()->setIsTransactionClosed(0);
+            $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
+        } catch (Mage_Core_Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::CRIT);
+            Mage::throwException(Mage::helper('core')->__('Payment Authorization Failure.'));
+        }
     }
 
     /**
