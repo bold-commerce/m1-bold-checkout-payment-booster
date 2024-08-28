@@ -35,7 +35,7 @@ class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Form_Fieldset_On
             return null;
         }
 
-        $apiUrl = $this->_getBaseAccountCenterUrl() . '/onboarding_banner/magento-1/' . $this->getOnboardingStatus();
+        $apiUrl = $this->_getBaseAccountCenterUrl() . '/onboarding_banner/magento-1/payment-booster/' . $this->getOnboardingStatus();
         /** @var array{
          *     header: string,
          *     body_text: string,
