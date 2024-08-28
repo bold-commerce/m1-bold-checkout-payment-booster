@@ -566,8 +566,8 @@
                     : '';
             });
             let regionCode = '';
-            if (window.shippingRegionUpdater.regions[magentoAddress.country_id]) {
-                Object.entries(window.shippingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
+            if (window.billingRegionUpdater.regions[magentoAddress.country_id]) {
+                Object.entries(window.billingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
                     const [regionId, regionData] = entry;
                     if (regionId === magentoAddress.region_id) {
                         regionCode = regionData.code;
@@ -606,7 +606,7 @@
             if (isInvalid) {
                 return false;
             }
-            let regionsRequired = window.shippingRegionUpdater || {
+            let regionsRequired = window.billingRegionUpdater || {
                 config: {
                     regions_required: []
                 }
@@ -781,8 +781,8 @@
                     : '';
             });
             let regionCode = '';
-            if (window.shippingRegionUpdater.regions[magentoAddress.country_id]) {
-                Object.entries(window.shippingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
+            if (window.billingRegionUpdater.regions[magentoAddress.country_id]) {
+                Object.entries(window.billingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
                     const [regionId, regionData] = entry;
                     if (regionId === magentoAddress.region_id) {
                         regionCode = regionData.code;
