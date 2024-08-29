@@ -84,7 +84,8 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
      */
     public function isAvailable($quote = null)
     {
-        return Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData() !== null;
+        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData() !== null
+            && Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData() !== null;
     }
 
     /**

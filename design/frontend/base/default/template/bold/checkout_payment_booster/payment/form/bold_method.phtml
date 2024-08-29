@@ -129,7 +129,7 @@
             if (isInvalid) {
                 return false;
             }
-            let regionsRequired = window.shippingRegionUpdater || {
+            let regionsRequired = window.billingRegionUpdater || {
                 config: {
                     regions_required: []
                 }
@@ -223,6 +223,10 @@
                 }.bind(this),
                 onFailure: function () {
                     this.hidePaymentMethod();
+                    if (window.boldFastlaneInstance) {
+                        window.boldFastlaneInstance.hidePaymentMethod();
+                    }
+                    checkout.setLoadWaiting(false);
                     window.bold.orderData = {};
                     console.error('Failed to sync order data');
                 }.bind(this),
