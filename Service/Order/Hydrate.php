@@ -133,7 +133,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getCartItems(Mage_Sales_Model_Quote $quote)
     {
         $items = [];
-        foreach ($quote->getAllItems() as $item) {
+        foreach ($quote->getAllVisibleItems() as $item) {
             $items[] = Bold_CheckoutPaymentBooster_Service_Quote_Item::extract($item);
         }
 
