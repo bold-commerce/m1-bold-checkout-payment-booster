@@ -28,10 +28,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Items
         $url = sprintf('/checkout/orders/{{shopId}}/%s/line_items', $publicOrderId);
         $itemsToFulfill = [];
         /** @var Mage_Sales_Model_Order_Item $item */
-        foreach ($order->getAllItems() as $item) {
-            if ($item->getChildrenItems()) {
-                continue;
-            }
+        foreach ($order->getAllVisibleItems() as $item) {
             $fulfilledQty = self::getFulfilledQty($item);
             if (!$fulfilledQty) {
                 continue;
