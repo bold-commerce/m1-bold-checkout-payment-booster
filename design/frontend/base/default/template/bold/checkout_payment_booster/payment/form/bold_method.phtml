@@ -200,14 +200,11 @@
             }
             this.updateOrderDataPayload();
             if (!this.isPayloadValid()) {
-                console.log('Payload is invalid');
                 return;
             }
             if (!this.isPayloadChanged()) {
-                console.log('Payload is not changed');
                 return;
             }
-            console.log('Hydrating order data...', this.orderPayload);
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
                 parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
@@ -296,7 +293,6 @@
          * Hide payment method section.
          */
         hidePaymentMethod: function () {
-            console.log('Hiding payment method');
             this.paymentMethodElement.style.display = 'none';
             this.loader.style.display = 'none';
         },
@@ -310,7 +306,6 @@
             if (!this.isAvailable) {
                 return;
             }
-            console.log('Showing PIGI');
             if (!this.iframeElement.src) {
                 this.iframeElement.src = this.iframeUrl;
             }
@@ -327,14 +322,9 @@
                             if (this.iframeElement.height === Math.round(data.payload.height) + 'px') {
                                 return;
                             }
-                            console.log('Updating iframe height');
                             this.iframeElement.height = Math.round(data.payload.height) + 'px';
-                            if (this.fastlaneAvailable) {
-                                this.iframeWindow.postMessage({actionType: 'PIGI_HIDE_CREDIT_CARD_OPTION'}, '*');
-                            }
                             break;
                         case 'PIGI_INITIALIZED':
-                            console.log('PIGI initialized');
                             this.iframeWindow = this.iframeElement.contentWindow;
                             if (data.payload && data.payload.height && this.iframeElement) {
                                 this.iframeElement.height = Math.round(data.payload.height) + 'px';
@@ -347,7 +337,6 @@
                             }
                             break;
                         case 'PIGI_ADD_PAYMENT':
-                            console.log('Adding payment');
                             if (!data.payload.success) {
                                 checkout.setLoadWaiting(false);
                                 console.error('Failed to add payment');
