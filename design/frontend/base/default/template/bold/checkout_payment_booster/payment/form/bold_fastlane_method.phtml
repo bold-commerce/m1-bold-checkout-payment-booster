@@ -86,11 +86,11 @@
             this.paymentCheckbox = document.getElementById('p_method_bold_fastlane');
             this.billingAddressForm = document.getElementById('billing-new-address-form');
             await this.authorize();
+            await this.renderFastlanePaymentComponent();
             this.subscribeToEmailChanges();
             this.subscribeToPhoneNumberChanges();
             this.waitForCheckoutInitialization();
             this.waitForPaymentInitialization();
-            await this.renderFastlanePaymentComponent();
         },
         /**
          * Hide payment method section.
