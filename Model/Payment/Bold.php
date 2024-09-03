@@ -84,10 +84,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
     {
         $infoInstance = $this->getInfoInstance();
         if ($infoInstance && $infoInstance->getCcLast4()) {
-            $ccLast4 = $infoInstance->decrypt($infoInstance->getCcLast4());
-            return strlen($ccLast4) === 4
-                ? $infoInstance->getCcType() . ': ending in ' . $ccLast4
-                : $infoInstance->getCcType() . ': ' . $ccLast4;
+            return $infoInstance->getCcType() . ': ending in ' . $infoInstance->decrypt($infoInstance->getCcLast4());
         }
         if ($infoInstance && $infoInstance->getAdditionalInformation('tender_details')) {
             return $infoInstance->getAdditionalInformation('tender_details');
