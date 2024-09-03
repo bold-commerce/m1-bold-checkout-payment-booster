@@ -52,14 +52,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         }
         $quote = $order->getQuote();
         $websiteId = $quote->getStore()->getWebsiteId();
-        // hydrate bold order before auth payment
         try {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
             $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
-            $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
-            $order->getPayment()->setIsTransactionClosed(0);
-            $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
+            $this->saveTransaction($order, $transactionData);
         } catch (Mage_Core_Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
             Mage::throwException(Mage::helper('core')->__('Payment Authorization Failure.'));
@@ -98,6 +95,37 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             Bold_CheckoutPaymentBooster_Service_Fastlane::clearGatewayData();
         } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
+        }
+    }
+
+    /**
+     * Add Bold transaction data to order payment.
+     *
+     * @param Mage_Sales_Model_Order $order
+     * @param stdClass $transactionData
+     * @return void
+     * @throws Mage_Core_Exception
+     */
+    private function saveTransaction(Mage_Sales_Model_Order $order, stdClass $transactionData)
+    {
+        $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
+        $order->getPayment()->setIsTransactionClosed(0);
+        $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
+        $cardDetails = isset($transactionData->transactions[0]->tender_details)
+            ? $transactionData->transactions[0]->tender_details
+            : null;
+        if ($cardDetails) {
+            $brand = isset($cardDetails->brand) ? $cardDetails->brand : null;
+            $lastFour = isset($cardDetails->last_four) ? $cardDetails->last_four : null;
+            if (!$lastFour && isset($cardDetails->line_text)) {
+                preg_match('/\b(\d{4})\b(?=\s*\(Transaction ID)/', $cardDetails->line_text, $matches);
+                $lastFour = isset($matches[1]) ? $matches[1] : null;
+            }
+            $order->getPayment()->setCcType($brand);
+            $order->getPayment()->setCcLast4($order->getPayment()->encrypt($lastFour));
+            if (!$lastFour && isset($cardDetails->line_text)) {
+                $order->getPayment()->setAdditionalInformation('tender_details', $cardDetails->line_text);
+            }
         }
     }
 }
