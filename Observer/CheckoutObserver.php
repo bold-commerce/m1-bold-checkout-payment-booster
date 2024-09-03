@@ -99,6 +99,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     }
 
     /**
+     * Add Bold transaction data to order payment.
+     *
      * @param Mage_Sales_Model_Order $order
      * @param stdClass $transactionData
      * @return void
