@@ -95,15 +95,17 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
      */
     public function getTitle()
     {
-        $title = null;
         $infoInstance = $this->getInfoInstance();
         if ($infoInstance && $infoInstance->getCcLast4()) {
             $ccLast4 = $infoInstance->decrypt($infoInstance->getCcLast4());
-            $title .= strlen($ccLast4) === 4
+            return strlen($ccLast4) === 4
                 ? $infoInstance->getCcType() . ': ending in ' . $ccLast4
                 : $infoInstance->getCcType() . ': ' . $ccLast4;
         }
-        return $title ?: parent::getTitle();
+        if ($infoInstance && $infoInstance->getAdditionalInformation('tender_details')) {
+            return $infoInstance->getAdditionalInformation('tender_details');
+        }
+        return parent::getTitle();
     }
 
     /**
