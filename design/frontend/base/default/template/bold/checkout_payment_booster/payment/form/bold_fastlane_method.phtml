@@ -69,7 +69,6 @@
          * @return {Promise<void>}
          */
         initialize: async function () {
-            this.hidePaymentMethod();
             if (!this.isAvailable) {
                 return;
             }
@@ -85,6 +84,17 @@
             this.emailField = document.getElementById('billing:email');
             this.paymentCheckbox = document.getElementById('p_method_bold_fastlane');
             this.billingAddressForm = document.getElementById('billing-new-address-form');
+            if (window.bold.fastlane.profileData) {
+                this.selectPaymentMethod();
+            }
+            this.renderWatermarkPlaceholder('fastlane-email-watermark-container', this.emailField);
+            await this.buildFastlaneInstance();
+            if (!window.bold.fastlane.instance) {
+                this.hidePaymentMethod();
+                this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
+                return;
+            }
+            this.renderWatermark()
             await this.authorize();
             await this.renderFastlanePaymentComponent();
             this.subscribeToEmailChanges();
@@ -350,13 +360,13 @@
             });
         },
         /**
-         * Render Fastlane watermark component.
+         * Render Fastlane watermark placeholder to show watermark immediately before fastlane is initialize.
          *
          * @param watermarkContainerId
          * @param afterElement
          * @return {void}
          */
-        renderWatermarkComponent: function (watermarkContainerId, afterElement) {
+        renderWatermarkPlaceholder: function (watermarkContainerId, afterElement) {
             const existingWatermarkContainer = document.getElementById(watermarkContainerId);
             if (existingWatermarkContainer) {
                 return;
@@ -367,13 +377,30 @@
             watermarkContainerImg.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
             watermarkContainerImg.alt = '';
             watermarkContainer.appendChild(watermarkContainerImg);
-
             afterElement.insertAdjacentElement('afterend', watermarkContainer);
-
+        },
+        /**
+         * Remove Fastlane watermark placeholder in case fastlane is not available.
+         *
+         * @param watermarkContainerId
+         * @return {void}
+         */
+        removeWatermarkPlaceholder: function (watermarkContainerId) {
+            const watermarkContainer = document.getElementById(watermarkContainerId);
+            if (watermarkContainer) {
+                watermarkContainer.remove();
+            }
+        },
+        /**
+         * Render Fastlane watermark.
+         *
+         * @return {void}
+         */
+        renderWatermark: function () {
             window.bold.fastlane.instance.FastlaneWatermarkComponent({
                 includeAdditionalInfo: true
             }).then((WatermarkComponent) => {
-                WatermarkComponent.render('#' + watermarkContainerId);
+                WatermarkComponent.render('#fastlane-email-watermark-container');
             });
         },
         /**
@@ -397,7 +424,6 @@
                 return;
             }
             this.emailSubscribed = true;
-            this.renderWatermarkComponent('fastlane-email-watermark-container', this.emailField)
             this.emailField.observe('change', () => {
                 setTimeout(async () => {
                     await this.authorize();
@@ -410,8 +436,7 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
-            await this.buildFastlaneInstance();
-            if (!this.emailField || !this.emailField.value) {
+            if (!this.emailField || !this.emailField.value || window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
             if (!window.Validation.validate(this.emailField)) {
@@ -435,6 +460,7 @@
                 } = await identity.triggerAuthenticationFlow(customerContextId);
                 if (authenticationState === 'succeeded') {
                     checkout.setLoadWaiting('billing', true);
+                    this.selectPaymentMethod();
                     window.bold.fastlane.profileData = profileData;
                     if (profileData.shippingAddress) {
                         this.updateBillingAddress(profileData.shippingAddress);
@@ -495,7 +521,6 @@
             if (billingAddressForm) {
                 billingAddressForm.appendChild(fastlaneAddressContainer);
             }
-            this.renderWatermarkComponent('fastlane-address-watermark', updateAddressButton);
         },
         /**
          * Remove address button from the billing address form.
@@ -788,7 +813,6 @@
                 return;
             }
             if (window.bold.fastlane.profileData && window.bold.fastlane.profileData.card?.id) {
-                this.showPaymentMethod();
                 await this.renderPaymentComponent();
                 return;
             }
