@@ -94,6 +94,7 @@
                 this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
                 return;
             }
+            this.renderWatermark()
             await this.authorize();
             await this.renderFastlanePaymentComponent();
             this.subscribeToEmailChanges();
@@ -359,7 +360,7 @@
             });
         },
         /**
-         * Render Fastlane watermark component.
+         * Render Fastlane watermark placeholder to show watermark immediately before fastlane is initialize.
          *
          * @param watermarkContainerId
          * @param afterElement
@@ -378,11 +379,29 @@
             watermarkContainer.appendChild(watermarkContainerImg);
             afterElement.insertAdjacentElement('afterend', watermarkContainer);
         },
+        /**
+         * Remove Fastlane watermark placeholder in case fastlane is not available.
+         *
+         * @param watermarkContainerId
+         * @return {void}
+         */
         removeWatermarkPlaceholder: function (watermarkContainerId) {
             const watermarkContainer = document.getElementById(watermarkContainerId);
             if (watermarkContainer) {
                 watermarkContainer.remove();
             }
+        },
+        /**
+         * Render Fastlane watermark.
+         *
+         * @return {void}
+         */
+        renderWatermark: function () {
+            window.bold.fastlane.instance.FastlaneWatermarkComponent({
+                includeAdditionalInfo: true
+            }).then((WatermarkComponent) => {
+                WatermarkComponent.render('#fastlane-email-watermark-container');
+            });
         },
         /**
          * Select payment method.
@@ -405,7 +424,6 @@
                 return;
             }
             this.emailSubscribed = true;
-            this.renderWatermarkPlaceholder('fastlane-email-watermark-container', this.emailField)
             this.emailField.observe('change', () => {
                 setTimeout(async () => {
                     await this.authorize();
@@ -418,11 +436,6 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
-            window.bold.fastlane.instance.FastlaneWatermarkComponent({
-                includeAdditionalInfo: true
-            }).then((WatermarkComponent) => {
-                WatermarkComponent.render('#fastlane-email-watermark-container');
-            });
             if (!this.emailField || !this.emailField.value || window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
@@ -508,7 +521,6 @@
             if (billingAddressForm) {
                 billingAddressForm.appendChild(fastlaneAddressContainer);
             }
-            this.renderWatermarkPlaceholder('fastlane-address-watermark', updateAddressButton);
         },
         /**
          * Remove address button from the billing address form.
