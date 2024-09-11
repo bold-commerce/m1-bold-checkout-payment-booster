@@ -662,7 +662,7 @@
             const cartData = await new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
-                    parameters: {form_key: '<?php echo $this->getFormKey() ?>'},
+                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
                     },
@@ -735,7 +735,7 @@
             const cartData = await new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
-                    parameters: {form_key: '<?php echo $this->getFormKey() ?>'},
+                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
                     },

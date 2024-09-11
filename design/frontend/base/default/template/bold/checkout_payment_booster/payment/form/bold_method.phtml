@@ -207,7 +207,12 @@
             }
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
-                parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
+                parameters: Object.assign(
+                    this.orderPayload,
+                    {
+                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'
+                    }
+                ),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
                     this.loader.style.display = 'none';
