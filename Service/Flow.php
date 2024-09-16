@@ -71,13 +71,32 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         $flows = self::getList($websiteId);
         $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
         if (!$isFastlaneEnabled) {
-            return self::BOLD;
+            return self::getDefaultFlowId($flows);
         }
         foreach ($flows as $flow) {
             if ($flow->flow_id === self::FASTLANE) {
                 return self::FASTLANE;
             }
         }
-        return self::BOLD;
+        return self::getDefaultFlowId($flows);
+    }
+
+    /**
+     * Get default Bold flow ID.
+     *
+     * @param array $flows
+     * @return string|null
+     */
+    private static function getDefaultFlowId(array $flows)
+    {
+        $fastlaneFlowId = null;
+        foreach ($flows as $flowKey => $flow) {
+            if ($flow->flow_id === self::FASTLANE) {
+                $fastlaneFlowId = $flow->flow_id;
+                unset($flows[$flowKey]);
+            }
+        }
+        // return fastlane flow only if it is the only flow available.
+        return $flows[0]->flow_id ?? $fastlaneFlowId;
     }
 }
