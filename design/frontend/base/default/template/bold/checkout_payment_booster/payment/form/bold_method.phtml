@@ -24,9 +24,7 @@
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         awaitingRefreshBeforePlacingOrder: false,
         paymentContainer: document.getElementById('bold-payments-container'),
-        available: <?php echo $this->isAvailable(); ?>,
-        fastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
-        alternativePaymentMethods: <?php echo $this->getAlternativePaymentMethods(); ?>,
+        isAvailable: <?php echo $this->isAvailable(); ?>,
         iframeElement: document.getElementById('PIGI'),
         iframeWindow: null,
         paymentCheckbox: null,
@@ -80,32 +78,13 @@
                     orderData: {}
                 };
             }
+            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.hidePaymentMethod();
             this.syncData();
             this.subscribeToFieldsChanges();
-            if (!this.isAvailable()) {
-                return;
-            }
-            this.paymentCheckbox = document.getElementById('p_method_bold');
             this.subscribeToPIGI();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
-        },
-        /**
-         * Validate if payment method is available.
-         *
-         * @return {*|boolean}
-         */
-        isAvailable: function () {
-            if (!this.available) {
-                return false;
-            }
-            if (this.fastlaneAvailable && this.alternativePaymentMethods.length > 0) {
-                return this.alternativePaymentMethods.some(function (method) {
-                    return method.type === 'braintree-paypal' || method.type === 'paypal_commerce_platform';
-                });
-            }
-            return true;
         },
         /**
          * Subscribe to fields changes for order hydration.
@@ -150,7 +129,7 @@
             if (isInvalid) {
                 return false;
             }
-            let regionsRequired = window.shippingRegionUpdater || {
+            let regionsRequired = window.billingRegionUpdater || {
                 config: {
                     regions_required: []
                 }
@@ -221,17 +200,19 @@
             }
             this.updateOrderDataPayload();
             if (!this.isPayloadValid()) {
-                console.log('Payload is invalid');
                 return;
             }
             if (!this.isPayloadChanged()) {
-                console.log('Payload is not changed');
                 return;
             }
-            console.log('Hydrating order data...', this.orderPayload);
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
-                parameters: Object.assign(this.orderPayload, {form_key: '<?php echo $this->getFormKey() ?>'}),
+                parameters: Object.assign(
+                    this.orderPayload,
+                    {
+                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'
+                    }
+                ),
                 onSuccess: function () {
                     window.bold.orderData = Object.assign({}, this.orderPayload);
                     this.loader.style.display = 'none';
@@ -244,6 +225,10 @@
                 }.bind(this),
                 onFailure: function () {
                     this.hidePaymentMethod();
+                    if (window.boldFastlaneInstance) {
+                        window.boldFastlaneInstance.hidePaymentMethod();
+                    }
+                    checkout.setLoadWaiting(false);
                     window.bold.orderData = {};
                     console.error('Failed to sync order data');
                 }.bind(this),
@@ -266,6 +251,10 @@
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
                         this.awaitingRefreshBeforePlacingOrder = true;
+                        if (!this.iframeWindow) {
+                            checkout.setLoadWaiting(false);
+                            return checkoutSaveMethod();
+                        }
                         this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
                     } else {
@@ -291,6 +280,10 @@
                     }
                     checkout.setLoadWaiting('payment', true);
                     if (!this.paymentType) {
+                        if (!this.iframeWindow) {
+                            checkout.setLoadWaiting(false);
+                            return paymentSaveMethod();
+                        }
                         this.awaitingRefreshBeforePlacingOrder = true;
                         this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
                         this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
@@ -305,7 +298,6 @@
          * Hide payment method section.
          */
         hidePaymentMethod: function () {
-            console.log('Hiding payment method');
             this.paymentMethodElement.style.display = 'none';
             this.loader.style.display = 'none';
         },
@@ -316,7 +308,9 @@
          * @private
          */
         showPIGI: function () {
-            console.log('Showing PIGI');
+            if (!this.isAvailable) {
+                return;
+            }
             if (!this.iframeElement.src) {
                 this.iframeElement.src = this.iframeUrl;
             }
@@ -333,14 +327,9 @@
                             if (this.iframeElement.height === Math.round(data.payload.height) + 'px') {
                                 return;
                             }
-                            console.log('Updating iframe height');
                             this.iframeElement.height = Math.round(data.payload.height) + 'px';
-                            if (this.fastlaneAvailable) {
-                                this.iframeWindow.postMessage({ actionType: 'PIGI_HIDE_CREDIT_CARD_OPTION' }, '*');
-                            }
                             break;
                         case 'PIGI_INITIALIZED':
-                            console.log('PIGI initialized');
                             this.iframeWindow = this.iframeElement.contentWindow;
                             if (data.payload && data.payload.height && this.iframeElement) {
                                 this.iframeElement.height = Math.round(data.payload.height) + 'px';
@@ -353,7 +342,6 @@
                             }
                             break;
                         case 'PIGI_ADD_PAYMENT':
-                            console.log('Adding payment');
                             if (!data.payload.success) {
                                 checkout.setLoadWaiting(false);
                                 console.error('Failed to add payment');

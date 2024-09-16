@@ -12,6 +12,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_IS_PAYMENT_BOOSTER_ENABLED = 'checkout/bold_checkout_payment_booster/is_payment_booster_enabled';
     const PATH_IS_FASTLANE_ENABLED = 'checkout/bold_checkout_payment_booster/is_fastlane_enabled';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
+    const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
 
     // Advanced settings
@@ -135,5 +136,31 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function getPaymentCss($websiteId)
     {
         return (string)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_PAYMENT_CSS);
+    }
+
+    /**
+     * Retrieve shared secret (decrypted).
+     *
+     * @param int $websiteId
+     * @return string|null
+     */
+    public function getSharedSecret($websiteId)
+    {
+        $encryptedSharedSecret = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_SHARED_SECRET);
+        return Mage::helper('core')->decrypt($encryptedSharedSecret);
+    }
+
+    /**
+     * Save generated shared secret.
+     *
+     * @param string|null $sharedSecret
+     * @param int $websiteId
+     * @return void
+     */
+    public function setSharedSecret($sharedSecret, $websiteId)
+    {
+        $sharedSecret = Mage::helper('core')->encrypt($sharedSecret);
+        Mage::getConfig()->saveConfig(self::PATH_SHARED_SECRET, $sharedSecret, 'websites', $websiteId);
+        Mage::getConfig()->cleanCache();
     }
 }

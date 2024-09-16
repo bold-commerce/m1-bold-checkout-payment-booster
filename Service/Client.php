@@ -60,10 +60,11 @@ class Bold_CheckoutPaymentBooster_Service_Client
      *
      * @param string $url
      * @param int $websiteId
+     * @param array|null $body
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function put($url, $websiteId, $body)
+    public static function put($url, $websiteId, array $body = null)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
         $headers = self::getHeaders($websiteId);
@@ -74,7 +75,32 @@ class Bold_CheckoutPaymentBooster_Service_Client
                 $url,
                 $websiteId,
                 $headers,
-                $body
+                $body ? json_encode($body) : ''
+            )
+        );
+    }
+
+    /**
+     * Perform PATCH HTTP request.
+     *
+     * @param string $url
+     * @param int $websiteId
+     * @param array|null $body
+     * @return stdClass
+     * @throws Mage_Core_Exception
+     */
+    public static function patch($url, $websiteId, array $body = null)
+    {
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $headers = self::getHeaders($websiteId);
+        $url = self::getUrl($websiteId, $shopId, $url);
+        return json_decode(
+            Bold_CheckoutPaymentBooster_Service_Client_Http::call(
+                'PATCH',
+                $url,
+                $websiteId,
+                $headers,
+                $body ? json_encode($body) : ''
             )
         );
     }

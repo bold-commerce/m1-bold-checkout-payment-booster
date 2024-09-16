@@ -14,6 +14,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         'shipping',
         'grand_total',
     ];
+
     private static $requiredFields = [
         'city',
         'firstname',
@@ -38,8 +39,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
      */
     public static function hydrate(Mage_Sales_Model_Quote $quote)
     {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $publicOrderId = $boldCheckoutData->public_order_id;
+        $quote->collectTotals();
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
         if (!$publicOrderId) {
             Mage::throwException('There is no public order ID in the checkout session.');
         }
@@ -48,20 +49,21 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
         $body = [
             'customer' => self::getCustomer($quote),
             'billing_address' => self::convertQuoteAddress($quote, 'billing'),
-            'shipping_address' => self::convertQuoteAddress($quote, 'shipping'),
             'cart_items' => self::getCartItems($quote),
             'taxes' => self::getTaxes($quote),
             'discounts' => self::$discounts,
             'fees' => self::$fees,
-            'shipping_line' => self::getShippingLine($quote),
             'totals' => self::getTotals($quote),
         ];
+        if (!$quote->isVirtual()) {
+            $body['shipping_address'] = self::convertQuoteAddress($quote, 'shipping');
+            $body['shipping_line'] = self::getShippingLine($quote);
+        }
         $response = Bold_CheckoutPaymentBooster_Service_Client::put(
             $apiUri,
             $quote->getStore()->getWebsiteId(),
-            json_encode($body)
+            $body
         );
-        Mage::log(json_encode($body), Zend_Log::DEBUG, 'hydrate.log', true);
         if (isset($response->errors) || isset($response->error)) {
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId
@@ -133,7 +135,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getCartItems(Mage_Sales_Model_Quote $quote)
     {
         $items = [];
-        foreach ($quote->getAllItems() as $item) {
+        foreach ($quote->getAllVisibleItems() as $item) {
             $items[] = Bold_CheckoutPaymentBooster_Service_Quote_Item::extract($item);
         }
 
@@ -225,14 +227,29 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     private static function getTotals(Mage_Sales_Model_Quote $quote)
     {
         $totals = $quote->getTotals();
-
-        return [
-            'sub_total' => self::convertToCents($totals['subtotal']['value']),
+        $subTotal = isset($totals['subtotal']['value_excl_tax'])
+            ? $totals['subtotal']['value_excl_tax']
+            : $totals['subtotal']['value'];
+        $shippingTotal = isset($totals['shipping']['value_excl_tax'])
+            ? $totals['shipping']['value_excl_tax']
+            : $totals['shipping']['value'];
+        $grandTotal = isset($totals['grand_total']['value_incl_tax'])
+            ? $totals['grand_total']['value_incl_tax']
+            : $totals['grand_total']['value'];
+        $processedTotals = [
+            'sub_total' => self::convertToCents($subTotal),
             'tax_total' => $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
             'discount_total' => self::getDiscountTotal(),
-            'shipping_total' => $totals['shipping']['value'] ? self::convertToCents($totals['shipping']['value']) : 0,
-            'order_total' => self::convertToCents($totals['grand_total']['value']),
+            'shipping_total' => self::convertToCents($shippingTotal),
+            'order_total' => self::convertToCents($grandTotal),
         ];
+        $calculatedGrandTotal = $processedTotals['sub_total'] + $processedTotals['tax_total']
+            + $processedTotals['shipping_total'] - $processedTotals['discount_total'];
+        if ($calculatedGrandTotal > $processedTotals['order_total']
+            && $calculatedGrandTotal === $processedTotals['order_total'] + $processedTotals['tax_total']) {
+            $processedTotals['order_total'] = $calculatedGrandTotal;
+        }
+        return $processedTotals;
     }
 
     /**

@@ -13,6 +13,56 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
     protected $_code = self::CODE;
 
     /**
+     * @var boolean
+     */
+    protected $_canAuthorize = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canCapture = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canCapturePartial = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canRefund = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canRefundInvoicePartial = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canVoid = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canUseInternal = false;
+
+    /**
+     * @var boolean
+     */
+    protected $_canUseCheckout = true;
+
+    /**
+     * @var boolean
+     */
+    protected $_canUseForMultishipping = false;
+
+    /**
+     * @var boolean
+     */
+    protected $_canFetchTransactionInfo = true;
+
+    /**
      * @var string
      */
     protected $_formBlockType = 'bold_checkout_payment_booster/payment_form_bold';
@@ -22,7 +72,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function isAvailable($quote = null)
     {
-        return Bold_CheckoutPaymentBooster_Service_Bold::isAvailable();
+        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
     }
 
     /**
@@ -32,15 +82,14 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function getTitle()
     {
-        $title = null;
         $infoInstance = $this->getInfoInstance();
         if ($infoInstance && $infoInstance->getCcLast4()) {
-            $ccLast4 = $infoInstance->decrypt($infoInstance->getCcLast4());
-            $title .= strlen($ccLast4) === 4
-                ? $infoInstance->getCcType() . ': ending in ' . $ccLast4
-                : $infoInstance->getCcType() . ': ' . $ccLast4;
+            return $infoInstance->getCcType() . ': ending in ' . $infoInstance->decrypt($infoInstance->getCcLast4());
         }
-        return $title ?: parent::getTitle();
+        if ($infoInstance && $infoInstance->getAdditionalInformation('tender_details')) {
+            return $infoInstance->getAdditionalInformation('tender_details');
+        }
+        return parent::getTitle();
     }
 
     /**
@@ -53,20 +102,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function capture(Varien_Object $payment, $amount)
     {
-        /** @var Mage_Sales_Model_Order $order */
-        $order = $payment->getOrder();
-        $this->saveIsDelayedCapture($order);
-        if ((float)$order->getGrandTotal() === (float)$amount) {
-            $payment->setTransactionId(Bold_CheckoutPaymentBooster_Api_Payment_Gateway::captureFull($order))
-                ->setShouldCloseParentTransaction(true);
-            return $this;
-        }
-        $payment->setTransactionId(Bold_CheckoutPaymentBooster_Api_Payment_Gateway::capturePartial($order,
-            (float)$amount));
-        if ((float)$payment->getBaseAmountAuthorized() === $payment->getBaseAmountPaid() + $amount) {
-            $payment->setShouldCloseParentTransaction(true);
-        }
-
+        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::capture($payment, $amount);
         return $this;
     }
 
@@ -79,13 +115,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function cancel(Varien_Object $payment)
     {
-        /** @var Mage_Sales_Model_Order $order */
-        $order = $payment->getOrder();
-        $this->saveIsDelayedCapture($order);
-        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancel(
-            $order,
-            Bold_CheckoutPaymentBooster_Api_Payment_Gateway::CANCEL
-        );
+        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancel($payment);
         return $this;
     }
 
@@ -98,13 +128,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function void(Varien_Object $payment)
     {
-        /** @var Mage_Sales_Model_Order $order */
-        $order = $payment->getOrder();
-        $this->saveIsDelayedCapture($order);
-        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancel(
-            $order,
-            Bold_CheckoutPaymentBooster_Api_Payment_Gateway::VOID
-        );
+        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::void($payment);
         return $this;
     }
 
@@ -118,39 +142,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function refund(Varien_Object $payment, $amount)
     {
-        /** @var Mage_Sales_Model_Order $order */
-        $order = $payment->getOrder();
-        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
-        $amount = Mage::app()->getStore()->roundPrice($amount);
-        if ($orderGrandTotal <= $amount) {
-            $transactionId = Bold_CheckoutPaymentBooster_Api_Payment_Gateway::refundFull($order);
-            $payment->setTransactionId($transactionId)
-                ->setIsTransactionClosed(1)
-                ->setShouldCloseParentTransaction(true);
-            return $this;
-        }
-        $transactionId = Bold_CheckoutPaymentBooster_Api_Payment_Gateway::refundPartial($order, (float)$amount);
-        $payment->setTransactionId($transactionId)->setIsTransactionClosed(1);
-        if ((float)$payment->getBaseAmountPaid() === $payment->getBaseAmountRefunded() + $amount) {
-            $payment->setShouldCloseParentTransaction(true);
-        }
-
+        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::refund($payment, $amount);
         return $this;
-    }
-
-    /**
-     * Save order uses delayed payment capture.
-     *
-     * @param Mage_Sales_Model_Order $order
-     * @return void
-     * @throws Exception
-     */
-    private function saveIsDelayedCapture(Mage_Sales_Model_Order $order)
-    {
-        /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
-        $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
-        $extOrderData->load($order->getEntityId(), Bold_CheckoutPaymentBooster_Model_Order::ORDER_ID);
-        $extOrderData->setIsDelayedCapture(1);
-        $extOrderData->save();
     }
 }

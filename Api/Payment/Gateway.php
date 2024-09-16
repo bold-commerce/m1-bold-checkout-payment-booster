@@ -14,6 +14,95 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     const VOID = 'void';
 
     /**
+     * Capture order payment.
+     *
+     * @param Varien_Object $payment
+     * @param float $amount
+     * @return void
+     * @throws Exception
+     */
+    public static function capture(Varien_Object $payment, $amount)
+    {
+        $order = $payment->getOrder();
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCapture($order);
+        if ((float)$order->getGrandTotal() === (float)$amount) {
+            $payment->setTransactionId(self::captureFull($order))
+                ->setShouldCloseParentTransaction(true);
+            return;
+        }
+        $payment->setTransactionId(self::capturePartial($order,
+            (float)$amount));
+        if ((float)$payment->getBaseAmountAuthorized() === $payment->getBaseAmountPaid() + $amount) {
+            $payment->setShouldCloseParentTransaction(true);
+        }
+    }
+
+    /**
+     * Cancel payment transaction.
+     *
+     * @param Varien_Object $payment
+     * @return void
+     * @throws Exception
+     */
+    public static function cancel(Varien_Object $payment)
+    {
+        /** @var Mage_Sales_Model_Order $order */
+        $order = $payment->getOrder();
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCancel($order);
+        Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancelVoid(
+            $order,
+            Bold_CheckoutPaymentBooster_Api_Payment_Gateway::CANCEL
+        );
+    }
+
+    /**
+     * Void payment transaction.
+     *
+     * @param Varien_Object $payment
+     * @return void
+     * @throws Exception
+     */
+    public static function void(Varien_Object $payment)
+    {
+        /** @var Mage_Sales_Model_Order $order */
+        $order = $payment->getOrder();
+        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformCancel($order);
+        self::cancelVoid(
+            $order,
+            Bold_CheckoutPaymentBooster_Api_Payment_Gateway::VOID
+        );
+    }
+
+    /**
+     * Refund payment via bold.
+     *
+     * @param Varien_Object $payment
+     * @param float $amount
+     * @return void
+     * @throws Exception
+     */
+    public static function refund(Varien_Object $payment, $amount)
+    {
+        /** @var Mage_Sales_Model_Order $order */
+        $order = $payment->getOrder();
+        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformRefund($order);
+        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
+        $amount = Mage::app()->getStore()->roundPrice($amount);
+        if ($orderGrandTotal <= $amount) {
+            $transactionId = self::refundFull($order);
+            $payment->setTransactionId($transactionId)
+                ->setIsTransactionClosed(1)
+                ->setShouldCloseParentTransaction(true);
+            return;
+        }
+        $transactionId = self::refundPartial($order, (float)$amount);
+        $payment->setTransactionId($transactionId)->setIsTransactionClosed(1);
+        if ((float)$payment->getBaseAmountPaid() === $payment->getBaseAmountRefunded() + $amount) {
+            $payment->setShouldCloseParentTransaction(true);
+        }
+    }
+
+    /**
      * Capture a payment for the full order amount.
      *
      * @param Mage_Sales_Model_Order $order
@@ -21,7 +110,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * @throws Mage_Payment_Exception
      * @throws Mage_Core_Exception
      */
-    public static function captureFull(Mage_Sales_Model_Order $order)
+    private static function captureFull(Mage_Sales_Model_Order $order)
     {
         self::keepTransactionAdditionalData($order);
         $orderPublicId = self::getOrderPublicId($order);
@@ -43,7 +132,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * @throws Mage_Payment_Exception
      * @throws Mage_Core_Exception
      */
-    public static function capturePartial(Mage_Sales_Model_Order $order, $amount)
+    private static function capturePartial(Mage_Sales_Model_Order $order, $amount)
     {
         self::keepTransactionAdditionalData($order);
         $orderPublicId = self::getOrderPublicId($order);
@@ -66,7 +155,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * @throws Mage_Payment_Exception
      * @throws Mage_Core_Exception
      */
-    public static function cancel(Mage_Sales_Model_Order $order, $operation)
+    private static function cancelVoid(Mage_Sales_Model_Order $order, $operation)
     {
         self::keepTransactionAdditionalData($order);
         $orderPublicId = self::getOrderPublicId($order);
@@ -108,7 +197,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * @throws Mage_Payment_Exception
      * @throws Mage_Core_Exception
      */
-    public static function refundFull(Mage_Sales_Model_Order $order)
+    private static function refundFull(Mage_Sales_Model_Order $order)
     {
         self::keepTransactionAdditionalData($order);
         $orderPublicId = self::getOrderPublicId($order);
@@ -130,7 +219,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * @throws Mage_Payment_Exception
      * @throws Mage_Core_Exception
      */
-    public static function refundPartial(Mage_Sales_Model_Order $order, $amount)
+    private static function refundPartial(Mage_Sales_Model_Order $order, $amount)
     {
         self::keepTransactionAdditionalData($order);
         $orderPublicId = self::getOrderPublicId($order);

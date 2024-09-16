@@ -95,6 +95,10 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setShopId</method>
                     </set_shop_identifier>
+                    <set_rsa_config>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>setRsaConfig</method>
+                    </set_rsa_config>
                     <update_pigi_styles>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>sendPigiStyles</method>
@@ -127,5 +131,30 @@
                 <title>Credit Card</title>
             </bold_fastlane>
         </payment>
+        <web>
+            <routers>
+                <bold>
+                    <class>Bold_CheckoutPaymentBooster_Model_Router</class>
+                </bold>
+            </routers>
+        </web>
     </default>
+
+    <rest>
+        <V1>
+            <shops>
+                <_shopIdentifier>
+                    <orders>
+                        <_publicOrderId>
+                            <payments>
+                                <POST>
+                                    <handler>Bold_CheckoutPaymentBooster_Api_Order_Payment::update</handler>
+                                </POST>
+                            </payments>
+                        </_publicOrderId>
+                    </orders>
+                </_shopIdentifier>
+            </shops>
+        </V1>
+    </rest>
 </config>

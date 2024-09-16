@@ -18,6 +18,28 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         try {
             Bold_CheckoutPaymentBooster_Service_ShopId::set($websiteId);
         } catch (Exception $exception) {
+            Mage::getSingleton('core/session')->addError($exception->getMessage());
+            Mage::log(
+                $exception->getMessage(),
+                Zend_Log::CRIT,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
+        }
+    }
+
+    /**
+     * Set RSA configuration.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function setRsaConfig(Varien_Event_Observer $event)
+    {
+        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
+        try {
+            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::setRsaConfig($websiteId);
+        } catch (Exception $exception) {
+            Mage::getSingleton('core/session')->addError($exception->getMessage());
             Mage::log(
                 $exception->getMessage(),
                 Zend_Log::CRIT,
@@ -55,6 +77,7 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
                 Bold_CheckoutPaymentBooster_Service_PIGI::buildStylesPayload([$newRules])
             );
         } catch (Exception $e) {
+            Mage::getSingleton('core/session')->addError($e->getMessage());
             Mage::log(
                 $e->getMessage(),
                 Zend_Log::ERR,
