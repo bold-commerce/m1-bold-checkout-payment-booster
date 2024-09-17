@@ -68,6 +68,15 @@
                             <frontend_class>validate-url</frontend_class>
                             <comment><![CDATA[ Bold Checkout API URL. Do not change. ]]></comment>
                         </api_url>
+                        <eps_url translate="label">
+                            <label>EPS URL</label>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>validate-url</frontend_class>
+                            <comment><![CDATA[ Bold Checkout EPS URL. Do not change. ]]></comment>
+                        </eps_url>
                         <weight_conversion_rate>
                             <label>Weight Unit Conversion Rate To Grams</label>
                             <frontend_type>text</frontend_type>

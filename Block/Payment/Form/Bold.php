@@ -163,7 +163,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         }
         $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
         try {
-            $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+            $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         } catch (Mage_Core_Exception $e) {
             return null;
         }

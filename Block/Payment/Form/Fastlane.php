@@ -18,8 +18,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     protected function _construct()
     {
         parent::_construct();
+        $this->quote = Mage::getSingleton('checkout/session')->getQuote();
         if ($this->isAvailable()) {
-            $this->quote = Mage::getSingleton('checkout/session')->getQuote();
             $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_fastlane_method.phtml');
         }
     }
@@ -59,16 +59,15 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         return $config->getFastlaneAddressContainerStyles($websiteId);
     }
 
-    /**
-     * Get payment gateway data.
-     *
-     * @return string
-     */
-    public function getGatewayData()
+    public function getEpsGatewayId()
     {
-        return json_encode(
-            Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData()
-        );
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return null;
+        }
+        return isset($boldCheckoutData->flow_settings->eps_gateway_id)
+            ? $boldCheckoutData->flow_settings->eps_gateway_id
+            : null;
     }
 
     /**
@@ -105,7 +104,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         }
         $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
         try {
-            $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+            $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         } catch (Mage_Core_Exception $e) {
             return null;
         }
@@ -116,6 +115,19 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
+     * Retrieve EPS URL.
+     *
+     * @return string
+     */
+    public function getEpsUrl()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getEpsUrl($websiteId) . '/' . $config->getShopDomain($websiteId) . '/';
+    }
+
+    /**
      * Retrieve JWT token.
      *
      * @return string|null
@@ -123,5 +135,15 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     public function getJwtToken()
     {
         return Bold_CheckoutPaymentBooster_Service_Bold::getJwtToken();
+    }
+
+    /**
+     * Retrieve EPS auth token.
+     *
+     * @return string|null
+     */
+    public function getEpsAuthToken()
+    {
+        return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
     }
 }

@@ -32,6 +32,16 @@ class Bold_CheckoutPaymentBooster_Service_Fastlane
             ]
         );
         if (isset($response->errors)) {
+            /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+            $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+            if ($config->isLogEnabled($websiteId)) {
+                Mage::log(
+                    'Fastlane gateway error: ' . json_encode($response->errors),
+                    Zend_Log::CRIT,
+                    'bold_checkout_payment_booster.log',
+                    true
+                );
+            }
             return;
         }
         /** @var Mage_Checkout_Model_Session $checkoutSession */

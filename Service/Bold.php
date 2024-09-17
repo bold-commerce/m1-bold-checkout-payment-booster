@@ -9,6 +9,7 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      * Init and load Bold Checkout Data to the checkout session.
      *
      * @param Mage_Sales_Model_Quote $quote
+     * @throws Mage_Core_Exception
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
@@ -17,6 +18,9 @@ class Bold_CheckoutPaymentBooster_Service_Bold
             return;
         }
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
+        if (!$flowId) {
+            Mage::throwException('Failed to get Bold flow ID.');
+        }
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
@@ -83,5 +87,23 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         return $quote && !$quote->getIsMultiShipping();
+    }
+
+    public static function getEpsAuthToken()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->flow_settings->eps_auth_token) ? $checkoutData->flow_settings->eps_auth_token : null;
+    }
+
+    public static function getConfigurationGroupLabel()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->flow_settings->configuration_group_label) ? $checkoutData->flow_settings->configuration_group_label : null;
     }
 }

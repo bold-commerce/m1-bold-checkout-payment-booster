@@ -5,7 +5,6 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
-    const BOLD = 'Bold three page';
     const FASTLANE = 'paypal_fastlane_3_page';
 
     private static $flowList = [];
@@ -71,13 +70,34 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         $flows = self::getList($websiteId);
         $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
         if (!$isFastlaneEnabled) {
-            return self::BOLD;
+            return self::getDefaultFlowId($flows);
         }
         foreach ($flows as $flow) {
             if ($flow->flow_id === self::FASTLANE) {
                 return self::FASTLANE;
             }
         }
-        return self::BOLD;
+        return self::getDefaultFlowId($flows);
+    }
+
+    /**
+     * Get default Bold flow ID.
+     *
+     * @param array $flows
+     * @return string|null
+     */
+    private static function getDefaultFlowId(array $flows)
+    {
+        $fastlaneFlowId = null;
+        foreach ($flows as $flowKey => $flow) {
+            if ($flow->flow_id === self::FASTLANE) {
+                if (isset($flow->flow_config->fallback_flow_id)) {
+                    return $flow->flow_config->fallback_flow_id;
+                }
+                $fastlaneFlowId = $flow->flow_id;
+                unset($flows[$flowKey]);
+            }
+        }
+        return isset($flows[0]->flow_id) ? $flows[0]->flow_id : $fastlaneFlowId;
     }
 }
