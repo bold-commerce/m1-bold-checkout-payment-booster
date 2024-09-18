@@ -5,7 +5,7 @@
  */
 class Bold_CheckoutPaymentBooster_Service_PIGI
 {
-    const PAYMENT_CSS_API_URI = 'checkout/shop/{shopId}/payment_css';
+    const PAYMENT_CSS_API_URI = 'checkout/shop/{{shopId}}/payment_css';
 
     /**
      * Build the payload for PIGI styles update.
