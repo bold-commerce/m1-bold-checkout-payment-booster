@@ -4,10 +4,11 @@
 $installer = $this;
 $installer->startSetup();
 
-$tableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
+$orderTableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
+$quoteTableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
 
-$sql = <<<SQL
-CREATE TABLE `{$tableName}` (
+$createOrderTableSql = <<<SQL
+CREATE TABLE `{$orderTableName}` (
     `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Entity ID',
     `order_id` INT UNSIGNED COMMENT 'Magento Order ID',
     `public_id` VARCHAR(255) NOT NULL COMMENT 'Bold Order Public ID',
@@ -21,6 +22,18 @@ CREATE TABLE `{$tableName}` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Bold Order Data';
 SQL;
 
-$installer->run($sql);
+$createQuoteTableSql = <<<SQL
+CREATE TABLE `{$quoteTableName}` (
+    `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Entity ID',
+    `quote_id` INT UNSIGNED COMMENT 'Magento Quote ID',
+    `public_id` VARCHAR(255) NOT NULL COMMENT 'Bold Order Public ID',
+    PRIMARY KEY (`entity_id`),
+    INDEX `IDX_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_ORDER_ID` (`quote_id`),
+    CONSTRAINT FOREIGN KEY (`quote_id`) REFERENCES `{$installer->getTable('sales/quote')}` (`entity_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Bold Quote Data';
+SQL;
+
+$installer->run($createOrderTableSql);
+$installer->run($createQuoteTableSql);
 
 $installer->endSetup();

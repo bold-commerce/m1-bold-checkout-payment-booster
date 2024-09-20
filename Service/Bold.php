@@ -50,17 +50,6 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     }
 
     /**
-     * Get JWT token.
-     *
-     * @return string|null
-     */
-    public static function getJwtToken()
-    {
-        $checkoutData = self::getBoldCheckoutData();
-        return $checkoutData ? $checkoutData->jwt_token : null;
-    }
-
-    /**
      * Get public order id.
      *
      * @return string|null
@@ -96,14 +85,5 @@ class Bold_CheckoutPaymentBooster_Service_Bold
             return null;
         }
         return isset($checkoutData->flow_settings->eps_auth_token) ? $checkoutData->flow_settings->eps_auth_token : null;
-    }
-
-    public static function getConfigurationGroupLabel()
-    {
-        $checkoutData = self::getBoldCheckoutData();
-        if (!$checkoutData) {
-            return null;
-        }
-        return isset($checkoutData->flow_settings->configuration_group_label) ? $checkoutData->flow_settings->configuration_group_label : null;
     }
 }

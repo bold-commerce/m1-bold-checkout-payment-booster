@@ -11,8 +11,9 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
      * @param Varien_Event_Observer $event
      * @return void
      * @throws Mage_Core_Exception
+     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
      */
-    public function setShopId(Varien_Event_Observer $event)
+    public function saveShopInfo(Varien_Event_Observer $event)
     {
         $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
         try {
@@ -27,6 +28,7 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
      *
      * @param Varien_Event_Observer $event
      * @return void
+     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
      */
     public function setRsaConfig(Varien_Event_Observer $event)
     {
@@ -35,39 +37,6 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
             Bold_CheckoutPaymentBooster_Service_Rsa_Connect::setRsaConfig($websiteId);
         } catch (Exception $exception) {
             $this->addErrorMessage($exception->getMessage());
-        }
-    }
-
-    /**
-     * Send PIGI styles to the Bold.
-     *
-     * @param Varien_Event_Observer $event
-     * @return void
-     */
-    public function sendPigiStyles(Varien_Event_Observer $event)
-    {
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
-        if (!$config->isPaymentBoosterEnabled($websiteId)) {
-            return;
-        }
-        try {
-            $savedValue = $config->getPaymentCss($websiteId);
-            $newRules = $savedValue
-                ? preg_replace('/\s+/', ' ', unserialize($savedValue))
-                : Bold_CheckoutPaymentBooster_Service_PIGI::getDefaultCss();
-            $savedStyles = Bold_CheckoutPaymentBooster_Service_PIGI::getStyles($websiteId);
-            $oldRules = isset($savedStyles->css_rules[0]->cssText) ? $savedStyles->css_rules[0]->cssText : '';
-            if ($oldRules === $newRules) {
-                return;
-            }
-            Bold_CheckoutPaymentBooster_Service_PIGI::updateStyles(
-                $websiteId,
-                Bold_CheckoutPaymentBooster_Service_PIGI::buildStylesPayload([$newRules])
-            );
-        } catch (Exception $e) {
-            $this->addErrorMessage($e->getMessage());
         }
     }
 

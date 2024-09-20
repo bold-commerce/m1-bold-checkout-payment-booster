@@ -15,13 +15,52 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
     private $billingAddress = null;
 
     /**
+     * @var Mage_Sales_Model_Quote|null
+     */
+    private $quote;
+
+    /**
      * @inheritDoc
      */
     protected function _construct()
     {
         parent::_construct();
+        $this->quote = Mage::getSingleton('checkout/session')->getQuote();
         $this->billingAddress = Mage::getSingleton('checkout/session')->getQuote()->getBillingAddress();
         $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_method.phtml');
+    }
+
+    public function getQuoteCurrencyCode()
+    {
+        return $this->quote->getQuoteCurrencyCode();
+    }
+
+    public function getPublicOrderID()
+    {
+        return Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+    }
+
+    public function getGroupLabel()
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getShopDomain($this->quote->getStore()->getWebsiteId());
+    }
+
+    /**
+     * Get EPS gateway ID from Bold checkout data.
+     *
+     * @return string|null
+     */
+    public function getEpsGatewayId()
+    {
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return null;
+        }
+        return isset($boldCheckoutData->flow_settings->eps_gateway_id)
+            ? $boldCheckoutData->flow_settings->eps_gateway_id
+            : null;
     }
 
     /**
@@ -186,6 +225,37 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         $bold = Mage::getModel('bold_checkout_payment_booster/payment_bold');
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         return (int)($bold->isAvailable($quote) && !$this->isFastlaneAvailable());
+    }
+
+    /**
+     * Retrieve EPS URL.
+     *
+     * @return string
+     */
+    public function getEpsUrl()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getEpsUrl($websiteId);
+    }
+
+    public function getEpsStaticUrl()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getEpsStaticUrl($websiteId);
+    }
+
+    /**
+     * Retrieve EPS auth token.
+     *
+     * @return string|null
+     */
+    public function getEpsAuthToken()
+    {
+        return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
     }
 
     /**

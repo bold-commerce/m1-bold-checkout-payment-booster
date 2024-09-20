@@ -59,6 +59,11 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         return $config->getFastlaneAddressContainerStyles($websiteId);
     }
 
+    /**
+     * Get EPS gateway ID from Bold checkout data.
+     *
+     * @return string|null
+     */
     public function getEpsGatewayId()
     {
         $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
@@ -90,31 +95,6 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
-     * Retrieve Bold Storefront API URL.
-     *
-     * @return string|null
-     */
-    public function getBoldApiUrl()
-    {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        if (!$publicOrderId) {
-            return null;
-        }
-        $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
-        try {
-            $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
-        } catch (Mage_Core_Exception $e) {
-            return null;
-        }
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $apiUrl = $config->getApiUrl($websiteId);
-        return $apiUrl . self::PATH . $shopId . '/' . $publicOrderId . '/';
-    }
-
-    /**
      * Retrieve EPS URL.
      *
      * @return string
@@ -125,16 +105,6 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         return $config->getEpsUrl($websiteId) . '/' . $config->getShopDomain($websiteId) . '/';
-    }
-
-    /**
-     * Retrieve JWT token.
-     *
-     * @return string|null
-     */
-    public function getJwtToken()
-    {
-        return Bold_CheckoutPaymentBooster_Service_Bold::getJwtToken();
     }
 
     /**

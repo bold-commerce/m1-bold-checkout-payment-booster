@@ -19,10 +19,10 @@ class Bold_CheckoutPaymentBooster_Model_Config
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
     const PATH_EPS_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_url';
+    const PATH_EPS_STATIC_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_static_url';
     const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
     const PATH_FASTLANE_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
-    const PATH_PAYMENT_CSS = 'checkout/bold_checkout_payment_booster_advanced/pigi_styles';
 
     /**
      * Check if the Payment Booster is enabled.
@@ -108,6 +108,17 @@ class Bold_CheckoutPaymentBooster_Model_Config
     }
 
     /**
+     * Retrieve EPS static URL.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public function getEpsStaticUrl($websiteId)
+    {
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_STATIC_URL), '/');
+    }
+
+    /**
      * Retrieve weight unit conversion rate to grams.
      *
      * @param int $websiteId
@@ -138,17 +149,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isLogEnabled($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_LOG_ENABLED);
-    }
-
-    /**
-     * Retrieve payment iframe additional css.
-     *
-     * @param int $websiteId
-     * @return string
-     */
-    public function getPaymentCss($websiteId)
-    {
-        return (string)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_PAYMENT_CSS);
     }
 
     /**
