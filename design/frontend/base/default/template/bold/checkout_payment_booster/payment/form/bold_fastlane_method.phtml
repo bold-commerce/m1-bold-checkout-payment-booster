@@ -25,9 +25,9 @@
         phoneNumberSelector: 'billing:telephone',
         fastlaneAddressContainerId: 'fastlane-address-container',
         publicOrderId: '<?php echo $this->getPublicOrderId(); ?>',
+        epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
         fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
         isAvailable: <?php echo $this->isAvailable(); ?>,
-        epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
         epsUrl: '<?php echo $this->getEpsUrl(); ?>',
         epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
         billingAddressFieldsMap: {
@@ -89,7 +89,14 @@
                 this.selectPaymentMethod();
             }
             this.renderWatermarkPlaceholder('fastlane-email-watermark-container', this.emailField);
-            await this.initFastlaneInstance();
+            try {
+                await this.initFastlaneInstance();
+            } catch (e) {
+                console.error('Error:', e);
+                this.hidePaymentMethod();
+                this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
+                return;
+            }
             if (!window.bold.fastlane.instance) {
                 this.hidePaymentMethod();
                 this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
@@ -301,7 +308,7 @@
                 return;
             }
             const response = await fetch(
-                encodeURI(this.epsUrl + 'client_init'),
+                encodeURI(this.epsUrl + 'client_init?option=fastlane'),
                 {
                     method: 'GET',
                     headers: {
@@ -515,7 +522,7 @@
                 }
             });
             if (typeof boldInstance !== 'undefined') {
-                boldInstance.syncData();
+                boldInstance.hydrateOrderData();
             }
         },
         /**
@@ -667,81 +674,33 @@
                     this.fastlanePaymentComponent.setShippingAddress(shippingAddress);
                 }
             }
-            if (this.gatewayData.type === 'ppcp') {
-                return await this.processPPCPPayment();
-            }
-            return await this.processBraintreePayment();
-        },
-        /**
-         * Process Fastlane payment for the Braintree gateway type.
-         *
-         * @return {Promise<void>}
-         */
-        processBraintreePayment: async function () {
-            debugger;
-            const billingAddress = this.getBillingAddress();
-            const paymentTokenResponse = this.fastlaneCardComponent
-                ? await this.fastlaneCardComponent.getPaymentToken({billingAddress: billingAddress})
-                : await this.fastlanePaymentComponent.getPaymentToken();
-            this.updateBillingAddress(paymentTokenResponse.paymentSource.card.billingAddress);
-            const cartData = await new Promise((resolve, reject) => {
-                new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
-                    method: 'get',
-                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
-                    onSuccess: function (response) {
-                        resolve(JSON.parse(response.responseText));
-                    },
-                    onFailure: function () {
-                        reject(new Error('Failed to get cart data'));
-                    }
-                });
-            });
-            const tokenizeResponse = await fetch(this.epsUrl + 'tokenize', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(
-                    {
-                        'version': 1,
-                        'auth_token': this.epsAuthToken,
-                        'gateway_id': Number(this.epsGatewayId),
-                        'tender_type': 'credit_card',
-                        'currency': cartData.quote_currency_code,
-                        'payload_type': 'card_token',
-                        'payload': {
-                            'card_token': paymentTokenResponse.id,
-                        },
-                    }
-                ),
-            });
-            if (!tokenizeResponse.ok) {
-                return Promise.reject('An error occurred while processing your payment. Please try again.');
-            }
+            return await this.tokenize();
         },
         /**
          * Process Fastlane payment for the PPCP gateway type.
          *
          * @return {Promise<void>}
          */
-        processPPCPPayment: async function () {
-            const billingAddress = this.getBillingAddress();
-            let ppcpBillingAddress = {
-                billingAddress: {
-                    'firstName': billingAddress.firstName,
-                    'lastName': billingAddress.lastName,
-                    'company': billingAddress.company,
-                    'phoneNumber': billingAddress.phoneNumber,
-                    'addressLine1': billingAddress.streetAddress,
-                    'addressLine2': billingAddress.extendedAddress,
-                    'adminArea2': billingAddress.locality,
-                    'adminArea1': billingAddress.region,
-                    'postalCode': billingAddress.postalCode,
-                    'countryCode': billingAddress.countryCodeAlpha2,
-                }
-            };
+        tokenize: async function () {
+            let billingAddress = this.getBillingAddress();
+            if (this.gatewayData.type === 'ppcp') {
+                billingAddress = {
+                    billingAddress: {
+                        'firstName': billingAddress.firstName,
+                        'lastName': billingAddress.lastName,
+                        'company': billingAddress.company,
+                        'phoneNumber': billingAddress.phoneNumber,
+                        'addressLine1': billingAddress.streetAddress,
+                        'addressLine2': billingAddress.extendedAddress,
+                        'adminArea2': billingAddress.locality,
+                        'adminArea1': billingAddress.region,
+                        'postalCode': billingAddress.postalCode,
+                        'countryCode': billingAddress.countryCodeAlpha2,
+                    }
+                };
+            }
             const paymentTokenResponse = this.fastlaneCardComponent
-                ? await this.fastlaneCardComponent.getPaymentToken(ppcpBillingAddress)
+                ? await this.fastlaneCardComponent.getPaymentToken(billingAddress)
                 : await this.fastlanePaymentComponent.getPaymentToken();
             this.updateBillingAddress(paymentTokenResponse.paymentSource.card.billingAddress);
             const cartData = await new Promise((resolve, reject) => {
