@@ -30,16 +30,66 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold extends Mage_Payment_B
         $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_method.phtml');
     }
 
+    /**
+     * Get Bold Frontend API URL.
+     *
+     * @return string|null
+     */
+    public function getBoldApiUrl()
+    {
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+        if (!$publicOrderId) {
+            return null;
+        }
+        $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
+        try {
+            $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
+        } catch (Mage_Core_Exception $e) {
+            return null;
+        }
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $apiUrl = $config->getApiUrl($websiteId);
+        return $apiUrl . self::PATH . $shopId . '/' . $publicOrderId . '/';
+    }
+
+    /**
+     * Get JWT token for the Bold frontend api calls.
+     *
+     * @return string|null
+     */
+    public function getJwtToken()
+    {
+        return Bold_CheckoutPaymentBooster_Service_Bold::getJwtToken();
+    }
+
+    /**
+     * Get quote currency code for EPS SKD init.
+     *
+     * @return string
+     */
     public function getQuoteCurrencyCode()
     {
         return $this->quote->getQuoteCurrencyCode();
     }
 
+    /**
+     * Get public order ID for EPS SDK init.
+     *
+     * @return string|null
+     */
     public function getPublicOrderID()
     {
         return Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
     }
 
+    /**
+     * Get group label for EPS SDK init.
+     *
+     * @return string
+     */
     public function getGroupLabel()
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */

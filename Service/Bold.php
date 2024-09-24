@@ -86,4 +86,13 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         }
         return isset($checkoutData->flow_settings->eps_auth_token) ? $checkoutData->flow_settings->eps_auth_token : null;
     }
+
+    public static function getJwtToken()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->jwt_token) ? $checkoutData->jwt_token : null;
+    }
 }

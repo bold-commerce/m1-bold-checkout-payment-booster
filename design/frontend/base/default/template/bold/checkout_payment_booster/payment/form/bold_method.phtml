@@ -16,6 +16,8 @@
         paymentContainer: document.getElementById('bold-payments-container'),
         paymentCheckbox: document.getElementById('p_method_bold'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
+        boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
+        jwtToken: '<?php echo $this->getJwtToken(); ?>',
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
         epsUrl: '<?php echo $this->getEpsUrl(); ?>',
@@ -101,6 +103,27 @@
                         'currency': this.quoteCurrencyCode,
                     }
                 ],
+                'callbacks': {
+                    'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
+                        if (paymentType !== 'ppcp') {
+                            return;
+                        }
+                        const walletPayResult = await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + this.jwtToken,
+                            },
+                            body: JSON.stringify(paymentPayload),
+                        });
+                        if (walletPayResult.ok) {
+                            const walletPayResultPayload = await walletPayResult.json();
+                            return walletPayResultPayload.data
+                        } else {
+                            throw 'Unable to create wallet pay order';
+                        }
+                    }.bind(this),
+                }
             };
             const boldPayments = new window.bold.Payments(initialData);
             boldPayments.renderPayments('payment_form_bold');
@@ -254,6 +277,12 @@
                     }
                 ),
                 onSuccess: function () {
+                    if (this.orderPayload.region_id) {
+                        const region = billingRegionUpdater.regions[this.orderPayload.country_id][this.orderPayload.region_id] || null;
+                        if (region) {
+                            this.orderPayload.region = region.code;
+                        }
+                    }
                     window.bold.orderData = Object.assign({}, this.orderPayload);
                 }.bind(this),
                 onFailure: function () {
@@ -329,7 +358,19 @@
          */
         tokenize: async function () {
             const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
-            iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE'}, '*');
+            const payload = {
+                billing_address: {
+                    first_name: window.bold.orderData.firstname,
+                    last_name: window.bold.orderData.lastname,
+                    address_line_1: window.bold.orderData.street1,
+                    address_line_2: window.bold.orderData.street2,
+                    province_code: window.bold.orderData.region,
+                    city: window.bold.orderData.city,
+                    postal_code: window.bold.orderData.postcode,
+                    country_code: window.bold.orderData.country_id,
+                }
+            };
+            iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
         },
         /**
          * Subscribe to SPI iframe events.
@@ -343,17 +384,25 @@
                     switch (eventType) {
                         case 'EVENT_SPI_TOKENIZED':
                             if (!data.payload.success) {
+                                this.paymentId = null;
                                 console.log('Failed to tokenize');
                                 checkout.setLoadWaiting(false);
-                                this.paymentId = null;
                                 return;
                             }
-                            this.paymentId = data.payload.payload.data.payment_id;
+                            this.paymentId = data.payload?.payload?.data?.payment_id;
                             if (checkout.save) {
                                 checkout.save();
                                 return;
                             }
                             payment.save();
+                            break;
+                        case 'EVENT_SPI_TOKENIZE_FAILED':
+                            this.paymentId = null;
+                            console.log('Failed to tokenize');
+                            checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_PAYMENT_ORDER_CREATE':
+                            console.log('Payment order created', data);
                     }
                 }
             });
