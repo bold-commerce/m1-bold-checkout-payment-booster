@@ -102,6 +102,14 @@
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane address container. ]]></comment>
                         </fastlane_address_container_styles>
+                        <fastlane_email_container_styles>
+                            <label>PayPal Fastlane Address Container Styles</label>
+                            <frontend_type>textarea</frontend_type>
+                            <sort_order>20</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane email watermark container. ]]></comment>
+                        </fastlane_email_container_styles>
                         <is_log_enabled translate="label">
                             <label>Enable requests log</label>
                             <frontend_type>select</frontend_type>

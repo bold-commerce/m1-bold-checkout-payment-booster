@@ -78,6 +78,11 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         return $quote && !$quote->getIsMultiShipping();
     }
 
+    /**
+     * Retrieve saved eps auth token from flow settings.
+     *
+     * @return null|string
+     */
     public static function getEpsAuthToken()
     {
         $checkoutData = self::getBoldCheckoutData();
@@ -87,6 +92,25 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         return isset($checkoutData->flow_settings->eps_auth_token) ? $checkoutData->flow_settings->eps_auth_token : null;
     }
 
+    /**
+     * Retrieve fastlane styles from flow settings.
+     *
+     * @return null|string
+     */
+    public static function getFastlaneStyles()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->flow_settings->fastlane_styles) ? $checkoutData->flow_settings->fastlane_styles : null;
+    }
+
+    /**
+     * Retrieve saved jwt token for Bold storefront api.
+     *
+     * @return null|string
+     */
     public static function getJwtToken()
     {
         $checkoutData = self::getBoldCheckoutData();

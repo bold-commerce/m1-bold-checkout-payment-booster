@@ -25,6 +25,19 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
+     * Retrieve Fastlane email container styles.
+     *
+     * @return string
+     */
+    public function getWatermarkContainerStyle()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getFastlaneWatermarkContainerStyles($websiteId);
+    }
+
+    /**
      * Check if fastlane payment method is available.
      *
      * @return int
@@ -78,20 +91,12 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     /**
      * Retrieve Fastlane styles.
      *
-     * @return string
+     * @return string|null
      */
     public function getFastlaneStyles()
     {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $styles = (object)[];
-        if (!$boldCheckoutData) {
-            return json_encode($styles);
-        }
-
-        // TODO: Need to implement styles retrieving from Checkout admin
-        // (for now there is no ability to get this information if order was created using checkout_sidekick)
-
-        return json_encode($styles);
+        $fastlaneStyles = Bold_CheckoutPaymentBooster_Service_Bold::getFastlaneStyles();
+        return $fastlaneStyles ? json_encode($fastlaneStyles) : null;
     }
 
     /**

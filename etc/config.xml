@@ -117,6 +117,7 @@
                 <eps_url>https://eps.secure.boldcommerce.com/</eps_url>
                 <eps_static_url>https://static-eps.secure.boldcommerce.com/</eps_static_url>
                 <weight_conversion_rate>1000</weight_conversion_rate>
+                <fastlane_email_container_styles>width: 365px</fastlane_email_container_styles>
                 <is_log_enabled>0</is_log_enabled>
             </bold_checkout_payment_booster_advanced>
         </checkout>

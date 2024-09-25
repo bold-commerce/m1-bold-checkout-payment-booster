@@ -16,9 +16,9 @@
         paymentContainer: document.getElementById('bold-payments-container'),
         paymentCheckbox: document.getElementById('p_method_bold'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
+        groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
         jwtToken: '<?php echo $this->getJwtToken(); ?>',
-        groupLabel: '<?php echo $this->getGroupLabel() ?>',
         epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
         epsUrl: '<?php echo $this->getEpsUrl(); ?>',
         epsStaticUrl: '<?php echo $this->getEpsStaticUrl(); ?>',
@@ -73,6 +73,7 @@
                     orderData: {}
                 };
             }
+            this.showPaymentMethod();
             this.hydrateOrderData();
             this.subscribeToFieldsChanges();
             if (!this.isAvailable) {
@@ -352,6 +353,12 @@
             this.paymentMethodElement.style.display = 'none';
         },
         /**
+         * Show payment method section.
+         */
+        showPaymentMethod: function () {
+            this.paymentMethodElement.style.display = 'block';
+        },
+        /**
          * Send tokenize action to SPI iframe.
          *
          * @return {Promise<void>}
@@ -401,8 +408,6 @@
                             console.log('Failed to tokenize');
                             checkout.setLoadWaiting(false);
                             break;
-                        case 'EVENT_SPI_PAYMENT_ORDER_CREATE':
-                            console.log('Payment order created', data);
                     }
                 }
             });

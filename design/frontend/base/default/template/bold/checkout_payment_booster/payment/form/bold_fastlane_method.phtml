@@ -88,21 +88,18 @@
             if (window.bold.fastlane.profileData) {
                 this.selectPaymentMethod();
             }
-            this.renderWatermarkPlaceholder('fastlane-email-watermark-container', this.emailField);
+            this.renderWatermarkPlaceholder();
             try {
                 await this.initFastlaneInstance();
             } catch (e) {
                 console.error('Error:', e);
-                this.hidePaymentMethod();
-                this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
+                this.fallbackToDefaultPaymentMethod();
                 return;
             }
             if (!window.bold.fastlane.instance) {
-                this.hidePaymentMethod();
-                this.removeWatermarkPlaceholder('fastlane-email-watermark-container');
+                this.fallbackToDefaultPaymentMethod();
                 return;
             }
-            this.renderWatermark()
             await this.authorize();
             await this.renderFastlanePaymentComponent();
             this.subscribeToEmailChanges();
@@ -111,14 +108,21 @@
             this.waitForPaymentInitialization();
         },
         /**
-         * Hide payment method section.
+         * Shop SPI in case Fastlane is failed to init.
+         *
+         * @return {void}
          */
-        hidePaymentMethod: function () {
+        fallbackToDefaultPaymentMethod: function () {
             const paymentMethodElement = document.getElementById('p_method_bold_fastlane')
                 ? document.getElementById('p_method_bold_fastlane').parentNode
                 : null;
             if (paymentMethodElement) {
                 paymentMethodElement.style.display = 'none';
+            }
+            this.removeWatermarkPlaceholder();
+            if (boldInstance) {
+                boldInstance.isAvailable = true;
+                boldInstance.initialize();
             }
         },
         /**
@@ -297,6 +301,7 @@
             if (this.gatewayData.type === 'ppcp') {
                 await this.buildPpcpFastlaneInstance();
             }
+            this.renderWatermark();
         },
         /**
          * Retrieve gateway data.
@@ -393,31 +398,34 @@
         /**
          * Render Fastlane watermark placeholder to show watermark immediately before fastlane is initialize.
          *
-         * @param watermarkContainerId
-         * @param afterElement
          * @return {void}
          */
-        renderWatermarkPlaceholder: function (watermarkContainerId, afterElement) {
+        renderWatermarkPlaceholder: function () {
+            const watermarkContainerId = 'fastlane-watermark-container';
             const existingWatermarkContainer = document.getElementById(watermarkContainerId);
             if (existingWatermarkContainer) {
                 return;
             }
             const watermarkContainer = document.createElement('div');
+            const watermarkSubContainer = document.createElement('div');
+            const watermark = document.createElement('img');
+            watermarkSubContainer.id = 'fastlane-email-watermark-container';
+            watermarkSubContainer.style = 'float: right; margin-top: 5px';
+            watermark.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
+            watermark.alt = '';
+            watermarkSubContainer.appendChild(watermark);
             watermarkContainer.id = watermarkContainerId;
-            const watermarkContainerImg = document.createElement('img');
-            watermarkContainerImg.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
-            watermarkContainerImg.alt = '';
-            watermarkContainer.appendChild(watermarkContainerImg);
-            afterElement.insertAdjacentElement('afterend', watermarkContainer);
+            watermarkContainer.style = '<?php echo $this->getWatermarkContainerStyle(); ?>';
+            watermarkContainer.appendChild(watermarkSubContainer);
+            this.emailField.insertAdjacentElement('afterend', watermarkContainer);
         },
         /**
          * Remove Fastlane watermark placeholder in case fastlane is not available.
          *
-         * @param watermarkContainerId
          * @return {void}
          */
-        removeWatermarkPlaceholder: function (watermarkContainerId) {
-            const watermarkContainer = document.getElementById(watermarkContainerId);
+        removeWatermarkPlaceholder: function () {
+            const watermarkContainer = document.getElementById('fastlane-watermark-container');
             if (watermarkContainer) {
                 watermarkContainer.remove();
             }
@@ -431,6 +439,7 @@
             window.bold.fastlane.instance.FastlaneWatermarkComponent({
                 includeAdditionalInfo: true
             }).then((WatermarkComponent) => {
+                document.getElementById('fastlane-email-watermark-container').style = 'float: right';
                 WatermarkComponent.render('#fastlane-email-watermark-container');
             });
         },
@@ -764,7 +773,6 @@
                     }
                 });
             }
-
             const fastlaneAddress = {
                 'firstName': magentoAddress.firstname,
                 'lastName': magentoAddress.lastname,
@@ -818,7 +826,7 @@
                     enabled: true,
                 }
             };
-            const styles = this.fastlaneStyles || {};
+            const styles = JSON.parse(this.fastlaneStyles) || {};
             this.fastlaneCardComponent = await window.bold.fastlane.instance.FastlaneCardComponent(
                 {
                     fields,
@@ -839,7 +847,7 @@
                     prefill: this.getFormattedPhoneNumber(),
                 }
             };
-            const styles = this.fastlaneStyles || {};
+            const styles = JSON.parse(this.fastlaneStyles) || {};
             this.fastlanePaymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
                 {
                     fields,
