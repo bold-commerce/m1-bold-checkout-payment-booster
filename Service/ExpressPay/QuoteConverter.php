@@ -6,6 +6,11 @@
 class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
 {
     /**
+     * @var bool
+     */
+    private $areTotalsCollected = false;
+
+    /**
      * @param Mage_Sales_Model_Quote $quote
      * @param string $gatewayId
      * @return array
@@ -176,8 +181,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         }
 
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
-
-        return [
+        $convertedQuote = [
             'order_data' => [
                 'items' => array_map(
                     static function (Mage_Sales_Model_Quote_Item $quoteItem) use ($currencyCode) {
@@ -217,6 +221,10 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 ]
             ]
         ];
+
+        $this->convertCustomTotals($quote, $convertedQuote);
+
+        return $convertedQuote;
     }
 
     /**
@@ -228,7 +236,11 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
     {
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
 
-        $quote->collectTotals(); // Ensure that we have the correct grand total for the quote
+        if (!$this->areTotalsCollected) {
+            $quote->collectTotals();
+
+            $this->areTotalsCollected = true;
+        }
 
         return [
             'order_data' => [
@@ -298,5 +310,73 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 ]
             ]
         ];
+    }
+
+    /**
+     * @param Mage_Sales_Model_Quote $quote
+     * @param array $convertedQuote
+     * @phpstan-param array<string, array<string, array<array<string, array<string, string>|bool|int|string>|string>>> $convertedQuote
+     * @return void
+     */
+    private function convertCustomTotals(Mage_Sales_Model_Quote $quote, array &$convertedQuote)
+    {
+        if (!$this->areTotalsCollected) {
+            $quote->collectTotals();
+
+            $this->areTotalsCollected = true;
+        }
+
+        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $excludedTotals = ['subtotal', 'shipping', 'tax', 'grand_total'];
+        $customTotals = array_filter(
+            $quote->getTotals(),
+            static function (Mage_Sales_Model_Quote_Address_Total $total) use ($excludedTotals) {
+                return !in_array($total->getCode(), $excludedTotals, true);
+            }
+        );
+
+        if (count($customTotals) === 0) {
+            return;
+        }
+
+        $customTotalsValue = 0;
+        $totalItems = array_filter(
+            array_map(
+                static function (Mage_Sales_Model_Quote_Address_Total $total) use ($currencyCode, &$customTotalsValue) {
+                    /** @var string|null $name */
+                    $name = $total->getData('title') ?: '';
+                    /** @var float|string|null $value */
+                    $value = $total->getData('value') ?: 0;
+
+                    if ((float)$value === 0.00) {
+                        return null;
+                    }
+
+                    $customTotalsValue += (float)$value;
+
+                    return [
+                        'name' => $name,
+                        'sku' => $total->getCode() ?: '',
+                        'unit_amount' => [
+                            'currency_code' => $currencyCode ?: '',
+                            'value' => number_format((float)$value, 2)
+                        ],
+                        'quantity' => 1,
+                        'is_shipping_required' => false
+                    ];
+                },
+                array_values($customTotals)
+            )
+        );
+
+        if ($customTotalsValue === 0) {
+            return;
+        }
+
+        $convertedQuote['order_data']['items'] = array_merge($convertedQuote['order_data']['items'], $totalItems);
+        $convertedQuote['order_data']['item_total']['value'] = number_format(
+            ((float)$convertedQuote['order_data']['item_total']['value']) + $customTotalsValue,
+            2
+        );
     }
 }
