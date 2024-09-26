@@ -3,7 +3,7 @@
 /**
  * Shop identifier retrieve service.
  */
-class Bold_CheckoutPaymentBooster_Service_ShopId
+class Bold_CheckoutPaymentBooster_Service_ShopInfo
 {
     const SHOP_INFO_URI = '/shops/v1/info';
 
@@ -14,7 +14,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
      * @return string
      * @throws Mage_Core_Exception
      */
-    public static function get($websiteId)
+    public static function getShopId($websiteId)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -22,7 +22,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
         if ($shopIdentifier) {
             return $shopIdentifier;
         }
-        self::set($websiteId);
+        self::saveShopInfo($websiteId);
 
         return $config->getShopId($websiteId);
     }
@@ -33,7 +33,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
      * @param int $websiteId
      * @throws Mage_Core_Exception
      */
-    public static function set($websiteId)
+    public static function saveShopInfo($websiteId)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
@@ -55,7 +55,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
             )
         );
         if (!$shopInfo) {
-            Mage::throwException('Failed to get shop info');
+            Mage::throwException('Failed to get shop info. Please contact Bold support.');
         }
         if (isset($shopInfo->errors)) {
             $error = current($shopInfo->errors);
@@ -67,5 +67,6 @@ class Bold_CheckoutPaymentBooster_Service_ShopId
 
         $shopIdentifier = $shopInfo->shop_identifier;
         $config->setShopId($shopIdentifier, $websiteId);
+        $config->setShopDomain($shopInfo->shop_domain, $websiteId);
     }
 }

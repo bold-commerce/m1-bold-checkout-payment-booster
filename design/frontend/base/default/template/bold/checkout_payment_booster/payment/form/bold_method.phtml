@@ -5,30 +5,25 @@
  * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold $this
  */
 ?>
-<div id='payment_form_bold' style='display: none'>
-    <iframe id='PIGI' scrolling='no' width='100%' frameborder='0'></iframe>
-</div>
-<span class='please-wait' id='bold-payments-iframe-loader' style='display:none;'>
-        <img src="<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif') ?>"
-             alt="<?php echo $this->__('Please wait...') ?>"
-             title="<?php echo $this->__('Please wait...') ?>"
-        /> <?php echo $this->__('Please wait...') ?>
-</span>
+<div id='payment_form_bold' style="display: none"></div>
 
 <script type="text/javascript">
     /**
      * Bold order data sync class.
      */
     let Bold = Class.create({
-        iframeUrl: "<?php echo $this->getIframeUrl(); ?>",
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
-        awaitingRefreshBeforePlacingOrder: false,
         paymentContainer: document.getElementById('bold-payments-container'),
+        paymentCheckbox: document.getElementById('p_method_bold'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
-        iframeElement: document.getElementById('PIGI'),
-        iframeWindow: null,
-        paymentCheckbox: null,
-        loader: document.getElementById('bold-payments-iframe-loader'),
+        groupLabel: '<?php echo $this->getGroupLabel() ?>',
+        boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
+        jwtToken: '<?php echo $this->getJwtToken(); ?>',
+        epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
+        epsUrl: '<?php echo $this->getEpsUrl(); ?>',
+        epsStaticUrl: '<?php echo $this->getEpsStaticUrl(); ?>',
+        epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
+        quoteCurrencyCode: '<?php echo $this->getQuoteCurrencyCode(); ?>',
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
             'firstname': 'billing:firstname',
@@ -78,14 +73,83 @@
                     orderData: {}
                 };
             }
-            this.paymentCheckbox = document.getElementById('p_method_bold');
-            this.hidePaymentMethod();
-            this.syncData();
+            this.showPaymentMethod();
+            this.hydrateOrderData();
             this.subscribeToFieldsChanges();
-            this.subscribeToPIGI();
+            if (!this.isAvailable) {
+                this.hidePaymentMethod();
+                return;
+            }
+            this.initPaymentForm();
+            this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
         },
+        /**
+         * Load SPI SDK.
+         *
+         * @returns {Promise<void>}
+         */
+        initPaymentForm: async function () {
+            await this.loadScript(this.epsStaticUrl + '/js/payments_sdk.js');
+            const initialData = {
+                'eps_url': this.epsUrl,
+                'eps_bucket_url': this.epsStaticUrl,
+                'group_label': this.groupLabel,
+                'trace_id': '<?php echo $this->getPublicOrderID(); ?>',
+                'payment_gateways': [
+                    {
+                        'gateway_id': Number(this.epsGatewayId),
+                        'auth_token': this.epsAuthToken,
+                        'currency': this.quoteCurrencyCode,
+                    }
+                ],
+                'callbacks': {
+                    'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
+                        if (paymentType !== 'ppcp') {
+                            return;
+                        }
+                        const walletPayResult = await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + this.jwtToken,
+                            },
+                            body: JSON.stringify(paymentPayload),
+                        });
+                        if (walletPayResult.ok) {
+                            const walletPayResultPayload = await walletPayResult.json();
+                            return walletPayResultPayload.data
+                        } else {
+                            throw 'Unable to create wallet pay order';
+                        }
+                    }.bind(this),
+                }
+            };
+            const boldPayments = new window.bold.Payments(initialData);
+            boldPayments.renderPayments('payment_form_bold');
+        },
+        /**
+         * Load specified script with attributes.
+         *
+         * @returns {Promise<void>}
+         */
+        loadScript: async function (src, attributes = {}) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                if (attributes.constructor === Object) {
+                    Object.keys(attributes).forEach((key) => {
+                        script.setAttribute(key, attributes[key]);
+                    });
+                }
+                document.head.appendChild(script);
+            });
+        },
+
         /**
          * Subscribe to fields changes for order hydration.
          *
@@ -97,7 +161,7 @@
                 if (field) {
                     field.observe('change', () => {
                         setTimeout(() => {
-                            this.syncData();
+                            this.hydrateOrderData();
                         }, 500);
                     });
                 }
@@ -193,9 +257,9 @@
         /**
          * Hydrate Bold order.
          */
-        syncData: function () {
+        hydrateOrderData: function () {
             if (Ajax.activeRequestCount > 0) {
-                this.syncData.bind(this).delay(0.1);
+                this.hydrateOrderData.bind(this).delay(0.1);
                 return;
             }
             this.updateOrderDataPayload();
@@ -214,14 +278,13 @@
                     }
                 ),
                 onSuccess: function () {
-                    window.bold.orderData = Object.assign({}, this.orderPayload);
-                    this.loader.style.display = 'none';
-                    this.showPIGI();
-                }.bind(this),
-                onLoading: function () {
-                    if (this.paymentMethodElement.style.display !== 'none') {
-                        this.loader.style.display = 'block';
+                    if (this.orderPayload.region_id) {
+                        const region = billingRegionUpdater.regions[this.orderPayload.country_id][this.orderPayload.region_id] || null;
+                        if (region) {
+                            this.orderPayload.region = region.code;
+                        }
                     }
+                    window.bold.orderData = Object.assign({}, this.orderPayload);
                 }.bind(this),
                 onFailure: function () {
                     this.hidePaymentMethod();
@@ -248,19 +311,14 @@
                     if (!this.paymentCheckbox.checked) {
                         return checkoutSaveMethod();
                     }
-                    checkout.setLoadWaiting('payment', true);
-                    if (!this.paymentType) {
-                        this.awaitingRefreshBeforePlacingOrder = true;
-                        if (!this.iframeWindow) {
-                            checkout.setLoadWaiting(false);
-                            return checkoutSaveMethod();
-                        }
-                        this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
-                        this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
-                    } else {
-                        checkout.setLoadWaiting(false);
-                        checkoutSaveMethod();
+                    checkout.validate();
+                    if (!this.paymentId) {
+                        checkout.setLoadWaiting('payment', true);
+                        this.tokenize();
+                        return;
                     }
+                    checkout.setLoadWaiting(false);
+                    checkoutSaveMethod();
                 }.bind(this)
             );
         },
@@ -278,19 +336,13 @@
                     if (!this.paymentCheckbox.checked) {
                         return paymentSaveMethod();
                     }
-                    checkout.setLoadWaiting('payment', true);
-                    if (!this.paymentType) {
-                        if (!this.iframeWindow) {
-                            checkout.setLoadWaiting(false);
-                            return paymentSaveMethod();
-                        }
-                        this.awaitingRefreshBeforePlacingOrder = true;
-                        this.iframeWindow.postMessage({actionType: 'PIGI_CLEAR_ERROR_MESSAGES'}, '*');
-                        this.iframeWindow.postMessage({actionType: 'PIGI_REFRESH_ORDER'}, '*');
-                    } else {
-                        checkout.setLoadWaiting(false);
-                        paymentSaveMethod();
+                    if (!this.paymentId) {
+                        checkout.setLoadWaiting('payment', true);
+                        this.tokenize();
+                        return;
                     }
+                    checkout.setLoadWaiting(false);
+                    paymentSaveMethod();
                 }.bind(this)
             );
         },
@@ -299,62 +351,63 @@
          */
         hidePaymentMethod: function () {
             this.paymentMethodElement.style.display = 'none';
-            this.loader.style.display = 'none';
         },
         /**
-         * Refresh Bold order to get the latest cart data and show PIGI iframe.
+         * Show payment method section.
+         */
+        showPaymentMethod: function () {
+            this.paymentMethodElement.style.display = 'block';
+        },
+        /**
+         * Send tokenize action to SPI iframe.
+         *
+         * @return {Promise<void>}
+         */
+        tokenize: async function () {
+            const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
+            const payload = {
+                billing_address: {
+                    first_name: window.bold.orderData.firstname,
+                    last_name: window.bold.orderData.lastname,
+                    address_line_1: window.bold.orderData.street1,
+                    address_line_2: window.bold.orderData.street2,
+                    province_code: window.bold.orderData.region,
+                    city: window.bold.orderData.city,
+                    postal_code: window.bold.orderData.postcode,
+                    country_code: window.bold.orderData.country_id,
+                }
+            };
+            iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
+        },
+        /**
+         * Subscribe to SPI iframe events.
          *
          * @returns {void}
-         * @private
          */
-        showPIGI: function () {
-            if (!this.isAvailable) {
-                return;
-            }
-            if (!this.iframeElement.src) {
-                this.iframeElement.src = this.iframeUrl;
-            }
-            this.paymentMethodElement.style.display = 'block';
-            this.paymentContainer.style.display = 'block';
-            this.loader.style.display = 'none';
-        },
-        subscribeToPIGI() {
+        subscribeToSpiEvents() {
             window.addEventListener('message', ({data}) => {
-                const responseType = data.responseType;
-                if (responseType) {
-                    switch (responseType) {
-                        case 'PIGI_UPDATE_HEIGHT':
-                            if (this.iframeElement.height === Math.round(data.payload.height) + 'px') {
-                                return;
-                            }
-                            this.iframeElement.height = Math.round(data.payload.height) + 'px';
-                            break;
-                        case 'PIGI_INITIALIZED':
-                            this.iframeWindow = this.iframeElement.contentWindow;
-                            if (data.payload && data.payload.height && this.iframeElement) {
-                                this.iframeElement.height = Math.round(data.payload.height) + 'px';
-                            }
-                            break;
-                        case 'PIGI_REFRESH_ORDER':
-                            if (this.awaitingRefreshBeforePlacingOrder) {
-                                this.iframeWindow.postMessage({actionType: 'PIGI_ADD_PAYMENT'}, '*');
-                                this.awaitingRefreshBeforePlacingOrder = false;
-                            }
-                            break;
-                        case 'PIGI_ADD_PAYMENT':
+                const eventType = data.eventType;
+                if (eventType) {
+                    switch (eventType) {
+                        case 'EVENT_SPI_TOKENIZED':
                             if (!data.payload.success) {
+                                this.paymentId = null;
+                                console.log('Failed to tokenize');
                                 checkout.setLoadWaiting(false);
-                                console.error('Failed to add payment');
-                                this.paymentType = null;
                                 return;
                             }
-                            this.paymentType = data.payload.paymentType;
+                            this.paymentId = data.payload?.payload?.data?.payment_id;
                             if (checkout.save) {
-                                checkout.setLoadWaiting(false);
                                 checkout.save();
                                 return;
                             }
                             payment.save();
+                            break;
+                        case 'EVENT_SPI_TOKENIZE_FAILED':
+                            this.paymentId = null;
+                            console.log('Failed to tokenize');
+                            checkout.setLoadWaiting(false);
+                            break;
                     }
                 }
             });

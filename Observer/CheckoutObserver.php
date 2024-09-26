@@ -22,10 +22,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             if (!$publicOrderId) {
                 return;
             }
-            Bold_CheckoutPaymentBooster_Service_Fastlane::loadGatewayData(
-                $publicOrderId,
-                (int)$quote->getStore()->getWebsiteId()
-            );
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }

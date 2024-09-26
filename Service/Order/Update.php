@@ -33,7 +33,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Update
             $body
         );
         if (isset($updateResponse->error) || !isset($updateResponse->data->public_order_id)) {
-            $message = json_encode($updateResponse->error);
+            $message = isset($updateResponse->error) ? json_encode($updateResponse->error) : 'n/a';
             Mage::throwException('Cannot update order state, order id: ' . $order->getId() . ', error: ' . $message);
         }
         return $updateResponse->data;

@@ -17,7 +17,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      */
     public static function get($url, $websiteId)
     {
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
         $url = self::getUrl($websiteId, $shopId, $url);
         return json_decode(
@@ -41,7 +41,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      */
     public static function post($url, $websiteId, array $body = null)
     {
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
         $url = self::getUrl($websiteId, $shopId, $url);
         return json_decode(
@@ -66,7 +66,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      */
     public static function put($url, $websiteId, array $body = null)
     {
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
         $url = self::getUrl($websiteId, $shopId, $url);
         return json_decode(
@@ -91,7 +91,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      */
     public static function patch($url, $websiteId, array $body = null)
     {
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
         $url = self::getUrl($websiteId, $shopId, $url);
         return json_decode(
@@ -115,7 +115,7 @@ class Bold_CheckoutPaymentBooster_Service_Client
      */
     public static function delete($url, $websiteId)
     {
-        $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
+        $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
         $url = self::getUrl($websiteId, $shopId, $url);
         return json_decode(

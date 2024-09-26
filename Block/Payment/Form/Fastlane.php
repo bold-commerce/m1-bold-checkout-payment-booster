@@ -18,10 +18,23 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     protected function _construct()
     {
         parent::_construct();
+        $this->quote = Mage::getSingleton('checkout/session')->getQuote();
         if ($this->isAvailable()) {
-            $this->quote = Mage::getSingleton('checkout/session')->getQuote();
             $this->setTemplate('bold/checkout_payment_booster/payment/form/bold_fastlane_method.phtml');
         }
+    }
+
+    /**
+     * Retrieve Fastlane email container styles.
+     *
+     * @return string
+     */
+    public function getWatermarkContainerStyle()
+    {
+        $websiteId = $this->quote->getStore()->getWebsiteId();
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getFastlaneWatermarkContainerStyles($websiteId);
     }
 
     /**
@@ -60,68 +73,52 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     }
 
     /**
-     * Get payment gateway data.
+     * Get EPS gateway ID from Bold checkout data.
      *
-     * @return string
+     * @return string|null
      */
-    public function getGatewayData()
+    public function getEpsGatewayId()
     {
-        return json_encode(
-            Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData()
-        );
+        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
+        if (!$boldCheckoutData) {
+            return null;
+        }
+        return isset($boldCheckoutData->flow_settings->eps_gateway_id)
+            ? $boldCheckoutData->flow_settings->eps_gateway_id
+            : null;
     }
 
     /**
      * Retrieve Fastlane styles.
      *
-     * @return string
+     * @return string|null
      */
     public function getFastlaneStyles()
     {
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $styles = (object)[];
-        if (!$boldCheckoutData) {
-            return json_encode($styles);
-        }
-
-        // TODO: Need to implement styles retrieving from Checkout admin
-        // (for now there is no ability to get this information if order was created using checkout_sidekick)
-
-        return json_encode($styles);
+        $fastlaneStyles = Bold_CheckoutPaymentBooster_Service_Bold::getFastlaneStyles();
+        return $fastlaneStyles ? json_encode($fastlaneStyles) : null;
     }
 
     /**
-     * Retrieve Bold Storefront API URL.
+     * Retrieve EPS URL.
      *
-     * @return string|null
+     * @return string
      */
-    public function getBoldApiUrl()
+    public function getEpsUrl()
     {
-        /** @var Mage_Checkout_Model_Session $checkoutSession */
-        $checkoutSession = Mage::getSingleton('checkout/session');
-        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        if (!$publicOrderId) {
-            return null;
-        }
-        $websiteId = $checkoutSession->getQuote()->getStore()->getWebsiteId();
-        try {
-            $shopId = Bold_CheckoutPaymentBooster_Service_ShopId::get($websiteId);
-        } catch (Mage_Core_Exception $e) {
-            return null;
-        }
+        $websiteId = $this->quote->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $apiUrl = $config->getApiUrl($websiteId);
-        return $apiUrl . self::PATH . $shopId . '/' . $publicOrderId . '/';
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        return $config->getEpsUrl($websiteId) . '/' . $config->getShopDomain($websiteId) . '/';
     }
 
     /**
-     * Retrieve JWT token.
+     * Retrieve EPS auth token.
      *
      * @return string|null
      */
-    public function getJwtToken()
+    public function getEpsAuthToken()
     {
-        return Bold_CheckoutPaymentBooster_Service_Bold::getJwtToken();
+        return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
     }
 }

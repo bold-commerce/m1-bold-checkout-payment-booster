@@ -68,6 +68,24 @@
                             <frontend_class>validate-url</frontend_class>
                             <comment><![CDATA[ Bold Checkout API URL. Do not change. ]]></comment>
                         </api_url>
+                        <eps_url translate="label">
+                            <label>EPS URL</label>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>validate-url</frontend_class>
+                            <comment><![CDATA[ Bold Checkout EPS URL. Do not change. ]]></comment>
+                        </eps_url>
+                        <eps_static_url translate="label">
+                            <label>EPS STATIC URL</label>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>validate-url</frontend_class>
+                            <comment><![CDATA[ Bold Checkout EPS STATIC URL. Do not change. ]]></comment>
+                        </eps_static_url>
                         <weight_conversion_rate>
                             <label>Weight Unit Conversion Rate To Grams</label>
                             <frontend_type>text</frontend_type>
@@ -76,15 +94,6 @@
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ The conversion rate between weight unit and grams. ]]></comment>
                         </weight_conversion_rate>
-                        <pigi_styles translate="label">
-                            <label>Payment Booster Payments Styles</label>
-                            <sort_order>10</sort_order>
-                            <show_in_default>0</show_in_default>
-                            <show_in_website>1</show_in_website>
-                            <frontend_type>textarea</frontend_type>
-                            <backend_model>bold_checkout_payment_booster/system_config_backend_payment_css</backend_model>
-                            <comment><![CDATA[Add custom styling to the payment section of your checkout.]]></comment>
-                        </pigi_styles>
                         <fastlane_address_container_styles>
                             <label>PayPal Fastlane Address Container Styles</label>
                             <frontend_type>textarea</frontend_type>
@@ -93,6 +102,14 @@
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane address container. ]]></comment>
                         </fastlane_address_container_styles>
+                        <fastlane_email_container_styles>
+                            <label>PayPal Fastlane Address Container Styles</label>
+                            <frontend_type>textarea</frontend_type>
+                            <sort_order>20</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane email watermark container. ]]></comment>
+                        </fastlane_email_container_styles>
                         <is_log_enabled translate="label">
                             <label>Enable requests log</label>
                             <frontend_type>select</frontend_type>

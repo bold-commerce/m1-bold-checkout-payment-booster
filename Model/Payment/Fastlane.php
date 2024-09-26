@@ -70,22 +70,26 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
     /**
      * @inheritDoc
      */
-    public function isEnabled($quote = null)
+    public function isAvailable($quote = null)
     {
+        if (!$quote) {
+            return false;
+        }
+        if ($quote->getIsMultiShipping()) {
+            return false;
+        }
+        if ($quote->getCustomer()->getId()) {
+            return false;
+        }
         /** @var Mage_Sales_Model_Quote|null $quote */
         $websiteId = $quote ? $quote->getStore()->getWebsiteId() : Mage::app()->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        return $config->isFastlaneEnabled($websiteId);
-    }
-
-    /**
-     * @inheritDoc
-     */
-    public function isAvailable($quote = null)
-    {
-        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData() !== null
-            && Bold_CheckoutPaymentBooster_Service_Fastlane::getGatewayData() !== null;
+        $enabled = $config->isFastlaneEnabled($websiteId);
+        if (!$enabled) {
+            return false;
+        }
+        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData() !== null;
     }
 
     /**

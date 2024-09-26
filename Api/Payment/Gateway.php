@@ -24,17 +24,20 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     public static function capture(Varien_Object $payment, $amount)
     {
         $order = $payment->getOrder();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCapture($order);
-        if ((float)$order->getGrandTotal() === (float)$amount) {
-            $payment->setTransactionId(self::captureFull($order))
-                ->setShouldCloseParentTransaction(true);
+        if (Bold_CheckoutPaymentBooster_Service_Order_Data::getIsCaptureInProgress($order)) {
             return;
         }
-        $payment->setTransactionId(self::capturePartial($order,
-            (float)$amount));
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, true);
+        if ((float)$order->getGrandTotal() === (float)$amount) {
+            $payment->setTransactionId(self::captureFull($order))->setShouldCloseParentTransaction(true);
+            Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, false);
+            return;
+        }
+        $payment->setTransactionId(self::capturePartial($order, (float)$amount));
         if ((float)$payment->getBaseAmountAuthorized() === $payment->getBaseAmountPaid() + $amount) {
             $payment->setShouldCloseParentTransaction(true);
         }
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, false);
     }
 
     /**
@@ -48,11 +51,15 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformCancel($order);
+        if (Bold_CheckoutPaymentBooster_Service_Order_Data::getIsCancelInProgress($order)) {
+            return;
+        }
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, true);
         Bold_CheckoutPaymentBooster_Api_Payment_Gateway::cancelVoid(
             $order,
             Bold_CheckoutPaymentBooster_Api_Payment_Gateway::CANCEL
         );
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, false);
     }
 
     /**
@@ -66,11 +73,15 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformCancel($order);
+        if (Bold_CheckoutPaymentBooster_Service_Order_Data::getIsCancelInProgress($order)) {
+            return;
+        }
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, true);
         self::cancelVoid(
             $order,
             Bold_CheckoutPaymentBooster_Api_Payment_Gateway::VOID
         );
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, false);
     }
 
     /**
@@ -85,7 +96,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::saveIsPlatformRefund($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, true);
         $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
         $amount = Mage::app()->getStore()->roundPrice($amount);
         if ($orderGrandTotal <= $amount) {
@@ -93,6 +104,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
             $payment->setTransactionId($transactionId)
                 ->setIsTransactionClosed(1)
                 ->setShouldCloseParentTransaction(true);
+            Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, false);
             return;
         }
         $transactionId = self::refundPartial($order, (float)$amount);
@@ -100,6 +112,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
         if ((float)$payment->getBaseAmountPaid() === $payment->getBaseAmountRefunded() + $amount) {
             $payment->setShouldCloseParentTransaction(true);
         }
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, false);
     }
 
     /**

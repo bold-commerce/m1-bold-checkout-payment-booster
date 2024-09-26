@@ -9,6 +9,7 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      * Init and load Bold Checkout Data to the checkout session.
      *
      * @param Mage_Sales_Model_Quote $quote
+     * @throws Mage_Core_Exception
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
@@ -17,6 +18,9 @@ class Bold_CheckoutPaymentBooster_Service_Bold
             return;
         }
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
+        if (!$flowId) {
+            Mage::throwException('Failed to get Bold flow ID.');
+        }
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
@@ -46,17 +50,6 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     }
 
     /**
-     * Get JWT token.
-     *
-     * @return string|null
-     */
-    public static function getJwtToken()
-    {
-        $checkoutData = self::getBoldCheckoutData();
-        return $checkoutData ? $checkoutData->jwt_token : null;
-    }
-
-    /**
      * Get public order id.
      *
      * @return string|null
@@ -83,5 +76,47 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         return $quote && !$quote->getIsMultiShipping();
+    }
+
+    /**
+     * Retrieve saved eps auth token from flow settings.
+     *
+     * @return null|string
+     */
+    public static function getEpsAuthToken()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->flow_settings->eps_auth_token) ? $checkoutData->flow_settings->eps_auth_token : null;
+    }
+
+    /**
+     * Retrieve fastlane styles from flow settings.
+     *
+     * @return null|string
+     */
+    public static function getFastlaneStyles()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->flow_settings->fastlane_styles) ? $checkoutData->flow_settings->fastlane_styles : null;
+    }
+
+    /**
+     * Retrieve saved jwt token for Bold storefront api.
+     *
+     * @return null|string
+     */
+    public static function getJwtToken()
+    {
+        $checkoutData = self::getBoldCheckoutData();
+        if (!$checkoutData) {
+            return null;
+        }
+        return isset($checkoutData->jwt_token) ? $checkoutData->jwt_token : null;
     }
 }

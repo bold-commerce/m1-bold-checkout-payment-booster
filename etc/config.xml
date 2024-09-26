@@ -23,6 +23,9 @@
                     <order>
                         <table>bold_checkout_payment_booster_order</table>
                     </order>
+                    <quote>
+                        <table>bold_checkout_payment_booster_quote</table>
+                    </quote>
                 </entities>
             </bold_checkout_payment_booster_resource>
         </models>
@@ -91,18 +94,14 @@
         <events>
             <admin_system_config_changed_section_checkout>
                 <observers>
-                    <set_shop_identifier>
+                    <save_shop_info>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>setShopId</method>
-                    </set_shop_identifier>
+                        <method>saveShopInfo</method>
+                    </save_shop_info>
                     <set_rsa_config>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setRsaConfig</method>
                     </set_rsa_config>
-                    <update_pigi_styles>
-                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>sendPigiStyles</method>
-                    </update_pigi_styles>
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>
@@ -115,7 +114,10 @@
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
+                <eps_url>https://eps.secure.boldcommerce.com/</eps_url>
+                <eps_static_url>https://static-eps.secure.boldcommerce.com/</eps_static_url>
                 <weight_conversion_rate>1000</weight_conversion_rate>
+                <fastlane_email_container_styles>width: 365px</fastlane_email_container_styles>
                 <is_log_enabled>0</is_log_enabled>
             </bold_checkout_payment_booster_advanced>
         </checkout>

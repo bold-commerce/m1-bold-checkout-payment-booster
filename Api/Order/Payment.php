@@ -71,6 +71,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
      */
     private static function invoice(Mage_Sales_Model_Order $order)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, true);
         $payment = $order->getPayment();
         $invoice = $order->prepareInvoice();
         $invoice->setRequestedCaptureCase('offline');
@@ -81,7 +82,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
         $invoice->getOrder()->setIsInProcess(true);
         $order->addRelatedObject($invoice);
         $order->save();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformCapture($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, false);
         return self::getResponseBody($order);
     }
 
@@ -93,11 +94,12 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
      */
     private static function refund(Mage_Sales_Model_Order $order)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, true);
         $creditmemo = Mage::getModel('sales/service_order', $order)->prepareCreditmemo();
         $creditmemo->setPaymentRefundDisallowed(true);
         $creditmemo->register();
         $creditmemo->save();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformRefund($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, false);
         return self::getResponseBody($order);
     }
 
@@ -111,7 +113,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
     private static function isRefund(Mage_Sales_Model_Order $order, array $data)
     {
         if ($data['financial_status'] === 'refunded') {
-            return !Bold_CheckoutPaymentBooster_Service_Order_Data::getIsPlatformRefund($order);
+            return !Bold_CheckoutPaymentBooster_Service_Order_Data::isRefundInProgress($order);
         }
         return false;
     }
@@ -126,7 +128,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
     private static function isInvoice(Mage_Sales_Model_Order $order, array $data)
     {
         if ($data['financial_status'] === 'paid') {
-            return !Bold_CheckoutPaymentBooster_Service_Order_Data::getIsPlatformCapture($order);
+            return !Bold_CheckoutPaymentBooster_Service_Order_Data::getIsCaptureInProgress($order);
         }
         return false;
     }
@@ -141,7 +143,7 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
     private static function isCancel(Mage_Sales_Model_Order $order, array $data)
     {
         if ($data['financial_status'] === 'cancelled') {
-            return !Bold_CheckoutPaymentBooster_Service_Order_Data::getIsPlatformCancel($order);
+            return !Bold_CheckoutPaymentBooster_Service_Order_Data::getIsCancelInProgress($order);
         }
         return false;
     }
@@ -154,9 +156,10 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
      */
     private static function cancel(Mage_Sales_Model_Order $order)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, true);
         $order->cancel();
         $order->save();
-        Bold_CheckoutPaymentBooster_Service_Order_Data::resetIsPlatformCancel($order);
+        Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCancelInProgress($order, false);
         return self::getResponseBody($order);
     }
 }
