@@ -59,10 +59,16 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
             ];
         }
 
-        return [
-            'order_id' => $result->body['data']['order_id'],
-            'error' => null
-        ];
+        return $this->_getLocation(
+            Mage::getModel('bold_checkout_payment_booster/expressPayApiResult')
+                ->setData(
+                    [
+                        'id' => null,
+                        'order_id' => $result->body['data']['order_id'],
+                        'error' => null
+                    ]
+                )
+        );
     }
 
     /**
@@ -113,8 +119,14 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
             ];
         }
 
-        return [
-            'error' => null
-        ];
+        return $this->_getLocation(
+            Mage::getModel('bold_checkout_payment_booster/expressPayApiResult')
+                ->setData(
+                    [
+                        'id' => null,
+                        'error' => null
+                    ]
+                )
+        );
     }
 }
