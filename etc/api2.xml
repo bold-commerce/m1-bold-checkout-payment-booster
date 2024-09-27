@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<config>
+    <api2>
+        <resource_groups>
+            <bold_checkout_payment_booster translate="title" module="api2">
+                <title>Bold Checkout Payment Booster</title>
+                <sort_order>100</sort_order>
+            </bold_checkout_payment_booster>
+        </resource_groups>
+        <resources>
+            <bold_checkout_payment_booster_express_pay translate="title" module="api2">
+                <group>bold_checkout_payment_booster</group>
+                <model>bold_checkout_payment_booster/api2_expresspay</model>
+                <title>Express Pay</title>
+                <sort_order>10</sort_order>
+                <privileges>
+                    <admin>
+                        <create>1</create>
+                        <retrieve>1</retrieve>
+                        <update>1</update>
+                        <delete>1</delete>
+                    </admin>
+                    <customer>
+                        <create>1</create>
+                        <update>1</update>
+                    </customer>
+                    <guest>
+                        <create>1</create>
+                        <update>1</update>
+                    </guest>
+                </privileges>
+                <attributes translate="order_id" module="api2">
+                    <order_id>Order ID</order_id>
+                    <error>Error</error>
+                </attributes>
+                <routes>
+                    <route_express_pay_order_create>
+                        <route>/express_pay/order/create/:quoteId</route>
+                        <action_type>entity</action_type>
+                    </route_express_pay_order_create>
+                    <route_express_pay_order_update>
+                        <route>/express_pay/order/updatek/:quoteId</route>
+                        <action_type>entity</action_type>
+                    </route_express_pay_order_update>
+                </routes>
+                <versions>1</versions>
+            </bold_checkout_payment_booster_express_pay>
+        </resources>
+    </api2>
+</config>
