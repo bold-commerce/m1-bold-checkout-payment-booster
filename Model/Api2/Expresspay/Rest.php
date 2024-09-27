@@ -8,7 +8,6 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
     protected function _create(array $data)
     {
         $quoteId = $this->getRequest()->getParam('quoteId');
-        $gatewayId = $this->getRequest()->getParam('gatewayId');
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('quote/quote')->load($quoteId);
 
@@ -23,7 +22,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
         $websiteId = $quote->getStore()->getWebsiteId();
         $uri = '/checkout/orders/{{shopId}}/wallet_pay';
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
-        $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
+        $expressPayData = $quoteConverter->convertFullQuote($quote, $data['gateway_id']);
 
         try {
             $result = Bold_CheckoutPaymentBooster_Service_Client::post($uri, $websiteId, $expressPayData);
@@ -72,7 +71,6 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
     protected function _update(array $data)
     {
         $quoteId = $this->getRequest()->getParam('quoteId');
-        $gatewayId = $this->getRequest()->getParam('gatewayId');
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('quote/quote')->load($quoteId);
 
@@ -87,7 +85,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
         $websiteId = $quote->getStore()->getWebsiteId();
         $uri = '/checkout/orders/{{shopId}}/wallet_pay';
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
-        $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
+        $expressPayData = $quoteConverter->convertFullQuote($quote, $data['gateway_id']);
 
         try {
             $result = Bold_CheckoutPaymentBooster_Service_Client::put($uri, $websiteId, $expressPayData);
