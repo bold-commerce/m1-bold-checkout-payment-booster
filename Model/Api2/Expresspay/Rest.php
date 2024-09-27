@@ -5,7 +5,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
     /**
      * Creates an Express Pay order in Bold Checkout
      */
-    protected function _create()
+    protected function _create(array $data)
     {
         $quoteId = $this->getRequest()->getParam('quoteId');
         $gatewayId = $this->getRequest()->getParam('gatewayId');
@@ -69,7 +69,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
     /**
      * Updates an Express Pay order in Bold Checkout
      */
-    protected function _update()
+    protected function _update(array $data)
     {
         $quoteId = $this->getRequest()->getParam('quoteId');
         $gatewayId = $this->getRequest()->getParam('gatewayId');
