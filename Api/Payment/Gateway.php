@@ -177,20 +177,17 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
             'reason' => $operation === self::CANCEL ? 'Order has been canceled.' : 'Order payment has been voided.',
         ];
         $websiteId = $order->getStore()->getWebsiteId();
-        $result = Bold_CheckoutPaymentBooster_Service_Client::post(
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(
             $url,
             $websiteId,
             $body
         );
         $errors = isset($result->errors) ? $result->errors : [];
-        $logMessage = sprintf('Order id: %s. Errors: ' . PHP_EOL, $order->getIncrementId());
         $errorMessage = '';
         foreach ($errors as $error) {
-            $logMessage .= sprintf('Type: %s. Message: %s' . PHP_EOL, $error->type, $error->message);
             $errorMessage = $error->message;
         }
         if ($errors) {
-            Mage::log($logMessage, Zend_Log::ERR, 'bold_cancel.log');
             Mage::throwException($errorMessage);
         }
         if (!isset($result->data->application_state)) {
@@ -220,7 +217,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
         ];
         $url = sprintf(self::REFUND_FULL_URL, $orderPublicId);
         $websiteId = $order->getStore()->getWebsiteId();
-        return self::sendRefundRequest($url, $order->getIncrementId(), $websiteId, $body);
+        return self::sendRefundRequest($url, $websiteId, $body);
     }
 
     /**
@@ -243,7 +240,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
         ];
         $url = sprintf(self::REFUND_PARTIALLY_URL, $orderPublicId);
         $websiteId = $order->getStore()->getWebsiteId();
-        return self::sendRefundRequest($url, $order->getIncrementId(), $websiteId, $body);
+        return self::sendRefundRequest($url, $websiteId, $body);
     }
 
     /**
@@ -258,7 +255,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      */
     private static function sendCaptureRequest($url, $orderId, $websiteId, array $body)
     {
-        $result = Bold_CheckoutPaymentBooster_Service_Client::post(
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(
             $url,
             $websiteId,
             $body
@@ -290,29 +287,20 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
      * Perform capture api call.
      *
      * @param string $url
-     * @param string $orderId
      * @param int $websiteId
      * @param array $body
      * @return string
      * @throws Mage_Core_Exception
      */
-    private static function sendRefundRequest($url, $orderId, $websiteId, array $body)
+    private static function sendRefundRequest($url, $websiteId, array $body)
     {
-        $result = Bold_CheckoutPaymentBooster_Service_Client::post($url, $websiteId, $body);
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post($url, $websiteId, $body);
         $errors = isset($result->errors) ? $result->errors : [];
-        $logMessage = sprintf('Order id: %s. Errors: ' . PHP_EOL, $orderId);
         $errorMessage = Mage::helper('core')->__('Cannot refund order.');
         foreach ($errors as $error) {
             $errorMessage = $error->message;
-            $logMessage .= sprintf(
-                'Code: %s. Type: %s. Message: %s' . PHP_EOL,
-                $error->code,
-                $error->type,
-                $error->message
-            );
         }
         if ($errors) {
-            Mage::log($logMessage, Zend_Log::ERR, 'bold_refund.log');
             Mage::throwException($errorMessage);
         }
         if (!isset($result->data->refund->transaction_details)) {

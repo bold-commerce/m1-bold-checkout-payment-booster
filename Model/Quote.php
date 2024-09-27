@@ -10,6 +10,8 @@
  * @method $this setQuoteId(int $value)
  * @method string getPublicId()
  * @method $this setPublicId(string $value)
+ * @method array getFlowSettings()
+ * @method $this setFlowSettings(array $value)
  */
 class Bold_CheckoutPaymentBooster_Model_Quote extends Mage_Core_Model_Abstract
 {

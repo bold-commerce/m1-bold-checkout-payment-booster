@@ -5,9 +5,14 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
-    const FASTLANE = 'paypal_fastlane_3_page';
+    const DEFAULT_FLOW_ID = 'bold_booster_m1';
+    const FASTLANE_FLOW_ID = 'bold_booster_fastlane_m1';
+    const STAGING_CONFIGURATION_GROUP = '/consumers/checkout-staging/configuration_group/{{shopDomain}}';
+    const CONFIGURATION_GROUP = '/consumers/checkout/configuration_group/{{shopDomain}}';
 
     private static $flowList = [];
+
+    private static $epsConfig = null;
 
     /**
      * Get Bold flows.
@@ -20,7 +25,7 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         if (self::$flowList) {
             return self::$flowList;
         }
-        self::$flowList = Bold_CheckoutPaymentBooster_Service_Client::get(
+        self::$flowList = Bold_CheckoutPaymentBooster_Service_BoldClient::get(
             '/checkout/shop/{{shopId}}/flows',
             $websiteId
         )->data->flows;
@@ -36,7 +41,7 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      */
     public static function disableFlow($websiteId, $flowId)
     {
-        return Bold_CheckoutPaymentBooster_Service_Client::delete(
+        return Bold_CheckoutPaymentBooster_Service_BoldClient::delete(
             '/checkout/shop/{{shopId}}/flows/' . $flowId,
             $websiteId
         );
@@ -50,10 +55,43 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      */
     public static function getAvailable($websiteId)
     {
-        return Bold_CheckoutPaymentBooster_Service_Client::get(
+        return Bold_CheckoutPaymentBooster_Service_BoldClient::get(
             '/checkout/shop/{{shopId}}/flows/available',
             $websiteId
         )->data->flows;
+    }
+
+    /**
+     * Create custom Bold flow.
+     *
+     * @param int $websiteId
+     * @param array $flowData
+     * @return stdClass
+     */
+    public static function createFlow($websiteId, $flowData)
+    {
+        return Bold_CheckoutPaymentBooster_Service_BoldClient::post(
+            '/checkout/shop/{{shopId}}/flows',
+            $websiteId,
+            $flowData
+        );
+    }
+
+    /**
+     * Update custom Bold flow.
+     *
+     * @param int $websiteId
+     * @param string $flowId
+     * @param array $flowData
+     * @return stdClass
+     */
+    public static function updateFlow($websiteId, $flowId, array $flowData)
+    {
+        return Bold_CheckoutPaymentBooster_Service_BoldClient::patch(
+            '/checkout/shop/{{shopId}}/flows/' . $flowId,
+            $websiteId,
+            $flowData
+        );
     }
 
     /**
@@ -62,42 +100,144 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      * @param Mage_Sales_Model_Quote $quote
      * @return string
      */
-    public static function getId(Mage_Sales_Model_Quote $quote)
+    public static function getFlowIdForCheckout(Mage_Sales_Model_Quote $quote)
     {
         $websiteId = $quote->getStore()->getWebsiteId();
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $flows = self::getList($websiteId);
         $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
-        if (!$isFastlaneEnabled) {
-            return self::getDefaultFlowId($flows);
+        if ($isFastlaneEnabled && !$quote->getCustomer()->getId()) {
+            return self::FASTLANE_FLOW_ID;
         }
-        foreach ($flows as $flow) {
-            if ($flow->flow_id === self::FASTLANE) {
-                return self::FASTLANE;
-            }
-        }
-        return self::getDefaultFlowId($flows);
+        return self::DEFAULT_FLOW_ID;
     }
 
     /**
-     * Get default Bold flow ID.
+     * Retrieve Bold flow settings by flow ID.
      *
-     * @param array $flows
-     * @return string|null
+     * @param Mage_Sales_Model_Quote $quote
+     * @param $flowId
+     * @return null
      */
-    private static function getDefaultFlowId(array $flows)
+    public static function getFlowSettingsByFlowId(Mage_Sales_Model_Quote $quote, $flowId)
     {
-        $fastlaneFlowId = null;
-        foreach ($flows as $flowKey => $flow) {
-            if ($flow->flow_id === self::FASTLANE) {
-                if (isset($flow->flow_config->fallback_flow_id)) {
-                    return $flow->flow_config->fallback_flow_id;
-                }
-                $fastlaneFlowId = $flow->flow_id;
-                unset($flows[$flowKey]);
+        $websiteId = $quote->getStore()->getWebsiteId();
+        $flowList = self::getList($websiteId);
+        foreach ($flowList as $flow) {
+            if ($flow->flow_id === $flowId) {
+                return $flow->flow_settings;
             }
         }
-        return isset($flows[0]->flow_id) ? $flows[0]->flow_id : $fastlaneFlowId;
+        return null;
+    }
+
+    /**
+     * Create|update Payment Booster flow for given website.
+     *
+     * @param int $websiteId
+     * @return void
+     */
+    public static function processPaymentBoosterFlow($websiteId)
+    {
+        $list = self::getList($websiteId);
+        foreach ($list as $flow) {
+            if ($flow->flow_id === self::DEFAULT_FLOW_ID) {
+                return;
+            }
+        }
+        self::createFlow(
+            $websiteId,
+            [
+                'flow_id' => self::DEFAULT_FLOW_ID,
+                'flow_name' => 'Bold Booster for PayPal',
+                'flow_type' => 'custom',
+            ]
+        );
+    }
+
+    /**
+     * Create|update Fastlane flow for given website.
+     *
+     * @param int $websiteId
+     * @return void
+     */
+    public static function processFastlaneFlow($websiteId)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
+        if (!$isFastlaneEnabled) {
+            return;
+        }
+        $list = self::getList($websiteId);
+        foreach ($list as $flow) {
+            if ($flow->flow_id === self::FASTLANE_FLOW_ID) {
+                return;
+            }
+        }
+        self::createFlow(
+            $websiteId,
+            [
+                'flow_id' => self::FASTLANE_FLOW_ID,
+                'flow_name' => 'Bold Booster for PayPal Fastlane',
+                'flow_type' => 'custom',
+            ]
+        );
+    }
+
+    /**
+     * Get EPS gateway ID.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public static function getEpsGatewayId($websiteId)
+    {
+        if (self::$epsConfig) {
+            return isset(self::$epsConfig->gateways[0]->id) ? self::$epsConfig->gateways[0]->id : null;
+        }
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $epsUrl = $config->getEpsUrl($websiteId);
+        $isStaging = strpos($epsUrl, 'staging') !== false;
+        $path = $isStaging ? self::STAGING_CONFIGURATION_GROUP : self::CONFIGURATION_GROUP;
+        self::$epsConfig = Bold_CheckoutPaymentBooster_Service_EpsClient::get($path, $websiteId);
+        return isset(self::$epsConfig->gateways[0]->id) ? self::$epsConfig->gateways[0]->id : null;
+    }
+
+    /**
+     * Get fastlane styles.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public static function getFastlaneStyles($websiteId)
+    {
+        if (self::$epsConfig) {
+            return self::extractStylesFromEpsConfig();
+        }
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $epsUrl = $config->getEpsUrl($websiteId);
+        $isStaging = strpos($epsUrl, 'staging') !== false;
+        $path = $isStaging ? self::STAGING_CONFIGURATION_GROUP : self::CONFIGURATION_GROUP;
+        self::$epsConfig = Bold_CheckoutPaymentBooster_Service_EpsClient::get($path, $websiteId);
+        return self::extractStylesFromEpsConfig();
+    }
+
+    /**
+     * Extract styles from EPS configuration.
+     *
+     * @return string
+     */
+    private static function extractStylesFromEpsConfig()
+    {
+        if (isset(self::$epsConfig->style->css)) {
+            try {
+                $styles = json_decode(self::$epsConfig->style->css);
+                return isset($styles->fastlane->styles) ? $styles->fastlane->styles : null;
+            } catch (Exception $e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

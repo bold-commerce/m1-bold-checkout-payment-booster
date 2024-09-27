@@ -62,6 +62,18 @@
             'country_id': '<?php echo $this->getCountryId() ?>',
             'postcode': '<?php echo $this->getPostcode() ?>',
         },
+        shippingAddressFieldsMap: {
+            'firstname': 'shipping:firstname',
+            'lastname': 'shipping:lastname',
+            'company': 'shipping:company',
+            'telephone': 'shipping:telephone',
+            'street1': 'shipping:street1',
+            'street2': 'shipping:street2',
+            'city': 'shipping:city',
+            'region_id': 'shipping:region_id',
+            'country_id': 'shipping:country_id',
+            'postcode': 'shipping:postcode'
+        },
         /**
          * Initialize class.
          *
@@ -124,10 +136,39 @@
                             throw 'Unable to create wallet pay order';
                         }
                     }.bind(this),
+                    'onUpdatePaymentOrder': async function (paymentType, paymentPayload) {
+                        //do noting.
+                    }.bind(this),
+                    'onApprovePaymentOrder': async function (paymentType, paymentPayload) {
+                        this.paymentId = paymentPayload.payment_id;
+                        if (checkout.save) {
+                            checkout.save();
+                            return;
+                        }
+                        payment.save();
+                    }.bind(this),
                 }
             };
             const boldPayments = new window.bold.Payments(initialData);
             boldPayments.renderPayments('payment_form_bold');
+        },
+        /**
+         * Convert PPCP address to Magento address.
+         *
+         * @param {{}} ppcpAddress
+         * @return {{}}
+         */
+        convertPPCPAddressToMagentoAddress: function (ppcpAddress) {
+            return {
+                'firstname': ppcpAddress.first_name,
+                'lastname': ppcpAddress.last_name,
+                'street1': ppcpAddress.address_line_1,
+                'street2': ppcpAddress.address_line_2,
+                'city': ppcpAddress.city,
+                'postcode': ppcpAddress.postal_code,
+                'country_id': ppcpAddress.country_code,
+                'region': ppcpAddress.state,
+            };
         },
         /**
          * Load specified script with attributes.
@@ -257,7 +298,7 @@
         /**
          * Hydrate Bold order.
          */
-        hydrateOrderData: function () {
+        hydrateOrderData: function (force = false) {
             if (Ajax.activeRequestCount > 0) {
                 this.hydrateOrderData.bind(this).delay(0.1);
                 return;
@@ -266,7 +307,7 @@
             if (!this.isPayloadValid()) {
                 return;
             }
-            if (!this.isPayloadChanged()) {
+            if (!this.isPayloadChanged() && !force) {
                 return;
             }
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
@@ -392,7 +433,7 @@
                         case 'EVENT_SPI_TOKENIZED':
                             if (!data.payload.success) {
                                 this.paymentId = null;
-                                console.log('Failed to tokenize');
+                                console.error('Failed to tokenize');
                                 checkout.setLoadWaiting(false);
                                 return;
                             }
@@ -405,7 +446,7 @@
                             break;
                         case 'EVENT_SPI_TOKENIZE_FAILED':
                             this.paymentId = null;
-                            console.log('Failed to tokenize');
+                            console.error('Failed to tokenize');
                             checkout.setLoadWaiting(false);
                             break;
                     }
