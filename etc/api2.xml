@@ -38,6 +38,10 @@
                         <route>/express_pay/order/create/:quoteId</route>
                         <action_type>entity</action_type>
                     </route_express_pay_order_create>
+                    <route_express_pay_order_update>
+                        <route>/express_pay/order/updatek/:quoteId</route>
+                        <action_type>entity</action_type>
+                    </route_express_pay_order_update>
                 </routes>
                 <versions>1</versions>
             </bold_checkout_payment_booster_express_pay>

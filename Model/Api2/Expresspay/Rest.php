@@ -65,4 +65,58 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
             'error' => null
         ];
     }
+
+    /**
+     * Updates an Express Pay order in Bold Checkout
+     */
+    protected function _update()
+    {
+        $quoteId = $this->getRequest()->getParam('quoteId');
+        $gatewayId = $this->getRequest()->getParam('gatewayId');
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = Mage::getModel('quote/quote')->load($quoteId);
+
+        if ($quote->getId() === null) {
+            return [
+                'order_id' => null,
+                'error' => Mage::helper('core')
+                    ->__('Could not update Express Pay order. Invalid quote ID "%s".', $quoteId)
+            ];
+        }
+
+        $websiteId = $quote->getStore()->getWebsiteId();
+        $uri = '/checkout/orders/{{shopId}}/wallet_pay';
+        $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
+        $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
+
+        try {
+            $result = Bold_CheckoutPaymentBooster_Service_Client::put($uri, $websiteId, $expressPayData);
+        } catch (Mage_Core_Exception $exception) {
+            return [
+                'error' => Mage::helper('core')
+                    ->__('Could not update Express Pay order. Express Pay order. Error: "%s"', $exception->getMessage())
+            ];
+        }
+
+        if (property_exists($result, 'errors') && count($result->errors) > 0) {
+            if (is_array($result->errors[0])) {
+                $exceptionMessage = Mage::helper('core')
+                    ->__(
+                        'Could not update Express Pay order. Errors: "%s"',
+                        implode(', ', array_column($result->errors, 'message'))
+                    );
+            } else {
+                $exceptionMessage = Mage::helper('core')
+                    ->__('Could not update Express Pay order. Error: "%s"', $result->errors[0]);
+            }
+
+            return [
+                'error' => $exceptionMessage
+            ];
+        }
+
+        return [
+            'error' => null
+        ];
+    }
 }
