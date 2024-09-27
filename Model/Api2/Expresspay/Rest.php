@@ -27,11 +27,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
             $result = Bold_CheckoutPaymentBooster_Service_Client::post($uri, $websiteId, $expressPayData);
         } catch (Mage_Core_Exception $exception) {
             $this->_critical(
-                Mage::helper('core')
-                    ->__(
-                        'Could not create Express Pay order. Express Pay order. Error: "%s"',
-                        $exception->getMessage()
-                    ),
+                Mage::helper('core')->__('Could not create Express Pay order. Error: "%s"', $exception->getMessage()),
                 Mage_Api2_Model_Server::HTTP_INTERNAL_ERROR
             );
         }
@@ -95,11 +91,7 @@ class Bold_CheckoutPaymentBooster_Model_Api2_Expresspay_Rest extends Bold_Checko
             $result = Bold_CheckoutPaymentBooster_Service_Client::put($uri, $websiteId, $expressPayData);
         } catch (Mage_Core_Exception $exception) {
             $this->_critical(
-                Mage::helper('core')
-                    ->__(
-                        'Could not update Express Pay order. Express Pay order. Error: "%s"',
-                        $exception->getMessage()
-                    ),
+                Mage::helper('core')->__('Could not update Express Pay order. Error: "%s"', $exception->getMessage()),
                 Mage_Api2_Model_Server::HTTP_INTERNAL_ERROR
             );
         }
