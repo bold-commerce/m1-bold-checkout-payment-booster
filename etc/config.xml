@@ -41,35 +41,35 @@
         <events>
             <controller_action_predispatch_checkout_onepage_index>
                 <observers>
-                    <bold>
+                    <BoldBeforeCheckout>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </bold>
+                    </BoldBeforeCheckout>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
             <checkout_submit_all_after>
                 <observers>
-                    <bold>
+                    <BoldAfterSaveOrder>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>afterSaveOrder</method>
-                    </bold>
+                    </BoldAfterSaveOrder>
                 </observers>
             </checkout_submit_all_after>
             <!-- TM_FireCheckout -->
             <controller_action_predispatch_firecheckout_index_index>
                 <observers>
-                    <bold>
+                    <BoldBeforeFireCheckout>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </bold>
+                    </BoldBeforeFireCheckout>
                 </observers>
             </controller_action_predispatch_firecheckout_index_index>
             <checkout_type_onepage_save_order>
                 <observers>
-                    <bold>
+                    <BoldBeforeSaveOrder>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeSaveOrder</method>
-                    </bold>
+                    </BoldBeforeSaveOrder>
                 </observers>
             </checkout_type_onepage_save_order>
         </events>
