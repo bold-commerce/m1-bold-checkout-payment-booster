@@ -24,6 +24,7 @@
         epsStaticUrl: '<?php echo $this->getEpsStaticUrl(); ?>',
         epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
         quoteCurrencyCode: '<?php echo $this->getQuoteCurrencyCode(); ?>',
+        paymentId: null,
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
             'firstname': 'billing:firstname',
@@ -123,6 +124,26 @@
                         } else {
                             throw 'Unable to create wallet pay order';
                         }
+                    }.bind(this),
+                    'onUpdatePaymentOrder': async function () {
+                        // We won't handle updating an order from PayPal data, we will disable address changes etc
+                    }.bind(this),
+                    'onApprovePaymentOrder': async function (paymentType, paymentInformation, paymentPayload) {
+                        // A PayPal payment has been completed, we need to capture the payment ID and pass it through
+                        if (paymentType !== 'ppcp') {
+                            return;
+                        }
+
+                        if (!paymentInformation.payment_id) {
+                            console.error('No payment ID provided from PayPal.');
+                            return;
+                        }
+
+                        // Update the payment ID from PayPal
+                        this.paymentId = paymentInformation.payment_id;
+
+                        // Save the payment step to push the customer along
+                        payment.save();
                     }.bind(this),
                 }
             };
