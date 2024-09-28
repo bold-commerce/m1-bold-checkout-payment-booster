@@ -23,4 +23,15 @@ class Bold_CheckoutPaymentBooster_Model_Quote extends Mage_Core_Model_Abstract
     {
         $this->_init(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
     }
+
+    /**
+     * Remove all existing entries for a quote
+     *
+     * @param $quoteId
+     * @return void
+     */
+    public function resetQuoteId($quoteId)
+    {
+        $this->_getResource()->resetQuoteId($quoteId);
+    }
 }
