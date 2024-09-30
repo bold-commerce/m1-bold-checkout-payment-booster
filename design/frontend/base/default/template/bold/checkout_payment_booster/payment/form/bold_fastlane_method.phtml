@@ -474,7 +474,7 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
-            if (!this.emailField?.value || window.bold.fastlane.authorizedEmail === this.emailField.value) {
+            if (!this.emailField || !this.emailField.value || window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
             if (!window.Validation.validate(this.emailField)) {
