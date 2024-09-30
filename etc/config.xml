@@ -41,35 +41,35 @@
         <events>
             <controller_action_predispatch_checkout_onepage_index>
                 <observers>
-                    <BoldBeforeCheckout>
+                    <init_bold_order>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </BoldBeforeCheckout>
+                    </init_bold_order>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
             <checkout_submit_all_after>
                 <observers>
-                    <BoldAfterSaveOrder>
+                    <update_bold_order_status>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>afterSaveOrder</method>
-                    </BoldAfterSaveOrder>
+                    </update_bold_order_status>
                 </observers>
             </checkout_submit_all_after>
             <!-- TM_FireCheckout -->
             <controller_action_predispatch_firecheckout_index_index>
                 <observers>
-                    <BoldBeforeFireCheckout>
+                    <init_bold_order>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </BoldBeforeFireCheckout>
+                    </init_bold_order>
                 </observers>
             </controller_action_predispatch_firecheckout_index_index>
             <checkout_type_onepage_save_order>
                 <observers>
-                    <BoldBeforeSaveOrder>
+                    <authorize_bold_payment>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeSaveOrder</method>
-                    </BoldBeforeSaveOrder>
+                    </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
         </events>
@@ -102,6 +102,10 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setRsaConfig</method>
                     </set_rsa_config>
+                    <process_flows>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>processFlows</method>
+                    </process_flows>
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>

@@ -27,7 +27,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Update
             Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId(),
             self::UPDATE_SIMPLE_ORDER_URI
         );
-        $updateResponse = Bold_CheckoutPaymentBooster_Service_Client::put(
+        $updateResponse = Bold_CheckoutPaymentBooster_Service_BoldClient::put(
             $url,
             $order->getStore()->getWebsiteId(),
             $body

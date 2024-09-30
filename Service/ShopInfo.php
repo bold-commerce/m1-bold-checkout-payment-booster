@@ -42,7 +42,7 @@ class Bold_CheckoutPaymentBooster_Service_ShopInfo
         $headers = [
             'Authorization: Bearer ' . $apiToken,
             'Content-Type: application/json',
-            'Bold-API-Version-Date:' . Bold_CheckoutPaymentBooster_Service_Client::BOLD_API_VERSION_DATE,
+            'Bold-API-Version-Date:' . Bold_CheckoutPaymentBooster_Service_BoldClient::BOLD_API_VERSION_DATE,
         ];
         $url = $config->getApiUrl($websiteId) . self::SHOP_INFO_URI;
 

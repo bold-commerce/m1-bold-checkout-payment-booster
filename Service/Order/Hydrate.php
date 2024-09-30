@@ -59,7 +59,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             $body['shipping_address'] = self::convertQuoteAddress($quote, 'shipping');
             $body['shipping_line'] = self::getShippingLine($quote);
         }
-        $response = Bold_CheckoutPaymentBooster_Service_Client::put(
+        $response = Bold_CheckoutPaymentBooster_Service_BoldClient::put(
             $apiUri,
             $quote->getStore()->getWebsiteId(),
             $body

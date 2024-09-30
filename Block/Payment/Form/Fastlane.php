@@ -5,8 +5,6 @@
  */
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payment_Block_Form
 {
-    const PATH = '/checkout/storefront/';
-
     /**
      * @var Mage_Sales_Model_Quote|null
      */
@@ -91,12 +89,13 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Fastlane extends Mage_Payme
     /**
      * Retrieve Fastlane styles.
      *
-     * @return string|null
+     * @return string
      */
     public function getFastlaneStyles()
     {
         $fastlaneStyles = Bold_CheckoutPaymentBooster_Service_Bold::getFastlaneStyles();
-        return $fastlaneStyles ? json_encode($fastlaneStyles) : null;
+        $fastlaneStyles = $fastlaneStyles ? (array)$fastlaneStyles : [];
+        return json_encode($fastlaneStyles);
     }
 
     /**
