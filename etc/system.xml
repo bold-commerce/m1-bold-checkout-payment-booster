@@ -86,16 +86,6 @@
                             <frontend_class>validate-url</frontend_class>
                             <comment><![CDATA[ Bold Checkout EPS STATIC URL. Do not change. ]]></comment>
                         </eps_static_url>
-                        <eps_token>
-                            <label>EPS Token</label>
-                            <frontend_type>obscure</frontend_type>
-                            <backend_model>adminhtml/system_config_backend_encrypted</backend_model>
-                            <sort_order>15</sort_order>
-                            <show_in_default>0</show_in_default>
-                            <show_in_website>1</show_in_website>
-                            <frontend_class>required-entry</frontend_class>
-                            <comment><![CDATA[API token used to communicate with the EPS Checkout APIs. ]]></comment>
-                        </eps_token>
                         <weight_conversion_rate>
                             <label>Weight Unit Conversion Rate To Grams</label>
                             <frontend_type>text</frontend_type>

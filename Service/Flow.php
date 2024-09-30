@@ -186,25 +186,6 @@ class Bold_CheckoutPaymentBooster_Service_Flow
     }
 
     /**
-     * Get EPS gateway ID.
-     *
-     * @param int $websiteId
-     * @return string
-     */
-    public static function getEpsGatewayId($websiteId)
-    {
-        if (self::$epsConfig) {
-            return isset(self::$epsConfig->gateways[0]->id) ? self::$epsConfig->gateways[0]->id : null;
-        }
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $epsUrl = $config->getEpsUrl($websiteId);
-        $isStaging = strpos($epsUrl, 'staging') !== false;
-        $path = $isStaging ? self::STAGING_CONFIGURATION_GROUP : self::CONFIGURATION_GROUP;
-        self::$epsConfig = Bold_CheckoutPaymentBooster_Service_EpsClient::get($path, $websiteId);
-        return isset(self::$epsConfig->gateways[0]->id) ? self::$epsConfig->gateways[0]->id : null;
-    }
-
-    /**
      * Get fastlane styles.
      *
      * @param int $websiteId
@@ -215,11 +196,16 @@ class Bold_CheckoutPaymentBooster_Service_Flow
         if (self::$epsConfig) {
             return self::extractStylesFromEpsConfig();
         }
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $epsUrl = $config->getEpsUrl($websiteId);
-        $isStaging = strpos($epsUrl, 'staging') !== false;
-        $path = $isStaging ? self::STAGING_CONFIGURATION_GROUP : self::CONFIGURATION_GROUP;
-        self::$epsConfig = Bold_CheckoutPaymentBooster_Service_EpsClient::get($path, $websiteId);
+
+        self::$epsConfig = Bold_CheckoutPaymentBooster_Service_Client_Http::call(
+            'GET',
+            $config->getFastlaneStylesUrl($websiteId),
+            $websiteId,
+            []
+        );
+
         return self::extractStylesFromEpsConfig();
     }
 
@@ -230,9 +216,9 @@ class Bold_CheckoutPaymentBooster_Service_Flow
      */
     private static function extractStylesFromEpsConfig()
     {
-        if (isset(self::$epsConfig->style->css)) {
+        if (isset(self::$epsConfig)) {
             try {
-                $styles = json_decode(self::$epsConfig->style->css);
+                $styles = json_decode(self::$epsConfig);
                 return isset($styles->fastlane->styles) ? $styles->fastlane->styles : null;
             } catch (Exception $e) {
                 return null;
