@@ -65,15 +65,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             $body
         );
         if (isset($response->errors) || isset($response->error)) {
-            // @TODO if this fails for a user error we need to inform them
-            $error = '';
-            if (isset($response->errors)) {
-                $error .= print_r($response->errors, true);
-            }
-            if (isset($response->error)) {
-                $error .= print_r($response->error, true);
-            }
-            Mage::log($error, Zend_Log::CRIT);
             Mage::throwException(
                 'Cannot hydrate order, Quote ID: ' . $quote->getId() . ', Public Order ID: ' . $publicOrderId
             );
