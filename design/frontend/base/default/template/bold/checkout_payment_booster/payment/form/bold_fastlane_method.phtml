@@ -120,7 +120,7 @@
                 paymentMethodElement.style.display = 'none';
             }
             this.removeWatermarkPlaceholder();
-            if (boldInstance) {
+            if (typeof boldInstance !== 'undefined') {
                 boldInstance.isAvailable = true;
                 boldInstance.initialize();
             }
