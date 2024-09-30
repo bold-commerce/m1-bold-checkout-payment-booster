@@ -83,11 +83,14 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
     public function getTitle()
     {
         $infoInstance = $this->getInfoInstance();
-        if ($infoInstance && $infoInstance->getCcLast4()) {
-            return $infoInstance->getCcType() . ': ending in ' . $infoInstance->decrypt($infoInstance->getCcLast4());
-        }
-        if ($infoInstance && $infoInstance->getAdditionalInformation('tender_details')) {
-            return $infoInstance->getAdditionalInformation('tender_details');
+        if ($infoInstance && $infoInstance->getAdditionalInformation('card_details')) {
+            $cardDetails = unserialize($infoInstance->getAdditionalInformation('card_details'));
+            if (isset($cardDetails['brand']) && isset($cardDetails['last_four'])) {
+                return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
+            }
+            if (isset($cardDetails['account']) && isset($cardDetails['email'])) {
+                return 'PayPal: ' . $cardDetails['email'];
+            }
         }
         return parent::getTitle();
     }

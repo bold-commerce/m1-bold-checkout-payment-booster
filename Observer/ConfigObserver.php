@@ -24,6 +24,24 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
     }
 
     /**
+     * Create|update or disable Payment Booster and Fastlane flows considering configuration.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
+     */
+    public function processFlows(Varien_Event_Observer $event)
+    {
+        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
+        try {
+            Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterFlow($websiteId);
+            Bold_CheckoutPaymentBooster_Service_Flow::processFastlaneFlow($websiteId);
+        } catch (Exception $exception) {
+            $this->addErrorMessage($exception->getMessage());
+        }
+    }
+
+    /**
      * Set RSA configuration.
      *
      * @param Varien_Event_Observer $event
