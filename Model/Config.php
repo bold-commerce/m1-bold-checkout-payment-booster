@@ -19,7 +19,6 @@ class Bold_CheckoutPaymentBooster_Model_Config
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
     const PATH_EPS_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_url';
-    const PATH_EPS_TOKEN = 'checkout/bold_checkout_payment_booster_advanced/eps_token';
     const PATH_EPS_STATIC_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_static_url';
     const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
     const PATH_FASTLANE_ADDRESS_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
@@ -210,13 +209,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     }
 
     /**
-     * Retrieve EPS token (decrypted).
+     * Retrieve the fastlane styles URL
      *
-     * @param int $websiteId
-     * @return string|null
+     * @param $websiteId
+     * @return string
+     * @throws Mage_Core_Exception
      */
-    public function getEpsToken($websiteId)
+    public function getFastlaneStylesUrl($websiteId)
     {
-        return Mage::helper('core')->decrypt(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_TOKEN));
+        $shopDomain = $this->getShopDomain($websiteId);
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_STATIC_URL), '/')
+            . '/'
+            . $shopDomain
+            . '/custom-style.css';
     }
 }
