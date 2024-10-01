@@ -17,19 +17,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
         try {
-            if (!Bold_CheckoutPaymentBooster_Service_Order_Init::isAllowed($quote)) {
-                return;
-            }
-            Bold_CheckoutPaymentBooster_Service_Bold::loadBoldCheckoutData($quote);
-            $checkoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-            $publicOrderId = $checkoutData ? $checkoutData->public_order_id : null;
+            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             if (!$publicOrderId) {
                 return;
             }
-            Bold_CheckoutPaymentBooster_Service_Fastlane::loadGatewayData(
-                $publicOrderId,
-                (int)$quote->getStore()->getWebsiteId()
-            );
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
@@ -46,8 +38,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
-        $boldCheckoutData = Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
-        $publicOrderId = $boldCheckoutData->public_order_id;
         $paymentMethod = $order->getPayment()->getMethod();
         $methodsToProcess = [
             Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
@@ -58,9 +48,72 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         }
         $quote = $order->getQuote();
         $websiteId = $quote->getStore()->getWebsiteId();
-        // hydrate bold order before auth payment
-        Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
-        // TODO: check if order total and transactions are correct
-        $paymentAuthData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+        try {
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+            $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
+            $this->saveTransaction($order, $transactionData);
+        } catch (Mage_Core_Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::CRIT);
+            Mage::throwException(Mage::helper('core')->__('Payment Authorization Failure.'));
+        }
+    }
+
+    /**
+     * Save Bold order data to database after order has been placed on Magento side.
+     *
+     * After Magento order has been placed, we have order id and can save Bold order data(public id) to database.
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function afterSaveOrder(Varien_Event_Observer $event)
+    {
+        /** @var Mage_Sales_Model_Order $order */
+        $order = $event->getEvent()->getOrder();
+        $methodsToProcess = [
+            Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
+            Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
+        ];
+        if (!in_array($order->getPayment()->getMethod(), $methodsToProcess)) {
+            Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+            return;
+        }
+        try {
+            /** @var Bold_CheckoutPaymentBooster_Model_Quote $extQuoteData */
+            $extQuoteData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
+            $extQuoteData->load($order->getQuoteId(), 'quote_id');
+
+            /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
+            $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
+            $extOrderData->setOrderId($order->getEntityId());
+            $extOrderData->setPublicId($extQuoteData->getPublicId());
+            $extOrderData->save();
+            Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
+            Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+        } catch (Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::CRIT);
+        }
+    }
+
+    /**
+     * Add Bold transaction data to order payment.
+     *
+     * @param Mage_Sales_Model_Order $order
+     * @param stdClass $transactionData
+     * @return void
+     * @throws Mage_Core_Exception
+     */
+    private function saveTransaction(Mage_Sales_Model_Order $order, stdClass $transactionData)
+    {
+        $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
+        $order->getPayment()->setIsTransactionClosed(0);
+        $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
+        $cardDetails = isset($transactionData->transactions[0]->tender_details)
+            ? $transactionData->transactions[0]->tender_details
+            : null;
+        if ($cardDetails) {
+            $order->getPayment()->setAdditionalInformation('card_details', serialize((array)$cardDetails));
+        }
     }
 }

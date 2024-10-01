@@ -1,0 +1,15 @@
+Api app/code/community/Bold/CheckoutPaymentBooster/Api
+Block app/code/community/Bold/CheckoutPaymentBooster/Block
+controllers app/code/community/Bold/CheckoutPaymentBooster/controllers
+data app/code/community/Bold/CheckoutPaymentBooster/data
+etc app/code/community/Bold/CheckoutPaymentBooster/etc
+Model app/code/community/Bold/CheckoutPaymentBooster/Model
+Observer app/code/community/Bold/CheckoutPaymentBooster/Observer
+Service app/code/community/Bold/CheckoutPaymentBooster/Service
+sql app/code/community/Bold/CheckoutPaymentBooster/sql
+design/adminhtml/default/default/layout/bold/* app/design/adminhtml/default/default/layout/bold
+design/adminhtml/default/default/template/bold/* app/design/adminhtml/default/default/template/bold
+design/frontend/base/default/layout/bold/* app/design/frontend/base/default/layout/bold
+design/frontend/base/default/template/bold/* app/design/frontend/base/default/template/bold
+skin/adminhtml/default/default/bold/* skin/adminhtml/default/default/bold
+etc/modules/Bold_CheckoutPaymentBooster.xml app/etc/modules

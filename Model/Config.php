@@ -12,15 +12,19 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_IS_PAYMENT_BOOSTER_ENABLED = 'checkout/bold_checkout_payment_booster/is_payment_booster_enabled';
     const PATH_IS_FASTLANE_ENABLED = 'checkout/bold_checkout_payment_booster/is_fastlane_enabled';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
+    const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
+    const PATH_SHOP_DOMAIN = 'checkout/bold_checkout_payment_booster/shop_domain';
 
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
     const PATH_ACCOUNT_CENTER_URL = 'checkout/bold_checkout_payment_booster_advanced/account_center_url';
+    const PATH_EPS_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_url';
+    const PATH_EPS_STATIC_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_static_url';
     const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
-    const PATH_FASTLANE_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
+    const PATH_FASTLANE_ADDRESS_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
+    const PATH_FASTLANE_EMAIL_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_email_container_styles';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
-    const PATH_PAYMENT_CSS = 'checkout/bold_checkout_payment_booster_advanced/pigi_styles';
 
     /**
      * Check if the Payment Booster is enabled.
@@ -106,6 +110,28 @@ class Bold_CheckoutPaymentBooster_Model_Config
     }
 
     /**
+     * Retrieve EPS URL.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public function getEpsUrl($websiteId)
+    {
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_URL), '/');
+    }
+
+    /**
+     * Retrieve EPS static URL.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public function getEpsStaticUrl($websiteId)
+    {
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_STATIC_URL), '/');
+    }
+
+    /**
      * Retrieve weight unit conversion rate to grams.
      *
      * @param int $websiteId
@@ -124,7 +150,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
      */
     public function getFastlaneAddressContainerStyles($websiteId)
     {
-        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_FASTLANE_STYLES) ?: '';
+        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_FASTLANE_ADDRESS_CONTAINER_STYLES) ?: '';
     }
 
     /**
@@ -139,13 +165,74 @@ class Bold_CheckoutPaymentBooster_Model_Config
     }
 
     /**
-     * Retrieve payment iframe additional css.
+     * Retrieve shared secret (decrypted).
      *
      * @param int $websiteId
-     * @return string
+     * @return string|null
      */
-    public function getPaymentCss($websiteId)
+    public function getSharedSecret($websiteId)
     {
-        return (string)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_PAYMENT_CSS);
+        $encryptedSharedSecret = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_SHARED_SECRET);
+        return Mage::helper('core')->decrypt($encryptedSharedSecret);
+    }
+
+    /**
+     * Save generated shared secret.
+     *
+     * @param string|null $sharedSecret
+     * @param int $websiteId
+     * @return void
+     */
+    public function setSharedSecret($sharedSecret, $websiteId)
+    {
+        $sharedSecret = Mage::helper('core')->encrypt($sharedSecret);
+        Mage::getConfig()->saveConfig(self::PATH_SHARED_SECRET, $sharedSecret, 'websites', $websiteId);
+        Mage::getConfig()->cleanCache();
+    }
+
+    /**
+     * Save Bold shop domain.
+     *
+     * @param string $shopDomain
+     * @param int $websiteId
+     * @return void
+     */
+    public function setShopDomain($shopDomain, $websiteId)
+    {
+        Mage::getConfig()->saveConfig(self::PATH_SHOP_DOMAIN, $shopDomain, 'websites', $websiteId);
+        Mage::getConfig()->cleanCache();
+    }
+
+    /**
+     * Retrieve saved Bold shop domain.
+     *
+     * @param $websiteId
+     * @return string
+     * @throws Mage_Core_Exception
+     */
+    public function getShopDomain($websiteId)
+    {
+        return (string)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_SHOP_DOMAIN);
+    }
+
+    public function getFastlaneWatermarkContainerStyles($websiteId)
+    {
+        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_FASTLANE_EMAIL_CONTAINER_STYLES) ?: '';
+    }
+
+    /**
+     * Retrieve the fastlane styles URL
+     *
+     * @param $websiteId
+     * @return string
+     * @throws Mage_Core_Exception
+     */
+    public function getFastlaneStylesUrl($websiteId)
+    {
+        $shopDomain = $this->getShopDomain($websiteId);
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EPS_STATIC_URL), '/')
+            . '/'
+            . $shopDomain
+            . '/custom-style.css';
     }
 }

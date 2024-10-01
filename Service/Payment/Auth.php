@@ -19,7 +19,7 @@ class Bold_CheckoutPaymentBooster_Service_Payment_Auth
     public static function full($publicOrderId, $websiteId, $data = [])
     {
         $apiUri = sprintf(self::AUTHORIZE_PAYMENT_URI, $publicOrderId);
-        $response = Bold_CheckoutPaymentBooster_Service_Client::post(
+        $response = Bold_CheckoutPaymentBooster_Service_BoldClient::post(
             $apiUri,
             $websiteId,
             $data

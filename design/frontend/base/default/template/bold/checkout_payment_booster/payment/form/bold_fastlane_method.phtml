@@ -11,22 +11,27 @@
      * Bold fastlane payment component.
      */
     const BoldFastlane = Class.create({
-        loaderImageUrl: '<?php echo $this->getSkinUrl('images/opc-ajax-loader.gif'); ?>',
-        emailField: document.getElementById('billing:email'),
-        boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
-        jwtToken: '<?php echo $this->getJwtToken(); ?>',
-        gatewayData: <?php echo $this->getGatewayData(); ?>,
-        fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
-        paymentContainerId: 'payment_form_bold_fastlane',
-        fastlaneAddressContainerId: 'fastlane-address-container',
-        isAvailable: <?php echo $this->isAvailable(); ?>,
+        emailSubscribed: false,
+        phoneNumberSubscribed: false,
+        checkoutSaveWrapped: false,
+        paymentSaveWrapped: false,
+        fastlaneCardComponent: null,
         fastlanePaymentComponent: null,
-        paymentToken: null,
         paymentCheckbox: null,
         billingAddressForm: null,
+        emailField: null,
+        gatewayData: null,
+        paymentContainerId: 'payment_form_bold_fastlane',
+        phoneNumberSelector: 'billing:telephone',
+        fastlaneAddressContainerId: 'fastlane-address-container',
+        publicOrderId: '<?php echo $this->getPublicOrderId(); ?>',
+        epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
+        fastlaneStyles: <?php echo $this->getFastlaneStyles(); ?>,
+        isAvailable: <?php echo $this->isAvailable(); ?>,
+        epsUrl: '<?php echo $this->getEpsUrl(); ?>',
+        epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
         billingAddressFieldsMap: {
             'firstname': 'billing:firstname',
-            'email': 'billing:email',
             'lastname': 'billing:lastname',
             'company': 'billing:company',
             'telephone': 'billing:telephone',
@@ -35,7 +40,8 @@
             'city': 'billing:city',
             'region_id': 'billing:region_id',
             'country_id': 'billing:country_id',
-            'postcode': 'billing:postcode'
+            'postcode': 'billing:postcode',
+            'use_for_shipping': 'billing:use_for_shipping_yes'
         },
         shippingAddressFieldsMap: {
             'firstname': 'shipping:firstname',
@@ -49,32 +55,137 @@
             'country_id': 'shipping:country_id',
             'postcode': 'shipping:postcode'
         },
+        requiredAddressFields: [
+            'firstName',
+            'lastName',
+            'streetAddress',
+            'postalCode',
+            'locality',
+            'countryCodeAlpha2',
+            'phoneNumber'
+        ],
         /**
-         * Initialize Fastlane instance, subscribe to email changes.
+         * Initialize Fastlane instance, subscribe to email, addresses changes etc.
          *
          * @return {Promise<void>}
          */
         initialize: async function () {
-            if (!this.isAvailable || !this.gatewayData) {
+            if (!this.isAvailable) {
                 return;
             }
-            console.count('initialize');
             if (!window.bold) {
                 window.bold = {};
             }
             if (!window.bold.fastlane) {
                 window.bold.fastlane = {
-                    instance: null
+                    instance: null,
+                    profileData: null,
                 };
             }
+            this.emailField = document.getElementById('billing:email');
             this.paymentCheckbox = document.getElementById('p_method_bold_fastlane');
             this.billingAddressForm = document.getElementById('billing-new-address-form');
-            await this.buildFastlaneInstance()
+            if (window.bold.fastlane.profileData) {
+                this.selectPaymentMethod();
+            }
+            this.renderWatermarkPlaceholder();
+            try {
+                await this.initFastlaneInstance();
+            } catch (e) {
+                console.error('Error:', e);
+                this.fallbackToDefaultPaymentMethod();
+                return;
+            }
+            if (!window.bold.fastlane.instance) {
+                this.fallbackToDefaultPaymentMethod();
+                return;
+            }
             await this.authorize();
+            await this.renderFastlanePaymentComponent();
             this.subscribeToEmailChanges();
-            this.renderPaymentContainer();
+            this.subscribeToPhoneNumberChanges();
             this.waitForCheckoutInitialization();
             this.waitForPaymentInitialization();
+        },
+        /**
+         * Shop SPI in case Fastlane is failed to init.
+         *
+         * @return {void}
+         */
+        fallbackToDefaultPaymentMethod: function () {
+            const paymentMethodElement = document.getElementById('p_method_bold_fastlane')
+                ? document.getElementById('p_method_bold_fastlane').parentNode
+                : null;
+            if (paymentMethodElement) {
+                paymentMethodElement.style.display = 'none';
+            }
+            this.removeWatermarkPlaceholder();
+            if (typeof boldInstance !== 'undefined') {
+                boldInstance.isAvailable = true;
+                boldInstance.initialize();
+            }
+        },
+        /**
+         * Show payment method section.
+         */
+        showPaymentMethod: function () {
+            const paymentMethodElement = document.getElementById('p_method_bold_fastlane')
+                ? document.getElementById('p_method_bold_fastlane').parentNode
+                : null;
+            if (paymentMethodElement) {
+                paymentMethodElement.style.display = 'block';
+            }
+        },
+        /**
+         * Subscribe to billing fields changes for fastlane payment component shipping address update.
+         *
+         * @returns {void}
+         */
+        subscribeToPhoneNumberChanges: function () {
+            if (this.phoneNumberSubscribed) {
+                return;
+            }
+            this.phoneNumberSubscribed = true;
+            let field = $(this.phoneNumberSelector);
+            if (!field) {
+                return;
+            }
+            field.observe('change', () => {
+                setTimeout(() => {
+                    this.updateCardComponentPrefills();
+                }, 500);
+            });
+        },
+        /**
+         * Set new shipping address to the Fastlane payment component.
+         *
+         * @returns {void}
+         */
+        updateCardComponentPrefills: function () {
+            if (!this.fastlaneCardComponent) {
+                return;
+            }
+            this.fastlaneCardComponent.updatePrefills(
+                {
+                    phoneNumber: this.getFormattedPhoneNumber(),
+                },
+            );
+        },
+        /**
+         * Get formatted phone number.
+         *
+         * @returns {string}
+         */
+        getFormattedPhoneNumber: function () {
+            let phoneNumber = document.getElementById(this.billingAddressFieldsMap.telephone).value ?? '';
+            phoneNumber = phoneNumber.replace(/\D/g, '');
+            if (!phoneNumber) {
+                return '';
+            }
+            if (phoneNumber.length === 11 && phoneNumber.startsWith('1')) {
+                return phoneNumber.substring(1);
+            }
+            return phoneNumber;
         },
         /**
          * Wait for checkout initialization and wrap save method.
@@ -84,14 +195,12 @@
         waitForCheckoutInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof checkout !== 'undefined' && checkout.save) {
-                    console.log('Fastlane. Checkout is initialized.');
                     this.wrapCheckoutSave();
                     clearInterval(intervalId);
                 }
             }, 100);
             setTimeout(() => {
                 clearInterval(intervalId);
-                console.log('Fastlane. Stopped waiting for checkout to initialize.');
             }, 10000);
         },
         /**
@@ -102,14 +211,12 @@
         waitForPaymentInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof payment !== 'undefined' && payment.save) {
-                    console.log('Fastlane. Payment is initialized.');
                     this.wrapPaymentSave();
                     clearInterval(intervalId);
                 }
             }, 100);
             setTimeout(() => {
                 clearInterval(intervalId);
-                console.log('Fastlane. Stopped waiting for payment to initialize.');
             }, 10000);
         },
         /**
@@ -118,7 +225,10 @@
          * @return {void}
          */
         wrapPaymentSave: function () {
-            console.count('wrapPaymentSave');
+            if (this.paymentSaveWrapped) {
+                return;
+            }
+            this.paymentSaveWrapped = true;
             payment.save = payment.save.wrap(
                 function (paymentSaveMethod) {
                     if (!this.paymentCheckbox) {
@@ -127,14 +237,14 @@
                     if (!this.paymentCheckbox.checked) {
                         return paymentSaveMethod();
                     }
-                    if (!this.paymentToken) {
-                        console.log('Get Fastlane payment token...');
-                        this.processPayment().then(() => {
-                            return paymentSaveMethod();
-                        });
-                    } else {
-                        return paymentSaveMethod();
-                    }
+                    checkout.setLoadWaiting('payment');
+                    this.processPayment().then(() => {
+                        checkout.setLoadWaiting(false);
+                        paymentSaveMethod();
+                    }).catch((error) => {
+                        checkout.setLoadWaiting(false);
+                        console.error('Error:', error);
+                    })
                 }.bind(this)
             );
         },
@@ -144,7 +254,10 @@
          * @return {void}
          */
         wrapCheckoutSave: function () {
-            console.count('wrapCheckoutSave');
+            if (this.checkoutSaveWrapped) {
+                return;
+            }
+            this.checkoutSaveWrapped = true;
             checkout.save = checkout.save.wrap(
                 function (checkoutSaveMethod) {
                     if (!this.paymentCheckbox) {
@@ -153,14 +266,15 @@
                     if (!this.paymentCheckbox.checked) {
                         return checkoutSaveMethod();
                     }
-                    if (!this.paymentToken) {
-                        console.log('Get Fastlane payment token...');
-                        this.processPayment().then(() => {
-                            return checkoutSaveMethod();
-                        });
-                    } else {
+                    checkout.setLoadWaiting('payment');
+                    checkout.validate();
+                    this.processPayment().then(() => {
+                        checkout.setLoadWaiting(false);
                         return checkoutSaveMethod();
-                    }
+                    }).catch((error) => {
+                        checkout.setLoadWaiting(false);
+                        console.error('Error:', error);
+                    })
                 }.bind(this)
             );
         },
@@ -169,12 +283,14 @@
          *
          * @return {Promise<void>}
          */
-        buildFastlaneInstance: async function () {
-            console.count('buildFastlaneInstance');
+        initFastlaneInstance: async function () {
             if (window.bold.fastlane.instance) {
                 return;
             }
-            console.log('Build Fastlane Instance');
+            await this.initGatewayData();
+            if (!this.gatewayData) {
+                return;
+            }
             if (this.gatewayData.is_test_mode) {
                 window.localStorage.setItem('axoEnv', 'sandbox');
                 window.localStorage.setItem('fastlaneEnv', 'sandbox');
@@ -185,6 +301,26 @@
             if (this.gatewayData.type === 'ppcp') {
                 await this.buildPpcpFastlaneInstance();
             }
+            this.renderWatermark();
+        },
+        /**
+         * Retrieve gateway data.
+         *
+         * @return {Promise<void>}
+         */
+        initGatewayData: async function () {
+            if (this.gatewayData) {
+                return;
+            }
+            const response = await fetch(
+                encodeURI(this.epsUrl + 'client_init?option=fastlane'),
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+            this.gatewayData = (await response.json())[this.epsGatewayId] || null;
         },
         /**
          * Build Fastlane Instance for the Braintree.
@@ -192,7 +328,6 @@
          * @return {Promise<void>}
          */
         buildBraintreeFastlaneInstance: async function () {
-            console.count('buildBraintreeFastlaneInstance');
             await this.loadScript(
                 'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/client.min.js'
             );
@@ -214,12 +349,10 @@
                 }
             );
             const {deviceData} = dataCollectorInstance;
-            const styles = this.fastlaneStyles || {};
             window.bold.fastlane.instance = await window.braintree.fastlane.create({
                 authorization: this.gatewayData.client_token,
                 client: clientInstance,
                 deviceData: deviceData,
-                styles: styles,
             });
         },
         /**
@@ -233,7 +366,7 @@
                 `https://www.paypal.com/sdk/js?client-id=${this.gatewayData.client_id}&components=fastlane${debugMode}`,
                 {
                     'data-user-id-token': this.gatewayData.client_token,
-                    'data-client-metadata-id': 'Magento2',
+                    'data-client-metadata-id': this.publicOrderId,
                 }
             );
             window.bold.fastlane.instance = await window.paypal.Fastlane();
@@ -246,7 +379,6 @@
          * @return {Promise<unknown>}
          */
         loadScript: async function (src, attributes = {}) {
-            console.count('loadScript');
             return new Promise((resolve, reject) => {
                 const script = document.createElement('script');
                 script.src = src;
@@ -262,33 +394,51 @@
             });
         },
         /**
-         * Render Fastlane watermark component.
+         * Render Fastlane watermark placeholder to show watermark immediately before fastlane is initialize.
          *
-         * @param watermarkContainerId
-         * @param afterElement
          * @return {void}
          */
-        renderWatermarkComponent: function (watermarkContainerId, afterElement) {
-            console.count('renderWatermarkComponent');
+        renderWatermarkPlaceholder: function () {
+            const watermarkContainerId = 'fastlane-watermark-container';
             const existingWatermarkContainer = document.getElementById(watermarkContainerId);
             if (existingWatermarkContainer) {
                 return;
             }
-
             const watermarkContainer = document.createElement('div');
+            const watermarkSubContainer = document.createElement('div');
+            const watermark = document.createElement('img');
+            watermarkSubContainer.id = 'fastlane-email-watermark-container';
+            watermarkSubContainer.style = 'float: right; margin-top: 5px';
+            watermark.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
+            watermark.alt = '';
+            watermarkSubContainer.appendChild(watermark);
             watermarkContainer.id = watermarkContainerId;
-
-            const watermarkContainerImg = document.createElement('img');
-            watermarkContainerImg.src = 'https://www.paypalobjects.com/connect-boba/assets/FastLaneLogoSmall.svg';
-            watermarkContainerImg.alt = '';
-            watermarkContainer.appendChild(watermarkContainerImg);
-
-            afterElement.insertAdjacentElement('afterend', watermarkContainer);
-
+            watermarkContainer.style = '<?php echo $this->getWatermarkContainerStyle(); ?>';
+            watermarkContainer.appendChild(watermarkSubContainer);
+            this.emailField.insertAdjacentElement('afterend', watermarkContainer);
+        },
+        /**
+         * Remove Fastlane watermark placeholder in case fastlane is not available.
+         *
+         * @return {void}
+         */
+        removeWatermarkPlaceholder: function () {
+            const watermarkContainer = document.getElementById('fastlane-watermark-container');
+            if (watermarkContainer) {
+                watermarkContainer.remove();
+            }
+        },
+        /**
+         * Render Fastlane watermark.
+         *
+         * @return {void}
+         */
+        renderWatermark: function () {
             window.bold.fastlane.instance.FastlaneWatermarkComponent({
                 includeAdditionalInfo: true
             }).then((WatermarkComponent) => {
-                WatermarkComponent.render('#' + watermarkContainerId);
+                document.getElementById('fastlane-email-watermark-container').style = 'float: right';
+                WatermarkComponent.render('#fastlane-email-watermark-container');
             });
         },
         /**
@@ -297,7 +447,6 @@
          * @return {void}
          */
         selectPaymentMethod: function () {
-            console.count('selectPaymentMethod');
             if (this.paymentCheckbox) {
                 this.paymentCheckbox.checked = true;
                 payment.switchMethod('bold_fastlane');
@@ -309,15 +458,15 @@
          * @return {void}
          */
         subscribeToEmailChanges: function () {
-            console.count('subscribeToEmailChanges');
-            if (this.emailField) {
-                this.renderWatermarkComponent('fastlane-email-watermark-container', this.emailField)
-                this.emailField.observe('change', () => {
-                    setTimeout(async () => {
-                        await this.authorize();
-                    }, 500);
-                });
+            if (!this.emailField || this.emailSubscribed) {
+                return;
             }
+            this.emailSubscribed = true;
+            this.emailField.observe('change', () => {
+                setTimeout(async () => {
+                    await this.authorize();
+                }, 500);
+            });
         },
         /**
          * Authorize user with email.
@@ -325,13 +474,10 @@
          * @return {Promise<void>}
          */
         authorize: async function () {
-            if (!this.emailField || !this.emailField.value) {
+            if (!this.emailField || !this.emailField.value || window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
             if (!window.Validation.validate(this.emailField)) {
-                return;
-            }
-            if (window.bold.fastlane.authorizedEmail === this.emailField.value) {
                 return;
             }
             checkout.setLoadWaiting('billing', true);
@@ -340,25 +486,27 @@
                 const {identity} = window.bold.fastlane.instance;
                 const {customerContextId} = await identity.lookupCustomerByEmail(this.emailField.value);
                 checkout.setLoadWaiting(false);
-                if (customerContextId) {
-                    const {
-                        authenticationState,
-                        profileData
-                    } = await identity.triggerAuthenticationFlow(customerContextId);
-                    if (authenticationState === 'succeeded') {
-                        checkout.setLoadWaiting('billing', true);
-                        window.bold.fastlane.memberAuthenticated = true;
-                        console.log('Authorized with profile Data:', profileData);
-                        if (profileData.shippingAddress) {
-                            this.setAddress(profileData.shippingAddress);
-                            this.addAddressButton();
-                        }
-                        checkout.setLoadWaiting(false);
-                    }
+                if (!customerContextId) {
+                    this.removeAddressButton();
+                    window.bold.fastlane.profileData = null;
+                    await this.renderFastlanePaymentComponent();
                     return;
                 }
-                this.removeAddressButton();
-                window.bold.fastlane.memberAuthenticated = false;
+                const {
+                    authenticationState,
+                    profileData
+                } = await identity.triggerAuthenticationFlow(customerContextId);
+                if (authenticationState === 'succeeded') {
+                    checkout.setLoadWaiting('billing', true);
+                    this.selectPaymentMethod();
+                    window.bold.fastlane.profileData = profileData;
+                    if (profileData.shippingAddress) {
+                        this.updateBillingAddress(profileData.shippingAddress);
+                        this.addAddressButton();
+                    }
+                    await this.renderFastlanePaymentComponent();
+                    checkout.setLoadWaiting(false);
+                }
             } catch (error) {
                 console.error('Error:', error);
             }
@@ -369,17 +517,20 @@
          * @param {{}} fastlaneAddress
          * @return {void}
          */
-        setAddress: function (fastlaneAddress) {
-            console.count('setAddress');
+        updateBillingAddress: function (fastlaneAddress) {
             const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
-            console.log('Set billing address...');
-            console.log('Fastlane address:', fastlaneAddress);
-            console.log('Magento address:', magentoAddress);
             Object.keys(this.billingAddressFieldsMap).forEach((field) => {
                 if (magentoAddress[field] && document.getElementById(this.billingAddressFieldsMap[field])) {
-                    document.getElementById(this.billingAddressFieldsMap[field]).value = magentoAddress[field];
+                    const element = document.getElementById(this.billingAddressFieldsMap[field]);
+                    if (!element) {
+                        return;
+                    }
+                    element.value = magentoAddress[field];
                 }
             });
+            if (typeof boldInstance !== 'undefined') {
+                boldInstance.hydrateOrderData();
+            }
         },
         /**
          * Add address button to the billing address form.
@@ -387,13 +538,10 @@
          * @return {void}
          */
         addAddressButton: function () {
-            console.count('addAddressButton');
             this.removeAddressButton();
-
             const fastlaneAddressContainer = document.createElement('fieldset');
             fastlaneAddressContainer.id = this.fastlaneAddressContainerId;
             fastlaneAddressContainer.style = '<?php echo $this->getAddressContainerStyle(); ?>';
-
             const updateAddressButton = document.createElement('button');
             updateAddressButton.type = 'button';
             updateAddressButton.className = 'button';
@@ -403,16 +551,14 @@
                     if (!editAddressResult.selectionChanged) {
                         return;
                     }
-                    this.setAddress(editAddressResult.selectedAddress);
+                    this.updateBillingAddress(editAddressResult.selectedAddress);
                 });
             });
             fastlaneAddressContainer.appendChild(updateAddressButton);
-
             const billingAddressForm = document.getElementById('billing-new-address-form');
             if (billingAddressForm) {
                 billingAddressForm.appendChild(fastlaneAddressContainer);
             }
-            this.renderWatermarkComponent('fastlane-address-watermark', updateAddressButton);
         },
         /**
          * Remove address button from the billing address form.
@@ -420,7 +566,6 @@
          * @return {void}
          */
         removeAddressButton: function () {
-            console.count('removeAddressButton');
             const fastlaneAddressContainer = document.getElementById(this.fastlaneAddressContainerId);
             if (fastlaneAddressContainer) {
                 fastlaneAddressContainer.remove();
@@ -433,7 +578,6 @@
          * @return {{}}
          */
         convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
-            console.count('convertFastlaneAddressToMagentoAddress');
             let magentoAddressRegionId = null;
             const fastlaneCountryCode = fastlaneAddress.countryCodeAlpha2 || fastlaneAddress.address?.countryCode;
             const fastlaneRegionCode = fastlaneAddress.region || fastlaneAddress.address?.adminArea1;
@@ -464,27 +608,27 @@
         /**
          * Retrieve shipping address.
          *
-         * @returns {{firstName: (string|*), lastName: (string|*), phoneNumber: (string|*), streetAddress: (string|*), postalCode: (string|*), locality: (string|*), company: (string|*), extendedAddress: (string|*), region: string, countryCodeAlpha2: (string|*)}}
+         * @returns {{}|null}
          */
-        getShippingAddress: function () {
-            console.count('getShippingAddress');
+        getBillingAddress: function () {
             let magentoAddress = {};
-            Object.entries(this.shippingAddressFieldsMap).forEach((entry) => {
+            Object.entries(this.billingAddressFieldsMap).forEach((entry) => {
                 const [key, idSelector] = entry;
                 magentoAddress[key] = document.getElementById(idSelector)
                     ? document.getElementById(idSelector).value
                     : '';
             });
             let regionCode = '';
-            if (window.shippingRegionUpdater.regions[magentoAddress.country_id]) {
-                Object.entries(window.shippingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
+            if (window.billingRegionUpdater.regions[magentoAddress.country_id]) {
+                Object.entries(window.billingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
                     const [regionId, regionData] = entry;
                     if (regionId === magentoAddress.region_id) {
                         regionCode = regionData.code;
                     }
                 });
             }
-            return {
+
+            const braintreeFastlaneAddress = {
                 'firstName': magentoAddress.firstname,
                 'lastName': magentoAddress.lastname,
                 'company': magentoAddress.company,
@@ -496,24 +640,34 @@
                 'postalCode': magentoAddress.postcode,
                 'countryCodeAlpha2': magentoAddress.country_id,
             };
+            if (!this.isAddressFull(braintreeFastlaneAddress)) {
+                return null;
+            }
+            return braintreeFastlaneAddress;
         },
         /**
-         * Render Fastlane payment container.
+         * Check if address is full.
+         *
+         * @returns {boolean}
          */
-        renderPaymentContainer: function () {
-            const observer = new MutationObserver(function () {
-                if (document.querySelector(`#${this.paymentContainerId}`)) {
-                    observer.disconnect();
-                    this.renderPaymentComponent();
-                    if (window.bold.fastlane.memberAuthenticated === true) {
-                        this.selectPaymentMethod();
-                    }
-                }
-            }.bind(this));
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
+        isAddressFull: function (address) {
+            let isInvalid = this.requiredAddressFields.some((field) => {
+                return !address[field];
+
             });
+            if (isInvalid) {
+                return false;
+            }
+            let regionsRequired = window.billingRegionUpdater || {
+                config: {
+                    regions_required: []
+                }
+            };
+            let isRegionRequired = regionsRequired.config.regions_required.indexOf(address.countryCodeAlpha2) !== -1;
+            if (isRegionRequired && !address.region) {
+                return false;
+            }
+            return !isInvalid;
         },
         /**
          * Process payment on PayPal and Bold sides.
@@ -521,29 +675,45 @@
          * @return {Promise<void>}
          */
         processPayment: async function () {
-            this.paymentToken = await this.fastlanePaymentComponent.getPaymentToken();
-            if (this.gatewayData.type === 'ppcp') {
-                await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + this.jwtToken,
-                    },
-                    body: JSON.stringify({
-                        gateway_type: 'paypal',
-                        payment_data: {
-                            locale: navigator.language,
-                            payment_type: 'fastlane',
-                            token: this.paymentToken.id,
-                        }
-                    }),
-                });
+            if (this.fastlanePaymentComponent) {
+                const shippingAddress = this.getShippingAddress();
+                if (shippingAddress) {
+                    this.fastlanePaymentComponent.setShippingAddress(shippingAddress);
+                }
             }
-            this.setAddress((await this.fastlanePaymentComponent.getPaymentToken()).paymentSource.card.billingAddress);
+            return await this.tokenize();
+        },
+        /**
+         * Process Fastlane payment for the PPCP gateway type.
+         *
+         * @return {Promise<void>}
+         */
+        tokenize: async function () {
+            let billingAddress = this.getBillingAddress();
+            if (this.gatewayData.type === 'ppcp') {
+                billingAddress = {
+                    billingAddress: {
+                        'firstName': billingAddress.firstName,
+                        'lastName': billingAddress.lastName,
+                        'company': billingAddress.company,
+                        'phoneNumber': billingAddress.phoneNumber,
+                        'addressLine1': billingAddress.streetAddress,
+                        'addressLine2': billingAddress.extendedAddress,
+                        'adminArea2': billingAddress.locality,
+                        'adminArea1': billingAddress.region,
+                        'postalCode': billingAddress.postalCode,
+                        'countryCode': billingAddress.countryCodeAlpha2,
+                    }
+                };
+            }
+            const paymentTokenResponse = this.fastlaneCardComponent
+                ? await this.fastlaneCardComponent.getPaymentToken(billingAddress)
+                : await this.fastlanePaymentComponent.getPaymentToken();
+            this.updateBillingAddress(paymentTokenResponse.paymentSource.card.billingAddress);
             const cartData = await new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
-                    parameters: {form_key: '<?php echo $this->getFormKey() ?>'},
+                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
                     },
@@ -552,23 +722,115 @@
                     }
                 });
             });
-            const paymentPayload = {
-                'gateway_public_id': this.gatewayData.gateway_public_id,
-                'currency': cartData.quote_currency_code,
-                'amount': cartData.grand_total,
-                'token': this.paymentToken.id
-            }
-            if (this.gatewayData.type === 'braintree') {
-                paymentPayload.type = 'fastlane';
-            }
-            await fetch(this.boldApiUrl + 'payments', {
+            const tokenizeResponse = await fetch(this.epsUrl + 'tokenize', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.jwtToken,
                 },
-                body: JSON.stringify(paymentPayload)
+                body: JSON.stringify(
+                    {
+                        'version': 1,
+                        'auth_token': this.epsAuthToken,
+                        'gateway_id': Number(this.epsGatewayId),
+                        'tender_type': 'credit_card',
+                        'currency': cartData.quote_currency_code,
+                        'payload_type': 'card_token',
+                        'payload': {
+                            'card_token': paymentTokenResponse.id,
+                        },
+                    }
+                ),
             });
+            const paymentId = (await tokenizeResponse.json()).data?.payment_id;
+            if (!tokenizeResponse.ok || !paymentId) {
+                return Promise.reject('An error occurred while processing your payment. Please try again.');
+            }
+        },
+        /**
+         * Retrieve shipping address.
+         *
+         * @returns {{}|null}
+         */
+        getShippingAddress: function () {
+            let magentoAddress = {};
+            const fieldsMap = $(this.billingAddressFieldsMap.use_for_shipping) && $(this.billingAddressFieldsMap.use_for_shipping).checked
+                ? this.billingAddressFieldsMap
+                : this.shippingAddressFieldsMap;
+            Object.entries(fieldsMap).forEach((entry) => {
+                const [key, idSelector] = entry;
+                magentoAddress[key] = document.getElementById(idSelector)
+                    ? document.getElementById(idSelector).value
+                    : '';
+            });
+            let regionCode = '';
+            if (window.billingRegionUpdater.regions[magentoAddress.country_id]) {
+                Object.entries(window.billingRegionUpdater.regions[magentoAddress.country_id]).forEach((entry) => {
+                    const [regionId, regionData] = entry;
+                    if (regionId === magentoAddress.region_id) {
+                        regionCode = regionData.code;
+                    }
+                });
+            }
+            const fastlaneAddress = {
+                'firstName': magentoAddress.firstname,
+                'lastName': magentoAddress.lastname,
+                'company': magentoAddress.company,
+                'phoneNumber': magentoAddress.telephone,
+                'streetAddress': magentoAddress.street1,
+                'extendedAddress': magentoAddress.street2,
+                'locality': magentoAddress.city,
+                'region': regionCode,
+                'postalCode': magentoAddress.postcode,
+                'countryCodeAlpha2': magentoAddress.country_id,
+            };
+            if (!this.isAddressFull(fastlaneAddress)) {
+                return null;
+            }
+            return fastlaneAddress;
+        },
+        /**
+         * Render Fastlane payment component considering user is registered in Fastlane and has credit card saved.
+         *
+         * @return {Promise<void>}
+         */
+        renderFastlanePaymentComponent: async function () {
+            const paymentContainer = document.getElementById(this.paymentContainerId);
+            if (!paymentContainer) {
+                return;
+            }
+            if (window.bold.fastlane.profileData && window.bold.fastlane.profileData.card?.id) {
+                await this.renderPaymentComponent();
+                return;
+            }
+            this.showPaymentMethod();
+            await this.renderCardComponent();
+        },
+        /**
+         * Render Fastlane payment component.
+         *
+         * @return {Promise<void>}
+         */
+        renderCardComponent: async function () {
+            this.fastlanePaymentComponent = null;
+            const billingAddress = this.getBillingAddress();
+            const firstName = billingAddress?.firstName || '';
+            const lastName = billingAddress?.lastName || '';
+            const fields = {
+                phoneNumber: {
+                    prefill: this.getFormattedPhoneNumber(),
+                },
+                cardholderName: {
+                    prefill: firstName + ' ' + lastName,
+                    enabled: true,
+                }
+            };
+            this.fastlaneCardComponent = await window.bold.fastlane.instance.FastlaneCardComponent(
+                {
+                    fields,
+                    styles: this.fastlaneStyles
+                }
+            );
+            await this.fastlaneCardComponent.render(`#${this.paymentContainerId}`);
         },
         /**
          * Render Fastlane payment component.
@@ -576,26 +838,20 @@
          * @return {Promise<void>}
          */
         renderPaymentComponent: async function () {
-            console.count('renderPaymentComponent');
-            const telephone = document.getElementById(this.billingAddressFieldsMap.telephone).value ?? '';
+            this.fastlaneCardComponent = null;
             const fields = {
                 phoneNumber: {
-                    prefill: telephone
+                    prefill: this.getFormattedPhoneNumber(),
                 }
             };
-            const styles = this.fastlaneStyles || {};
-            console.log('Render Fastlane Payment Component');
-            if (this.fastlanePaymentComponent === null) {
-                this.fastlanePaymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
-                    {
-                        fields,
-                        styles
-                    }
-                );
-            }
+            this.fastlanePaymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
+                {
+                    fields,
+                    styles: this.fastlaneStyles
+                }
+            );
             const shippingAddress = this.getShippingAddress();
             if (shippingAddress) {
-                console.log('Set Fastlane shipping address: ', shippingAddress);
                 this.fastlanePaymentComponent.setShippingAddress(shippingAddress);
             }
             await this.fastlanePaymentComponent.render(`#${this.paymentContainerId}`);
