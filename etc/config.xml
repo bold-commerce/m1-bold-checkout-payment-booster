@@ -109,6 +109,13 @@
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>
+        <layout>
+            <updates>
+                <bold_checkout_payment_booster>
+                    <file>bold/checkout_payment_booster.xml</file>
+                </bold_checkout_payment_booster>
+            </updates>
+        </layout>
     </adminhtml>
     <default>
         <checkout>
@@ -118,6 +125,7 @@
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
+                <account_center_url>https://apps.boldapps.net/</account_center_url>
                 <eps_url>https://eps.secure.boldcommerce.com/</eps_url>
                 <eps_static_url>https://static-eps.secure.boldcommerce.com/</eps_static_url>
                 <weight_conversion_rate>1000</weight_conversion_rate>
