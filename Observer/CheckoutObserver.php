@@ -77,18 +77,20 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         ];
         if (!in_array($order->getPayment()->getMethod(), $methodsToProcess)) {
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
-            Bold_CheckoutPaymentBooster_Service_Fastlane::clearGatewayData();
             return;
         }
         try {
+            /** @var Bold_CheckoutPaymentBooster_Model_Quote $extQuoteData */
+            $extQuoteData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
+            $extQuoteData->load($order->getQuoteId(), 'quote_id');
+
             /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
             $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
             $extOrderData->setOrderId($order->getEntityId());
-            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
+            $extOrderData->setPublicId($extQuoteData->getPublicId());
             $extOrderData->save();
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
-            Bold_CheckoutPaymentBooster_Service_Fastlane::clearGatewayData();
         } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
         }
@@ -111,17 +113,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             ? $transactionData->transactions[0]->tender_details
             : null;
         if ($cardDetails) {
-            $brand = isset($cardDetails->brand) ? $cardDetails->brand : null;
-            $lastFour = isset($cardDetails->last_four) ? $cardDetails->last_four : null;
-            if (!$lastFour && isset($cardDetails->line_text)) {
-                preg_match('/\b(\d{4})\b(?=\s*\(Transaction ID)/', $cardDetails->line_text, $matches);
-                $lastFour = isset($matches[1]) ? $matches[1] : null;
-            }
-            $order->getPayment()->setCcType($brand);
-            $order->getPayment()->setCcLast4($order->getPayment()->encrypt($lastFour));
-            if (!$lastFour && isset($cardDetails->line_text)) {
-                $order->getPayment()->setAdditionalInformation('tender_details', $cardDetails->line_text);
-            }
+            $order->getPayment()->setAdditionalInformation('card_details', serialize((array)$cardDetails));
         }
     }
 }

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS `{$quoteTableName}` (
     `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Entity ID',
     `quote_id` INT UNSIGNED COMMENT 'Magento Quote ID',
     `public_id` VARCHAR(255) NOT NULL COMMENT 'Bold Order Public ID',
+    `flow_settings` TEXT COMMENT 'Serialized Bold Flow Settings',
     PRIMARY KEY (`entity_id`),
     INDEX `IDX_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_ORDER_ID` (`quote_id`),
     CONSTRAINT FOREIGN KEY (`quote_id`) REFERENCES `{$installer->getTable('sales/quote')}` (`entity_id`) ON DELETE CASCADE

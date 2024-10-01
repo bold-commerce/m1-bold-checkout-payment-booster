@@ -41,35 +41,35 @@
         <events>
             <controller_action_predispatch_checkout_onepage_index>
                 <observers>
-                    <bold>
+                    <init_bold_order>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </bold>
+                    </init_bold_order>
                 </observers>
             </controller_action_predispatch_checkout_onepage_index>
             <checkout_submit_all_after>
                 <observers>
-                    <bold>
+                    <update_bold_order_status>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>afterSaveOrder</method>
-                    </bold>
+                    </update_bold_order_status>
                 </observers>
             </checkout_submit_all_after>
             <!-- TM_FireCheckout -->
             <controller_action_predispatch_firecheckout_index_index>
                 <observers>
-                    <bold>
+                    <init_bold_order>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeCheckout</method>
-                    </bold>
+                    </init_bold_order>
                 </observers>
             </controller_action_predispatch_firecheckout_index_index>
             <checkout_type_onepage_save_order>
                 <observers>
-                    <bold>
+                    <authorize_bold_payment>
                         <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
                         <method>beforeSaveOrder</method>
-                    </bold>
+                    </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
         </events>
@@ -102,9 +102,20 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setRsaConfig</method>
                     </set_rsa_config>
+                    <process_flows>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>processFlows</method>
+                    </process_flows>
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>
+        <layout>
+            <updates>
+                <bold_checkout_payment_booster>
+                    <file>bold/checkout_payment_booster.xml</file>
+                </bold_checkout_payment_booster>
+            </updates>
+        </layout>
     </adminhtml>
     <default>
         <checkout>
@@ -114,6 +125,7 @@
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
+                <account_center_url>https://apps.boldapps.net/</account_center_url>
                 <eps_url>https://eps.secure.boldcommerce.com/</eps_url>
                 <eps_static_url>https://static-eps.secure.boldcommerce.com/</eps_static_url>
                 <weight_conversion_rate>1000</weight_conversion_rate>

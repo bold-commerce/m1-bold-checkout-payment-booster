@@ -120,7 +120,7 @@
                 paymentMethodElement.style.display = 'none';
             }
             this.removeWatermarkPlaceholder();
-            if (boldInstance) {
+            if (typeof boldInstance !== 'undefined') {
                 boldInstance.isAvailable = true;
                 boldInstance.initialize();
             }
@@ -349,12 +349,10 @@
                 }
             );
             const {deviceData} = dataCollectorInstance;
-            const styles = this.fastlaneStyles || {};
             window.bold.fastlane.instance = await window.braintree.fastlane.create({
                 authorization: this.gatewayData.client_token,
                 client: clientInstance,
                 deviceData: deviceData,
-                styles: styles,
             });
         },
         /**
@@ -826,11 +824,10 @@
                     enabled: true,
                 }
             };
-            const styles = JSON.parse(this.fastlaneStyles) || {};
             this.fastlaneCardComponent = await window.bold.fastlane.instance.FastlaneCardComponent(
                 {
                     fields,
-                    styles
+                    styles: this.fastlaneStyles
                 }
             );
             await this.fastlaneCardComponent.render(`#${this.paymentContainerId}`);
@@ -847,11 +844,10 @@
                     prefill: this.getFormattedPhoneNumber(),
                 }
             };
-            const styles = JSON.parse(this.fastlaneStyles) || {};
             this.fastlanePaymentComponent = await window.bold.fastlane.instance.FastlanePaymentComponent(
                 {
                     fields,
-                    styles
+                    styles: this.fastlaneStyles
                 }
             );
             const shippingAddress = this.getShippingAddress();

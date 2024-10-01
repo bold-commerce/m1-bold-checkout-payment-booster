@@ -3,6 +3,12 @@
     <sections>
         <checkout>
             <groups>
+                <bold_checkout_payment_booster_onboarding>
+                    <sort_order>0</sort_order>
+                    <show_in_default>0</show_in_default>
+                    <show_in_website>1</show_in_website>
+                    <frontend_model>bold_checkout_payment_booster/adminhtml_system_config_form_fieldset_onboarding</frontend_model>
+                </bold_checkout_payment_booster_onboarding>
                 <bold_checkout_payment_booster translate="label">
                     <label>Bold Checkout Payment Booster Extension</label>
                     <frontend_type>text</frontend_type>
@@ -68,6 +74,15 @@
                             <frontend_class>validate-url</frontend_class>
                             <comment><![CDATA[ Bold Checkout API URL. Do not change. ]]></comment>
                         </api_url>
+                        <account_center_url translate="label">
+                            <label>Account Center URL</label>
+                            <frontend_type>text</frontend_type>
+                            <sort_order>10</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <frontend_class>validate-url</frontend_class>
+                            <comment><![CDATA[ Bold Account Center URL. Do not change. ]]></comment>
+                        </account_center_url>
                         <eps_url translate="label">
                             <label>EPS URL</label>
                             <frontend_type>text</frontend_type>
@@ -89,7 +104,7 @@
                         <weight_conversion_rate>
                             <label>Weight Unit Conversion Rate To Grams</label>
                             <frontend_type>text</frontend_type>
-                            <sort_order>15</sort_order>
+                            <sort_order>20</sort_order>
                             <show_in_default>0</show_in_default>
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ The conversion rate between weight unit and grams. ]]></comment>
@@ -97,7 +112,7 @@
                         <fastlane_address_container_styles>
                             <label>PayPal Fastlane Address Container Styles</label>
                             <frontend_type>textarea</frontend_type>
-                            <sort_order>20</sort_order>
+                            <sort_order>25</sort_order>
                             <show_in_default>0</show_in_default>
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane address container. ]]></comment>
@@ -105,7 +120,7 @@
                         <fastlane_email_container_styles>
                             <label>PayPal Fastlane Address Container Styles</label>
                             <frontend_type>textarea</frontend_type>
-                            <sort_order>20</sort_order>
+                            <sort_order>30</sort_order>
                             <show_in_default>0</show_in_default>
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Custom CSS styles for the PayPal Fastlane email watermark container. ]]></comment>
@@ -114,7 +129,7 @@
                             <label>Enable requests log</label>
                             <frontend_type>select</frontend_type>
                             <source_model>adminhtml/system_config_source_yesno</source_model>
-                            <sort_order>20</sort_order>
+                            <sort_order>35</sort_order>
                             <show_in_default>0</show_in_default>
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Log requests in var/log/bold_checkout_payment_booster.log for debugging purposes. ]]></comment>

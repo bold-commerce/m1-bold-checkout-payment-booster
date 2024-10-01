@@ -5,12 +5,20 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Order_Data
 {
+    /**
+     * Load ext order data.
+     *
+     * @param Mage_Sales_Model_Order $order
+     * @return Bold_CheckoutPaymentBooster_Model_Order
+     */
     public static function getOrderBoldData(Mage_Sales_Model_Order $order)
     {
+        /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
         $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
         $extOrderData->load($order->getEntityId(), Bold_CheckoutPaymentBooster_Model_Order::ORDER_ID);
         return $extOrderData;
     }
+
     /**
      * Save order uses delayed payment capture.
      *

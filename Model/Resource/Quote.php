@@ -8,6 +8,11 @@ class Bold_CheckoutPaymentBooster_Model_Resource_Quote extends Mage_Core_Model_M
     const ENTITY_ID = 'entity_id';
     const QUOTE_ID = 'quote_id';
     const PUBLIC_ID = 'public_id';
+    const FLOW_SETTINGS = 'flow_settings';
+
+    protected $_serializableFields = [
+        self::FLOW_SETTINGS => [null, null],
+    ];
 
     /**
      * Initialize resource model.

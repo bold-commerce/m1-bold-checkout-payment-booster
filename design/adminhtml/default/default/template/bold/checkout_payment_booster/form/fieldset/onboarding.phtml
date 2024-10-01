@@ -1,0 +1,63 @@
+<?php
+
+/** @var Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Form_Fieldset_Onboarding $this */
+
+$onboardingBannerData = $this->getOnboardingBannerData();
+
+if ($onboardingBannerData === null):
+    return '';
+endif;
+
+$onboardingStatus = $this->getOnboardingStatus();
+?>
+<div id="bold-checkout-onboarding">
+    <div class="onboarding-content">
+        <h2><?php echo $this->escapeHtml($onboardingBannerData['header']) ?></h2>
+        <p>
+            <?php echo $this->escapeHtml($onboardingBannerData['body_text']) ?>
+            <?php if (
+                array_key_exists('body_link_url', $onboardingBannerData)
+                && array_key_exists('body_link_text', $onboardingBannerData)
+            ): ?>
+                <a href="<?php echo $this->escapeUrl($onboardingBannerData['body_link_url']) ?>" target="_blank">
+                    <?php echo $this->escapeHtml($onboardingBannerData['body_link_text']) ?>
+                </a>
+            <?php endif ?>
+        </p>
+    </div>
+
+    <div class="onboarding-sidebar">
+        <p>
+            <?php if ($onboardingStatus === 'in_progress'): ?>
+                <button
+                    class="bold-button"
+                    type="button"
+                    onclick="
+                        window.open(
+                            '<?php echo $this->escapeUrl($onboardingBannerData['button_link']) ?>',
+                            'Bold Account Center',
+                            'width=1400,height=950'
+                        )
+                    "
+                >
+                    <?php echo $this->escapeHtml($onboardingBannerData['button_text']) ?>
+                </button>
+            <?php endif ?>
+            <?php if ($onboardingStatus === 'complete'): ?>
+                <a class="bold-button" href="<?php echo $this->escapeUrl($onboardingBannerData['button_link']) ?>" target="_blank">
+                    <?php echo $this->escapeHtml($onboardingBannerData['button_text']) ?>
+                </a>
+            <?php endif ?>
+        </p>
+        <?php if (
+            array_key_exists('sidebar_link_url', $onboardingBannerData)
+            && array_key_exists('sidebar_link_text', $onboardingBannerData)
+        ): ?>
+            <p class="onboarding-sidebar-link">
+                <a href="<?php echo $this->escapeUrl($onboardingBannerData['sidebar_link_url']) ?>" target="_blank">
+                    <?php echo $this->escapeHtml($onboardingBannerData['sidebar_link_text']) ?>
+                </a>
+            </p>
+        <?php endif ?>
+    </div>
+</div>

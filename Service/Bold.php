@@ -17,10 +17,7 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         if (!self::isAvailable()) {
             return;
         }
-        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getId($quote);
-        if (!$flowId) {
-            Mage::throwException('Failed to get Bold flow ID.');
-        }
+        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getFlowIdForCheckout($quote);
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
@@ -103,7 +100,9 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         if (!$checkoutData) {
             return null;
         }
-        return isset($checkoutData->flow_settings->fastlane_styles) ? $checkoutData->flow_settings->fastlane_styles : null;
+        return isset($checkoutData->flow_settings->fastlane_styles)
+            ? $checkoutData->flow_settings->fastlane_styles
+            : null;
     }
 
     /**

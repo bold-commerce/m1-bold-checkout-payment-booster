@@ -3,7 +3,7 @@
 /**
  * Perform requests to Bold Checkout API.
  */
-class Bold_CheckoutPaymentBooster_Service_Client
+class Bold_CheckoutPaymentBooster_Service_BoldClient
 {
     const BOLD_API_VERSION_DATE = '2022-10-14';
 
@@ -129,6 +129,8 @@ class Bold_CheckoutPaymentBooster_Service_Client
     }
 
     /**
+     * Build request headers.
+     *
      * @param int $websiteId
      * @return string[]
      */
@@ -144,6 +146,8 @@ class Bold_CheckoutPaymentBooster_Service_Client
     }
 
     /**
+     * Build URL for API request.
+     *
      * @param int $websiteId
      * @param string $shopId
      * @param string $url
