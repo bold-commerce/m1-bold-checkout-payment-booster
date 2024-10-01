@@ -17,8 +17,7 @@ class Bold_CheckoutPaymentBooster_Service_Bold
         if (!self::isAvailable()) {
             return;
         }
-        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getFlowIdForCheckout($quote);
-        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);
