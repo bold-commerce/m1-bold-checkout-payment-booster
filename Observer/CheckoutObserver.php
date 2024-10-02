@@ -80,14 +80,10 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             return;
         }
         try {
-            /** @var Bold_CheckoutPaymentBooster_Model_Quote $extQuoteData */
-            $extQuoteData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
-            $extQuoteData->load($order->getQuoteId(), 'quote_id');
-
             /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
             $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
             $extOrderData->setOrderId($order->getEntityId());
-            $extOrderData->setPublicId($extQuoteData->getPublicId());
+            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
             $extOrderData->save();
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
