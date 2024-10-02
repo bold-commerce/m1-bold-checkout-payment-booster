@@ -18,6 +18,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
 
     // Advanced settings
     const PATH_API_URL = 'checkout/bold_checkout_payment_booster_advanced/api_url';
+    const PATH_ACCOUNT_CENTER_URL = 'checkout/bold_checkout_payment_booster_advanced/account_center_url';
     const PATH_EPS_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_url';
     const PATH_EPS_STATIC_URL = 'checkout/bold_checkout_payment_booster_advanced/eps_static_url';
     const PATH_WEIGHT_CONVERSION_RATE = 'checkout/bold_checkout_payment_booster_advanced/weight_conversion_rate';
@@ -95,6 +96,17 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function getApiUrl($websiteId)
     {
         return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_URL), '/');
+    }
+
+    /**
+     * Retrieve Bold Account Center URL.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public function getAccountCenterUrl($websiteId)
+    {
+        return rtrim(Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_ACCOUNT_CENTER_URL), '/');
     }
 
     /**
