@@ -75,7 +75,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
      * @return stdClass|null
      * @throws Mage_Core_Exception
      */
-    private static function lookupForExistingOrder(Mage_Sales_Model_Quote $quote)
+    public static function lookupForExistingOrder(Mage_Sales_Model_Quote $quote)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Quote $quote */
         $quoteBoldData = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
@@ -93,13 +93,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
         if (isset($orderData->error)) {
             return null;
         }
-        $flowSettings = $quoteBoldData->getFlowSettings();
-        if (!$flowSettings) {
-            return $orderData;
-        }
-        $flowSettingsObject = self::convertFlowSettings($flowSettings);
-        $orderData->data->flow_settings = $flowSettingsObject;
-        return $orderData;
+        return $orderData->data->jwt_token;
     }
 
     /**

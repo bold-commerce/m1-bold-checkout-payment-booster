@@ -18,6 +18,19 @@ class Bold_CheckoutPaymentBooster_Service_Bold
             return;
         }
         $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getFlowIdForCheckout($quote);
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $checkoutData = $checkoutSession->getBoldCheckoutData();
+        if(isset($checkoutData)) {
+            $jwt = Bold_CheckoutPaymentBooster_Service_Order_Init::lookupForExistingOrder($quote);
+            $checkoutData->jwt_token = $jwt;
+            $checkoutSession->setBoldCheckoutData($checkoutData);
+        } else {
+            $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+            /** @var Mage_Checkout_Model_Session $checkoutSession */
+            $checkoutSession = Mage::getSingleton('checkout/session');
+            $checkoutSession->setBoldCheckoutData($checkoutData);
+        }
+
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
