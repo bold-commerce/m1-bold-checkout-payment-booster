@@ -162,7 +162,7 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
             $authorized = false;
         }
         if (!$authorized) {
-            $this->logRequest($tracingId, 'Unauthorized.', $websiteId);
+            $this->logRequest($tracingId, 'Authorization failed.', $websiteId);
             $response->setBody(json_encode(['errors' => ['Unauthorized.']]));
             $response->setHttpResponseCode(401);
             $request->setDispatched();
