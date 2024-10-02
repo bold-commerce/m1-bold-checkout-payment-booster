@@ -10,20 +10,20 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     /**
      * Perform GET HTTP request.
      *
-     * @param string $url
+     * @param string $path
      * @param int $websiteId
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function get($url, $websiteId)
+    public static function get($path, $websiteId)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
-        $url = self::getUrl($websiteId, $shopId, $url);
+        $path = self::getUrl($websiteId, $shopId, $path);
         return json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'GET',
-                $url,
+                $path,
                 $websiteId,
                 $headers
             )
@@ -33,21 +33,21 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     /**
      * Perform POST HTTP request.
      *
-     * @param string $url
+     * @param string $path
      * @param int $websiteId
      * @param array|null $body
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function post($url, $websiteId, array $body = null)
+    public static function post($path, $websiteId, array $body = null)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
-        $url = self::getUrl($websiteId, $shopId, $url);
+        $path = self::getUrl($websiteId, $shopId, $path);
         return json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'POST',
-                $url,
+                $path,
                 $websiteId,
                 $headers,
                 $body ? json_encode($body) : ''
@@ -58,21 +58,21 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     /**
      * Perform PUT HTTP request.
      *
-     * @param string $url
+     * @param string $path
      * @param int $websiteId
      * @param array|null $body
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function put($url, $websiteId, array $body = null)
+    public static function put($path, $websiteId, array $body = null)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
-        $url = self::getUrl($websiteId, $shopId, $url);
+        $path = self::getUrl($websiteId, $shopId, $path);
         return json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'PUT',
-                $url,
+                $path,
                 $websiteId,
                 $headers,
                 $body ? json_encode($body) : ''
@@ -83,21 +83,21 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     /**
      * Perform PATCH HTTP request.
      *
-     * @param string $url
+     * @param string $path
      * @param int $websiteId
      * @param array|null $body
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function patch($url, $websiteId, array $body = null)
+    public static function patch($path, $websiteId, array $body = null)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
-        $url = self::getUrl($websiteId, $shopId, $url);
+        $path = self::getUrl($websiteId, $shopId, $path);
         return json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'PATCH',
-                $url,
+                $path,
                 $websiteId,
                 $headers,
                 $body ? json_encode($body) : ''
@@ -108,20 +108,20 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     /**
      * Perform DELETE HTTP request.
      *
-     * @param string $url
+     * @param string $path
      * @param int $websiteId
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function delete($url, $websiteId)
+    public static function delete($path, $websiteId)
     {
         $shopId = Bold_CheckoutPaymentBooster_Service_ShopInfo::getShopId($websiteId);
         $headers = self::getHeaders($websiteId);
-        $url = self::getUrl($websiteId, $shopId, $url);
+        $path = self::getUrl($websiteId, $shopId, $path);
         return json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'DELETE',
-                $url,
+                $path,
                 $websiteId,
                 $headers
             )
@@ -150,15 +150,15 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
      *
      * @param int $websiteId
      * @param string $shopId
-     * @param string $url
+     * @param string $path
      * @return string
      */
-    private static function getUrl($websiteId, $shopId, $url)
+    private static function getUrl($websiteId, $shopId, $path)
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         return $config->getApiUrl($websiteId)
             . '/'
-            . ltrim(str_replace('{{shopId}}', $shopId, $url), '/');
+            . ltrim(str_replace('{{shopId}}', $shopId, $path), '/');
     }
 }
