@@ -238,7 +238,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             : $totals['grand_total']['value'];
         $processedTotals = [
             'sub_total' => self::convertToCents($subTotal),
-            'tax_total' => $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
+            'tax_total' => isset($totals['tax']['value']) && $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
             'discount_total' => self::getDiscountTotal(),
             'shipping_total' => self::convertToCents($shippingTotal),
             'order_total' => self::convertToCents($grandTotal),

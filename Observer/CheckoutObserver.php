@@ -17,8 +17,21 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
         try {
-            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
-            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+            /** @var Bold_CheckoutPaymentBooster_Model_Quote $existingBoldQuote */
+            $existingBoldQuote = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
+            $existingBoldQuote->load($quote->getId(), 'quote_id');
+            if ($existingBoldQuote->getId()) {
+                $publicOrderId = $existingBoldQuote->getPublicId();
+            } else {
+                $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+
+                /** @var Bold_CheckoutPaymentBooster_Model_Quote $quoteData */
+                $quoteData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
+                $quoteData->setQuoteId($quote->getId());
+                $quoteData->setPublicId($publicOrderId);
+                $quoteData->save();
+            }
+
             if (!$publicOrderId) {
                 return;
             }
@@ -80,10 +93,14 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             return;
         }
         try {
+            /** @var Bold_CheckoutPaymentBooster_Model_Quote $extQuoteData */
+            $extQuoteData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
+            $extQuoteData->load($order->getQuoteId(), 'quote_id');
+
             /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
             $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
             $extOrderData->setOrderId($order->getEntityId());
-            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
+            $extOrderData->setPublicId($extQuoteData->getPublicId());
             $extOrderData->save();
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
