@@ -5,8 +5,7 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
-    const DEFAULT_FLOW_ID = 'bold_booster_m1';
-    const FASTLANE_FLOW_ID = 'bold_booster_fastlane_m1';
+    const DEFAULT_FLOW_ID = 'bold-booster-m1';
     const STAGING_CONFIGURATION_GROUP = '/consumers/checkout-staging/configuration_group/{{shopDomain}}';
     const CONFIGURATION_GROUP = '/consumers/checkout/configuration_group/{{shopDomain}}';
 
