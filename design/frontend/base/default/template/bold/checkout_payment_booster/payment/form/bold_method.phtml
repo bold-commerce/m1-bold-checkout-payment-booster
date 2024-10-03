@@ -157,6 +157,25 @@
                         // Save the payment step to push the customer along
                         payment.save();
                     }.bind(this),
+                    'onScaPaymentOrder': async function (type, payload) {
+                        const url = `${this.boldApiUrl}payments/on_sca`;
+                        const orderId = payload.order_id;
+
+                        if (type === 'ppcp') {
+                            const scaResult = await fetch(url, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${this.jwtToken}`},
+                                body: JSON.stringify({'order_id': orderId, 'public_order_id': '<?php echo $this->getPublicOrderID(); ?>'}),
+                            });
+                            if (!scaResult.ok) {
+                                throw new Error('SCA failed');
+                            }
+                            const data = await scaResult.json();
+                            return {card: data};
+
+                        }
+                        throw new Error('Unsupported payment type');
+                    }.bind(this)
                 }
             };
             const boldPayments = new window.bold.Payments(initialData);
