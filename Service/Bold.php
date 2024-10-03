@@ -6,6 +6,26 @@
 class Bold_CheckoutPaymentBooster_Service_Bold
 {
     /**
+     * Resume a quote
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @param $publicOrderId
+     * @return array
+     * @throws Mage_Core_Exception
+     */
+    public static function resumeQuote(Mage_Sales_Model_Quote $quote, $publicOrderId)
+    {
+        if (!self::isAvailable()) {
+            return;
+        }
+
+        return Bold_CheckoutPaymentBooster_Service_Order_Resume::resumeOrder(
+            $quote,
+            $publicOrderId
+        );
+    }
+
+    /**
      * Init and load Bold Checkout Data to the checkout session.
      *
      * @param Mage_Sales_Model_Quote $quote
