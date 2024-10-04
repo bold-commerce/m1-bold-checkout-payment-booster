@@ -111,7 +111,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             ->getLocale()
             ->getCountryTranslation($countryIsoCode);
 
-        return [
+        $addressData = [
             'first_name' => $address->getFirstname(),
             'last_name' => $address->getLastname(),
             'business_name' => $address->getCompany() ? $address->getCompany() : '',
@@ -119,12 +119,22 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
             'address_line_1' => $address->getStreet1(),
             'address_line_2' => $address->getStreet2(),
             'city' => $address->getCity(),
-            'province' => $address->getRegion(),
-            'province_code' => $address->getRegionCode(),
             'country' => $countryName,
             'country_code' => $address->getCountryId(),
             'postal_code' => $address->getPostcode(),
         ];
+
+        $province = $address->getRegion();
+        if (!empty($province)) {
+            $addressData['province'] = $province;
+        }
+
+        $provinceCode = $address->getRegionCode();
+        if (!empty($provinceCode)) {
+            $addressData['province_code'] = $provinceCode;
+        }
+
+        return $addressData;
     }
 
     /**
