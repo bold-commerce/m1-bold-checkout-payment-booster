@@ -4,15 +4,6 @@
 
 Use this repository to implement Bold Booster for PayPal on Magento 1 (M1).
 
-## Dependencies/Prerequisites
-
-List prerequisite files or dependencies that must be installed for this software to function. Optionally, link to installation documentation for each dependency.
-
-* [Prerequisite 1] - [How to Install Prerequisite 1](https://lmgtfy.app/)
-* [Prerequisite 2]
-* [Prerequisite 3]
-
-
 ## Installation
 
 1. Download the repository contents (click the **Code** drop-down menu and select **Download ZIP**).
@@ -26,15 +17,6 @@ List prerequisite files or dependencies that must be installed for this software
 
 To continue setting up Bold Booster for PayPal, continue following the steps [Bold's developer documentation](https://developer.boldcommerce.com/guides/checkout/bold-boosters/m1-bold-booster-for-paypal#step-3-complete-bold-booster-for-paypal-onboarding).
 
-## Configuration (need?)
-
-If the software is configurable by the user, list common commands and configuration options. Think of this as a `help` command on the command line, but written out in a handy table.
-
-| Command     | Function                |
-| ----------- | ----------------------- |
-| `command 1` | [Command description 1] |
-| `command 2` | [Command description 2] |
-| `command 3` | [Command description 3] |
 
 ## Documentation
 
