@@ -129,7 +129,13 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      */
     private function saveTransaction(Mage_Sales_Model_Order $order, stdClass $transactionData)
     {
-        $order->getPayment()->setTransactionId($transactionData->transactions[0]->transaction_id);
+        $transactionId = isset($transactionData->transactions[0]->transaction_id)
+            ? $transactionData->transactions[0]->transaction_id
+            : null;
+        if (!$transactionId) {
+            return;
+        }
+        $order->getPayment()->setTransactionId($transactionId);
         $order->getPayment()->setIsTransactionClosed(0);
         $order->getPayment()->addTransaction(Mage_Sales_Model_Order_Payment_Transaction::TYPE_AUTH);
         $cardDetails = isset($transactionData->transactions[0]->tender_details)
