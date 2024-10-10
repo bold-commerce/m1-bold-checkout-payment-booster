@@ -414,6 +414,7 @@
                     }, 500);
                 });
             }
+            this.buildPaymentsInstanceInProgress = true;
             await this.loadScript(this.epsStaticUrl + '/js/payments_sdk.js');
             const initialData = {
                 'eps_url': this.epsUrl,
