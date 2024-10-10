@@ -11,25 +11,25 @@
     /**
      * Bold order data sync class.
      */
-    let Bold = Class.create({
+    let BoldPaymentMethod = Class.create({
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         paymentContainer: document.getElementById('bold-payments-container'),
         paymentCheckbox: document.getElementById('p_method_bold'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
         isFastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
+        paymentId: null,
         /**
          * Initialize class.
          *
          * @returns {*|boolean}
          */
         initialize: async function () {
-            this.showPaymentMethod();
             if (!this.isAvailable) {
                 this.hidePaymentMethod();
                 return;
             }
             await this.waitForBaseInstance();
-            this.renderPaymentForm();
+            await this.renderPaymentForm();
             this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
@@ -54,7 +54,7 @@
             });
         },
         /**
-         * Render payment form.
+         * Render payment form considering Fastlane.
          *
          * @returns {void}
          */
@@ -62,8 +62,8 @@
             const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
             const boldPaymentsForm = document.getElementById('payment_form_bold');
             if (this.isFastlaneAvailable) {
-                await paymentInstance.renderWalletPayments('payment_form_bold');
-                if (boldPaymentsForm.getInnerHTML().trim() === '') {
+                await paymentInstance.renderWalletPayments('payment_form_bold', {fastlane: 1});
+                if (boldPaymentsForm.getHTML().trim() === '') {
                     this.hidePaymentMethod();
                 }
                 return;
@@ -117,7 +117,7 @@
                         return checkoutSaveMethod();
                     }
                     checkout.validate();
-                    if (!window.bold.paymentId) {
+                    if (!this.paymentId) {
                         checkout.setLoadWaiting('payment', true);
                         this.tokenize();
                         return;
@@ -141,7 +141,7 @@
                     if (!this.paymentCheckbox.checked) {
                         return paymentSaveMethod();
                     }
-                    if (!window.bold.paymentId) {
+                    if (!this.paymentId) {
                         checkout.setLoadWaiting('payment', true);
                         this.tokenize();
                         return;
@@ -170,17 +170,12 @@
          */
         tokenize: async function () {
             const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
+            const cartData = await window.bold.baseInstance.getCartData();
             const payload = {
-                billing_address: {
-                    first_name: window.bold.orderData.firstname,
-                    last_name: window.bold.orderData.lastname,
-                    address_line_1: window.bold.orderData.street1,
-                    address_line_2: window.bold.orderData.street2,
-                    province_code: window.bold.orderData.region,
-                    city: window.bold.orderData.city,
-                    postal_code: window.bold.orderData.postcode,
-                    country_code: window.bold.orderData.country_id,
-                }
+                customer: cartData.customer,
+                billing_address: cartData.billing_address,
+                shipping_address: cartData.shipping_address || cartData.billing_address,
+                totals: cartData.totals,
             };
             iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
         },
@@ -196,7 +191,7 @@
                     switch (eventType) {
                         case 'EVENT_SPI_TOKENIZED':
                             if (!data.payload.success) {
-                                window.bold.paymentId = null;
+                                this.paymentId = null;
                                 console.error('Failed to tokenize');
                                 checkout.setLoadWaiting(false);
                                 return;
@@ -209,14 +204,26 @@
                             payment.save();
                             break;
                         case 'EVENT_SPI_TOKENIZE_FAILED':
-                            window.bold.paymentId = null;
+                            this.paymentId = null;
                             console.error('Failed to tokenize');
                             checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_PAYMENT_ORDER_SCA':
+                            checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_ENABLE_FULLSCREEN':
+                            checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_DISABLE_FULLSCREEN':
+                            checkout.setLoadWaiting('payment', true);
                             break;
                     }
                 }
             });
         },
     });
-    const boldInstance = new Bold();
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+    window.bold.boldPaymentMethod = new BoldPaymentMethod();
 </script>

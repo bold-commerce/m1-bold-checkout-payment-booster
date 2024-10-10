@@ -14,7 +14,9 @@
         fastlaneInstance: null,
         fastlaneProfileData: null,
         gatewayData: null,
+        synchronizedOrderData: null,
         buildFastlaneInstanceInProgress: false,
+        buildPaymentsInstanceInProgress: false,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
@@ -25,7 +27,6 @@
         epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
         quoteCurrencyCode: '<?php echo $this->getQuoteCurrencyCode(); ?>',
         isFastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
-        paymentId: null,
         billingAddressFieldsMap: {
             'firstname': 'billing:firstname',
             'lastname': 'billing:lastname',
@@ -85,11 +86,6 @@
         initialize: async function () {
             if (!this.isAvailable) {
                 return false;
-            }
-            if (!window.bold) {
-                window.bold = {
-                    orderData: {}
-                };
             }
             this.hydrateOrderData();
             this.subscribeToBillingAddressFieldsChanges();
@@ -189,16 +185,7 @@
             }
             this.buildFastlaneInstanceInProgress = true;
             const boldPaymentsInstance = await this.getBoldPaymentsInstance();
-            //this.gatewayData = (await boldPaymentsInstance.getFastlaneClientInit())[this.epsGatewayId] || null;
-            const response = await fetch(
-                encodeURI(this.epsUrl + '/' + this.groupLabel + '/client_init?option=fastlane'),
-                {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-            this.gatewayData = (await response.json())[this.epsGatewayId] || null;
+            this.gatewayData = (await boldPaymentsInstance.getFastlaneClientInit())[this.epsGatewayId] || null;
             if (!this.gatewayData) {
                 return null;
             }
@@ -222,16 +209,16 @@
          */
         buildBraintreeFastlaneInstance: async function () {
             await this.loadScript(
-                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/client.min.js'
+                'https://js.braintreegateway.com/web/3.106.0/js/client.min.js'
             );
             await this.loadScript(
-                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/data-collector.min.js'
+                'https://js.braintreegateway.com/web/3.106.0/js/data-collector.min.js'
             );
             await this.loadScript(
-                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/hosted-fields.min.js'
+                'https://js.braintreegateway.com/web/3.106.0/js/hosted-fields.min.js'
             );
             await this.loadScript(
-                'https://js.braintreegateway.com/web/3.101.0-fastlane-beta.7.2/js/fastlane.min.js'
+                'https://js.braintreegateway.com/web/3.106.0/js/fastlane.min.js'
             );
             const clientInstance = await window.braintree.client.create({
                 authorization: this.gatewayData.client_token,
@@ -251,10 +238,10 @@
         /**
          * Build Fastlane Instance for the PPCP.
          *
-         * @return {Promise<void>}
+         * @return {Promise<{}>}
+         * @private
          */
         buildPpcpFastlaneInstance: async function () {
-            console.log('Building PPCP Fastlane instance');
             const debugMode = this.gatewayData.is_test_mode ? '&debug=true' : '';
             await this.loadScript(
                 `https://www.paypal.com/sdk/js?client-id=${this.gatewayData.client_id}&components=fastlane${debugMode}`,
@@ -287,8 +274,8 @@
                 if (!customerContextId) {
                     this.removeAddressButton();
                     this.fastlaneProfileData = null;
-                    if (window.boldFastlaneInstance) {
-                        window.boldFastlaneInstance.renderFastlanePaymentComponent();
+                    if (window.bold.fastlanePaymentMethod) {
+                        window.bold.fastlanePaymentMethod.renderFastlanePaymentComponent();
                     }
                     return;
                 }
@@ -298,14 +285,14 @@
                 } = await identity.triggerAuthenticationFlow(customerContextId);
                 if (authenticationState === 'succeeded') {
                     checkout.setLoadWaiting('billing', true);
-                    this.profileData = profileData;
+                    this.fastlaneProfileData = profileData;
                     if (profileData.shippingAddress) {
-                        this.updateBillingAddress(profileData.shippingAddress);
+                        this.updateBillingAddressFormValues(profileData.shippingAddress);
                         this.addAddressButton();
                     }
-                    if (window.boldFastlaneInstance) {
-                        window.boldFastlaneInstance.selectPaymentMethod();
-                        window.boldFastlaneInstance.renderFastlanePaymentComponent();
+                    if (window.bold.fastlanePaymentMethod) {
+                        window.bold.fastlanePaymentMethod.selectPaymentMethod();
+                        window.bold.fastlanePaymentMethod.renderFastlanePaymentComponent();
                     }
                     checkout.setLoadWaiting(false);
                 }
@@ -314,12 +301,12 @@
             }
         },
         /**
-         * Set Fastlane shipping address as Magento shipping address.
+         * Fill billing address form with Fastlane address.
          *
          * @param {{}} fastlaneAddress
          * @return {void}
          */
-        updateBillingAddress: function (fastlaneAddress) {
+        updateBillingAddressFormValues: function (fastlaneAddress) {
             const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
             Object.keys(this.billingAddressFieldsMap).forEach((field) => {
                 if (magentoAddress[field] && document.getElementById(this.billingAddressFieldsMap[field])) {
@@ -335,7 +322,7 @@
         /**
          * Convert Fastlane address to Magento address.
          *
-         * @param fastlaneAddress
+         * @param fastlaneAddress {{}}
          * @return {{}}
          */
         convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
@@ -400,7 +387,7 @@
                         if (!editAddressResult.selectionChanged) {
                             return;
                         }
-                        this.updateBillingAddress(editAddressResult.selectedAddress);
+                        this.updateBillingAddressFormValues(editAddressResult.selectedAddress);
                     });
                 });
             });
@@ -417,7 +404,15 @@
          */
         getBoldPaymentsInstance: async function () {
             if (this.boldPaymentsInstance) {
+                this.buildPaymentsInstanceInProgress = false;
                 return this.boldPaymentsInstance;
+            }
+            if (this.buildPaymentsInstanceInProgress) {
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve(this.getBoldPaymentsInstance());
+                    }, 500);
+                });
             }
             await this.loadScript(this.epsStaticUrl + '/js/payments_sdk.js');
             const initialData = {
@@ -463,7 +458,7 @@
                             console.error('No payment ID provided from PayPal.');
                             return;
                         }
-                        window.bold.paymentId = paymentInformation.payment_id;
+                        window.bold.boldPaymentMethod.paymentId = paymentInformation.payment_id;
                         payment.save();
                     }.bind(this),
                     'onScaPaymentOrder': async function (type, payload) {
@@ -495,12 +490,17 @@
                 }
             };
             this.boldPaymentsInstance = new window.bold.Payments(initialData);
+            this.boldPaymentsInstance.state = {options: {fastlane: this.isFastlaneAvailable}};
+            this.buildPaymentsInstanceInProgress = false;
             return this.boldPaymentsInstance;
         },
         /**
          * Load specified script with attributes.
          *
+         * @param {string} src
+         * @param {Object} attributes
          * @returns {Promise<void>}
+         * @private
          */
         loadScript: async function (src, attributes = {}) {
             return new Promise((resolve, reject) => {
@@ -579,12 +579,12 @@
          * @returns {boolean}
          */
         isPayloadChanged: function () {
-            if (!window.bold.orderData) {
+            if (!this.synchronizedOrderData) {
                 return true;
             }
             let isChanged = false;
             for (let [key, value] of Object.entries(this.orderPayload)) {
-                if (window.bold.orderData[key] !== value) {
+                if (this.synchronizedOrderData[key] !== value) {
                     isChanged = true;
                     break;
                 }
@@ -594,7 +594,7 @@
         /**
          * Hydrate Bold order.
          */
-        hydrateOrderData: function (force = false) {
+        hydrateOrderData: function () {
             if (Ajax.activeRequestCount > 0) {
                 this.hydrateOrderData.bind(this).delay(0.1);
                 return;
@@ -603,7 +603,7 @@
             if (!this.isPayloadValid()) {
                 return;
             }
-            if (!this.isPayloadChanged() && !force) {
+            if (!this.isPayloadChanged()) {
                 return;
             }
             new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
@@ -621,47 +621,46 @@
                             this.orderPayload.region = region.code;
                         }
                     }
-                    window.bold.orderData = Object.assign({}, this.orderPayload);
+                    this.synchronizedOrderData = Object.assign({}, this.orderPayload);
                 }.bind(this),
                 onFailure: function () {
-                    if (typeof window.bold.FastlaneInstance !== 'undefined') {
-                        window.bold.FastlaneInstance.hidePaymentMethod();
+                    if (window.bold.fastlanePaymentMethod) {
+                        window.bold.fastlanePaymentMethod.hidePaymentMethod();
                     }
                     checkout.setLoadWaiting(false);
-                    window.bold.orderData = {};
+                    this.synchronizedOrderData = {};
                     console.error('Failed to sync order data');
                 }.bind(this),
             });
         },
         /**
-         * Send tokenize action to SPI iframe.
-         *
-         * @return {Promise<void>}
-         */
-        tokenize: async function () {
-            const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
-            const payload = {
-                billing_address: {
-                    first_name: window.bold.orderData.firstname,
-                    last_name: window.bold.orderData.lastname,
-                    address_line_1: window.bold.orderData.street1,
-                    address_line_2: window.bold.orderData.street2,
-                    province_code: window.bold.orderData.region,
-                    city: window.bold.orderData.city,
-                    postal_code: window.bold.orderData.postcode,
-                    country_code: window.bold.orderData.country_id,
-                }
-            };
-            iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
-        },
-        /**
          * Get email field.
          *
          * @return {HTMLElement}
+         * @private
          */
         getEmailField: function () {
             return document.getElementById('billing:email');
-        }
+        },
+        /**
+         * Pull cart data from backend.
+         *
+         * @returns {Promise<{}>}
+         */
+        getCartData: async function () {
+            return new Promise((resolve, reject) => {
+                new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
+                    method: 'get',
+                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
+                    onSuccess: function (response) {
+                        resolve(JSON.parse(response.responseText));
+                    },
+                    onFailure: function () {
+                        reject(new Error('Failed to get cart data'));
+                    }
+                });
+            });
+        },
     });
     document.observe('dom:loaded', function () {
         if (typeof window.bold === 'undefined') {

@@ -10,7 +10,7 @@
     /**
      * Bold fastlane payment component.
      */
-    const BoldFastlane = Class.create({
+    const BoldFastlanePaymentMethod = Class.create({
         emailSubscribed: false,
         phoneNumberSubscribed: false,
         checkoutSaveWrapped: false,
@@ -367,19 +367,8 @@
             const paymentTokenResponse = this.fastlaneCardComponent
                 ? await this.fastlaneCardComponent.getPaymentToken(billingAddress)
                 : await this.fastlanePaymentComponent.getPaymentToken();
-            window.bold.baseInstance.updateBillingAddress(paymentTokenResponse.paymentSource.card.billingAddress);
-            const cartData = await new Promise((resolve, reject) => {
-                new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
-                    method: 'get',
-                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
-                    onSuccess: function (response) {
-                        resolve(JSON.parse(response.responseText));
-                    },
-                    onFailure: function () {
-                        reject(new Error('Failed to get cart data'));
-                    }
-                });
-            });
+            window.bold.baseInstance.updateBillingAddressFormValues(paymentTokenResponse.paymentSource.card.billingAddress);
+            const cartData = await window.bold.baseInstance.getCartData();
             const tokenizeResponse = await fetch(this.epsUrl + '/' + this.groupLabel + '/tokenize', {
                 method: 'POST',
                 headers: {
@@ -456,11 +445,10 @@
             if (!paymentContainer) {
                 return;
             }
-            if (window.bold.baseInstance.profileData && window.bold.baseInstance.profileData.card?.id) {
+            if (window.bold.baseInstance.fastlaneProfileData?.card?.id) {
                 await this.renderPaymentComponent();
                 return;
             }
-            this.showPaymentMethod();
             await this.renderCardComponent();
         },
         /**
@@ -517,6 +505,8 @@
             await this.fastlanePaymentComponent.render(`#${this.paymentContainerId}`);
         }
     });
-    window.boldFastlaneInstance = new BoldFastlane();
-
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+    window.bold.fastlanePaymentMethod = new BoldFastlanePaymentMethod();
 </script>
