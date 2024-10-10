@@ -2,7 +2,12 @@
 <layout version="0.1.0">
     <checkout_onepage_index>
         <reference name="content">
-            <block type="bold_checkout_payment_booster/payment_form_fastlane" name="bold.fastlane.payment" as="bold.fastlane.payment"/>
+            <block type="bold_checkout_payment_booster/payment_form_base" name="bold.payments.base" as="bold.payments.base"/>
         </reference>
     </checkout_onepage_index>
+    <firecheckout_index_index>
+        <reference name="content">
+            <block type="bold_checkout_payment_booster/payment_form_base" name="bold.payments.base" as="bold.payments.base"/>
+        </reference>
+    </firecheckout_index_index>
 </layout>

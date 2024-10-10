@@ -46,11 +46,8 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
             return;
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
-        $cartData = [
-            'grand_total' => $quote->getGrandTotal() * 100,
-            'quote_currency_code' => $quote->getQuoteCurrencyCode(),
-        ];
-
+        $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
+        $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
         $this->getResponse()->setBody(json_encode($cartData));
     }
 
