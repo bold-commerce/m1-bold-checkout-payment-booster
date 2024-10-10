@@ -6,26 +6,6 @@
 class Bold_CheckoutPaymentBooster_Service_Bold
 {
     /**
-     * Resume a quote
-     *
-     * @param Mage_Sales_Model_Quote $quote
-     * @param $publicOrderId
-     * @return array
-     * @throws Mage_Core_Exception
-     */
-    public static function resumeQuote(Mage_Sales_Model_Quote $quote, $publicOrderId)
-    {
-        if (!self::isAvailable()) {
-            return;
-        }
-
-        return Bold_CheckoutPaymentBooster_Service_Order_Resume::resumeOrder(
-            $quote,
-            $publicOrderId
-        );
-    }
-
-    /**
      * Init and load Bold Checkout Data to the checkout session.
      *
      * @param Mage_Sales_Model_Quote $quote
@@ -33,17 +13,26 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
-        self::clearBoldCheckoutData();
         if (!self::isAvailable()) {
             return;
         }
-        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID;
-        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+        if (self::getPublicOrderId()) {
+            $orderData = Bold_CheckoutPaymentBooster_Service_Order_Resume::resumeOrder(
+                $quote,
+                self::getPublicOrderId()
+            );
+            if ($orderData) {
+                $checkoutData = self::getBoldCheckoutData();
+                $checkoutData->jwt_token = $orderData->jwt_token;
+                $checkoutSession = Mage::getSingleton('checkout/session');
+                $checkoutSession->setBoldCheckoutData($checkoutData);
+                return;
+            }
+        }
+        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);
-
-        return $checkoutData->public_order_id;
     }
 
     /**
