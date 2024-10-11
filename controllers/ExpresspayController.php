@@ -61,12 +61,9 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post($uri, $websiteId, $expressPayData);
 
         if (property_exists($result, 'errors') && count($result->errors) > 0) {
-            if (is_array($result->errors[0])) {
+            if (is_object($result->errors[0])) {
                 $exceptionMessage = Mage::helper('core')
-                    ->__(
-                        'Could not create Express Pay order. Errors: "%s"',
-                        implode(', ', array_column($result->errors, 'message'))
-                    );
+                    ->__('Could not create Express Pay order. Error: "%s"', $result->errors[0]->message);
             } else {
                 $exceptionMessage = Mage::helper('core')
                     ->__('Could not create Express Pay order. Error: "%s"', $result->errors[0]);
@@ -157,12 +154,9 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::put($uri, $websiteId, $expressPayData);
 
         if (property_exists($result, 'errors') && count($result->errors) > 0) {
-            if (is_array($result->errors[0])) {
+            if (is_object($result->errors[0])) {
                 $exceptionMessage = Mage::helper('core')
-                    ->__(
-                        'Could not update Express Pay order. Errors: "%s"',
-                        implode(', ', array_column($result->errors, 'message'))
-                    );
+                    ->__('Could not update Express Pay order. Error: "%s"', $result->errors[0]->message);
             } else {
                 $exceptionMessage = Mage::helper('core')
                     ->__('Could not update Express Pay order. Error: "%s"', $result->errors[0]);
