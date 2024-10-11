@@ -44,7 +44,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('quote/quote')->load($quoteId);
+        $quote = Mage::getModel('sales/quote')->load($quoteId);
 
         if ($quote->getId() === null) {
             $this->getResponse()
@@ -140,7 +140,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('quote/quote')->load($quoteId);
+        $quote = Mage::getModel('sales/quote')->load($quoteId);
 
         if ($quote->getId() === null) {
             $this->getResponse()
