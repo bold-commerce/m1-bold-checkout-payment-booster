@@ -13,6 +13,8 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
+        $this->parseRawJsonRequestData();
+
         if (!$this->_validateFormKey()) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
@@ -107,6 +109,8 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
+        $this->parseRawJsonRequestData();
+
         if (!$this->_validateFormKey()) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
@@ -188,5 +192,17 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
 
         $this->getResponse()
             ->setHttpResponseCode(201);
+    }
+
+    /**
+     * @return void
+     */
+    private function parseRawJsonRequestData()
+    {
+        if ($this->getRequest()->getHeader('Content-Type') !== 'application/json') {
+            return;
+        }
+
+        $_POST = json_decode(file_get_contents('php://input'), true);
     }
 }
