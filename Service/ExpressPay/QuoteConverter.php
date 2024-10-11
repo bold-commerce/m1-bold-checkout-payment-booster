@@ -92,7 +92,12 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
     {
         $shippingAddress = $quote->getShippingAddress();
 
-        if ($quote->getIsVirtual()) {
+        if (
+            $quote->getIsVirtual()
+            || $shippingAddress->getCity() === null
+            || $shippingAddress->getRegion() === null
+            || $shippingAddress->getCountryId() === null
+        ) {
             return [];
         }
 
