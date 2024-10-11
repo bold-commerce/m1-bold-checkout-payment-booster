@@ -67,7 +67,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
     {
         $billingAddress = $quote->getBillingAddress();
 
-        if ($billingAddress->getId() === null) {
+        if ($billingAddress->getFirstname() === null || $billingAddress->getLastname() === null) {
             return [];
         }
 
