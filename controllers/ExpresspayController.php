@@ -76,7 +76,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        if (!property_exists($result, 'body') || count($result->body) === 0) {
+        if (!property_exists($result, 'data') || !property_exists($result->data, 'order_id')) {
             $this->getResponse()
                 ->setHttpResponseCode(500)
                 ->setBody(
@@ -92,7 +92,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         $this->getResponse()
-            ->setBody(json_encode(['order_id' => $result['data']['order_id']]));
+            ->setBody(json_encode(['order_id' => $result->data->order_id]));
     }
 
     /**
@@ -165,21 +165,6 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             $this->getResponse()
                 ->setHttpResponseCode(500)
                 ->setBody(json_encode(['error' => $exceptionMessage]));
-
-            return;
-        }
-
-        if (!property_exists($result, 'body') || count($result->body) === 0) {
-            $this->getResponse()
-                ->setHttpResponseCode(500)
-                ->setBody(
-                    json_encode(
-                        [
-                            'error' => Mage::helper('core')
-                                ->__('An unknown error occurred while updating the Express Pay order.')
-                        ]
-                    )
-                );
 
             return;
         }
