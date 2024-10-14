@@ -365,7 +365,7 @@
                 };
             }
             const paymentTokenResponse = this.fastlaneCardComponent
-                ? await this.fastlaneCardComponent.getPaymentToken(billingAddress)
+                ? await this.fastlaneCardComponent.getPaymentToken({billingAddress: billingAddress})
                 : await this.fastlanePaymentComponent.getPaymentToken();
             window.bold.baseInstance.updateBillingAddressFormValues(paymentTokenResponse.paymentSource.card.billingAddress);
             const cartData = await window.bold.baseInstance.getCartData();
