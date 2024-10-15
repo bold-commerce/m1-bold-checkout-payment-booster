@@ -350,22 +350,20 @@
             let billingAddress = this.getBillingAddress();
             if (window.bold.baseInstance.gatewayData.type === 'ppcp') {
                 billingAddress = {
-                    billingAddress: {
-                        'firstName': billingAddress.firstName,
-                        'lastName': billingAddress.lastName,
-                        'company': billingAddress.company,
-                        'phoneNumber': billingAddress.phoneNumber,
-                        'addressLine1': billingAddress.streetAddress,
-                        'addressLine2': billingAddress.extendedAddress,
-                        'adminArea2': billingAddress.locality,
-                        'adminArea1': billingAddress.region,
-                        'postalCode': billingAddress.postalCode,
-                        'countryCode': billingAddress.countryCodeAlpha2,
-                    }
+                    'firstName': billingAddress.firstName,
+                    'lastName': billingAddress.lastName,
+                    'company': billingAddress.company,
+                    'phoneNumber': billingAddress.phoneNumber,
+                    'addressLine1': billingAddress.streetAddress,
+                    'addressLine2': billingAddress.extendedAddress,
+                    'adminArea2': billingAddress.locality,
+                    'adminArea1': billingAddress.region,
+                    'postalCode': billingAddress.postalCode,
+                    'countryCode': billingAddress.countryCodeAlpha2,
                 };
             }
             const paymentTokenResponse = this.fastlaneCardComponent
-                ? await this.fastlaneCardComponent.getPaymentToken(billingAddress)
+                ? await this.fastlaneCardComponent.getPaymentToken({billingAddress: billingAddress})
                 : await this.fastlanePaymentComponent.getPaymentToken();
             window.bold.baseInstance.updateBillingAddressFormValues(paymentTokenResponse.paymentSource.card.billingAddress);
             const cartData = await window.bold.baseInstance.getCartData();
