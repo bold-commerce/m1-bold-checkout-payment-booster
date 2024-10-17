@@ -119,7 +119,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ];
         }
 
-        if ($shippingAddress->hasShippingMethod()) {
+        if ($includeAddress && $hasRequiredAddressData && $shippingAddress->hasShippingMethod()) {
             $convertedQuote['order_data']['selected_shipping_option'] = [
                 'id' => $shippingAddress->getShippingMethod(),
                 'label' => $shippingAddress->getShippingDescription(),
