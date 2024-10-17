@@ -92,12 +92,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
     {
         $shippingAddress = $quote->getShippingAddress();
 
-        if (
-            $quote->getIsVirtual()
-            || $shippingAddress->getCity() === null
-            || $shippingAddress->getRegion() === null
-            || $shippingAddress->getCountryId() === null
-        ) {
+        if ($quote->getIsVirtual()) {
             return [];
         }
 
@@ -109,8 +104,10 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ]
         ];
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getRegion() !== null
+            && $shippingAddress->getCountryId() !== null;
 
-        if ($includeAddress) {
+        if ($includeAddress && $hasRequiredAddressData) {
             $streetAddress = $shippingAddress->getStreet();
             $convertedQuote['order_data']['shipping_address'] = [
                 'address_line_1' => isset($streetAddress[0]) ? $streetAddress[0] : '',
