@@ -160,7 +160,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::put($uri, $websiteId, $expressPayData);
 
-        if (property_exists($result, 'errors') && count($result->errors) > 0) {
+        if (is_object($result) && property_exists($result, 'errors') && count($result->errors) > 0) {
             if (is_object($result->errors[0])) {
                 $exceptionMessage = Mage::helper('core')
                     ->__('Could not update Express Pay order. Error: "%s"', $result->errors[0]->message);
