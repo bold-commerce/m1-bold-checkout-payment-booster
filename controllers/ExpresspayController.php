@@ -62,6 +62,9 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $uri = '/checkout/orders/{{shopId}}/wallet_pay';
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
         $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
+
+        $this->removePlaceholderData($expressPayData);
+
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post($uri, $websiteId, $expressPayData);
 
         if (property_exists($result, 'errors') && count($result->errors) > 0) {
@@ -158,6 +161,9 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $uri = '/checkout/orders/{{shopId}}/wallet_pay';
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
         $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
+
+        $this->removePlaceholderData($expressPayData);
+
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::put($uri, $websiteId, $expressPayData);
 
         if (is_object($result) && property_exists($result, 'errors') && count($result->errors) > 0) {
@@ -190,5 +196,19 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         $_POST = json_decode(file_get_contents('php://input'), true);
+    }
+
+    private function removePlaceholderData(&$expressPayData)
+    {
+        if (
+            array_key_exists('shipping_address', $expressPayData['order_data'])
+            && array_key_exists('address_line_1', $expressPayData['order_data']['shipping_address'])
+            && $expressPayData['order_data']['shipping_address']['address_line_1'] === '0 Unprovided St'
+        ) {
+            unset(
+                $expressPayData['order_data']['shipping_address']['address_line_1'],
+                $expressPayData['order_data']['shipping_address']['address_line_2']
+            );
+        }
     }
 }
