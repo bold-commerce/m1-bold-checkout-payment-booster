@@ -18,6 +18,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         if (!$this->_validateFormKey()) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
+                ->setHeader('Content-Type', 'application/json')
                 ->setBody(json_encode(['error' => Mage::helper('core')->__('Invalid form key.')]));
 
             return;
@@ -28,6 +29,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         if ($quoteId === null) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
+                ->setHeader('Content-Type', 'application/json')
                 ->setBody(json_encode(['error' => Mage::helper('core')->__('Please provide a quote ID.')]));
 
             return;
@@ -38,6 +40,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         if ($gatewayId === null) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
+                ->setHeader('Content-Type', 'application/json')
                 ->setBody(json_encode(['error' => Mage::helper('core')->__('Please provide a gateway ID.')]));
 
             return;
@@ -49,6 +52,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         if ($quote->getId() === null) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
+                ->setHeader('Content-Type', 'application/json')
                 ->setBody(json_encode(['error' => Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId)]));
 
             return;
@@ -71,6 +75,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
 
            $this->getResponse()
                ->setHttpResponseCode(500)
+               ->setHeader('Content-Type', 'application/json')
                ->setBody(json_encode(['error' => $exceptionMessage]));
 
             return;
@@ -79,6 +84,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         if (!property_exists($result, 'data') || !property_exists($result->data, 'order_id')) {
             $this->getResponse()
                 ->setHttpResponseCode(500)
+                ->setHeader('Content-Type', 'application/json')
                 ->setBody(
                     json_encode(
                         [
@@ -92,6 +98,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         $this->getResponse()
+            ->setHeader('Content-Type', 'application/json')
             ->setBody(json_encode(['order_id' => $result->data->order_id]));
     }
 
