@@ -177,7 +177,7 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         $this->getResponse()
-            ->setHttpResponseCode(201);
+            ->setHttpResponseCode(204);
     }
 
     /**
