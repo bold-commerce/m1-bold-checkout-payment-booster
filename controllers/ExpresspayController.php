@@ -189,6 +189,87 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
     /**
      * @return void
      */
+    public function getOrderAction()
+    {
+        if (!$this->getRequest()->isPost() || !$this->getRequest()->isAjax()) {
+            $this->_forward('noroute');
+
+            return;
+        }
+
+        $this->parseRawJsonRequestData();
+
+        if (!$this->_validateFormKey()) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setBody(json_encode(['error' => Mage::helper('core')->__('Invalid form key.')]));
+
+            return;
+        }
+
+        $orderId = $this->getRequest()->getParam('order_id');
+
+        if ($orderId === null) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setBody(json_encode(['error' => Mage::helper('core')->__('Please provide an order ID.')]));
+
+            return;
+        }
+
+        $gatewayId = $this->getRequest()->getParam('gateway_id');
+
+        if ($gatewayId === null) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setBody(json_encode(['error' => Mage::helper('core')->__('Please provide a gateway ID.')]));
+
+            return;
+        }
+
+        $uri = "/checkout/orders/{{shopId}}/wallet_pay/$orderId?gateway_id=$gatewayId";
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::get($uri, Mage::app()->getStore()->getWebsiteId());
+
+        if (property_exists($result, 'errors') && count($result->errors) > 0) {
+            if (is_object($result->errors[0])) {
+                $exceptionMessage = Mage::helper('core')
+                    ->__('Could not retrieve Express Pay order. Error: "%s"', $result->errors[0]->message);
+            } else {
+                $exceptionMessage = Mage::helper('core')
+                    ->__('Could not retrieve Express Pay order. Error: "%s"', $result->errors[0]);
+            }
+
+            $this->getResponse()
+                ->setHttpResponseCode(500)
+                ->setBody(json_encode(['error' => $exceptionMessage]));
+
+            return;
+        }
+
+        if (!property_exists($result, 'data')) {
+            $this->getResponse()
+                ->setHttpResponseCode(500)
+                ->setHeader('Content-Type', 'application/json')
+                ->setBody(
+                    json_encode(
+                        [
+                            'error' => Mage::helper('core')
+                                ->__('An unknown error occurred while retrieving the Express Pay order.')
+                        ]
+                    )
+                );
+
+            return;
+        }
+
+        $this->getResponse()
+            ->setHeader('Content-Type', 'application/json')
+            ->setBody(json_encode($result->data));
+    }
+
+    /**
+     * @return void
+     */
     private function parseRawJsonRequestData()
     {
         if ($this->getRequest()->getHeader('Content-Type') !== 'application/json') {
