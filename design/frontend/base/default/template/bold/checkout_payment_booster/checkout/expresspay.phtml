@@ -1,0 +1,39 @@
+<?php
+
+/** @var Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay $this */
+
+if (!$this->isEnabled()):
+    return;
+endif;
+
+$quote = $this->getQuote();
+?>
+<section id="express-pay-container">
+    <header class="page-title">
+        <h1><?php echo $this->__('Express Checkout') ?></h1>
+    </header>
+</section>
+
+<script type="text/javascript">
+    const expressPayConfig = {
+        epsApiUrl: '<?php echo $this->escapeUrl($this->getEpsApiUrl()) ?>',
+        epsStaticApiUrl: '<?php echo $this->escapeUrl($this->getEpsStaticApiUrl()) ?>',
+        shopDomain: '<?php echo $this->jsQuoteEscape($this->getShopDomain()) ?>',
+        currency: '<?php echo $this->jsQuoteEscape($quote->getQuoteCurrencyCode()) ?>',
+        quoteId: '<?php echo $this->jsQuoteEscape($quote->getEntityId()) ?>',
+        boldCheckoutData: <?php echo json_encode($this->getBoldCheckoutData()) ?>,
+        formKey: '<?php echo $this->getFormKey() ?>',
+        regions: <?php echo $this->getRegionsAsJson() ?>,
+        saveShippingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShipping')) ?>',
+        saveShippingMethodUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShippingMethod')) ?>',
+        saveBillingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveBilling')) ?>',
+        savePaymentUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/savePayment')) ?>',
+        saveOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveOrder')) ?>',
+        successUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/success')) ?>',
+        createOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/createOrder')) ?>',
+        updateOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/updateOrder')) ?>',
+        getOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/getOrder')) ?>',
+    };
+
+    ExpressPay(expressPayConfig).then(async expressPay => await expressPay.render());
+</script>
