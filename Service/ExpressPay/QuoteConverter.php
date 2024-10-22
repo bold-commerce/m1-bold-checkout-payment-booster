@@ -166,6 +166,8 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             );
         }
 
+        $convertedQuote['order_data'] = array_filter($convertedQuote['order_data']);
+
         return $convertedQuote;
     }
 
