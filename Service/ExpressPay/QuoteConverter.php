@@ -38,7 +38,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
     public function convertGatewayIdentifier($gatewayId)
     {
         return [
-            'gateway_id' => $gatewayId
+            'gateway_id' => (string)$gatewayId
         ];
     }
 
