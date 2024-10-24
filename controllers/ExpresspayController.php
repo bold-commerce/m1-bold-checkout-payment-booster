@@ -175,6 +175,33 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
 
         $this->removePlaceholderData($expressPayData);
 
+        $getExpressPayOrderUri = "/checkout/orders/{{shopId}}/wallet_pay/$orderId?gateway_id=$gatewayId";
+
+        try {
+            $getExpressPayOrderResult = Bold_CheckoutPaymentBooster_Service_BoldClient::get(
+                $getExpressPayOrderUri,
+                Mage::app()->getStore()->getWebsiteId()
+            );
+        } catch (Mage_Core_Exception $exception) {
+            $getExpressPayOrderResult = new stdClass();
+        }
+
+        if (property_exists($getExpressPayOrderResult, 'data')) {
+            $expressPayOrder = $getExpressPayOrderResult->data;
+        }
+
+        $expressPayOrderShipping = property_exists($expressPayOrder, 'shipping_address')
+            ? $expressPayOrder->shipping_address
+            : new stdClass();
+        $hasShippingData = property_exists($expressPayOrderShipping, 'country')
+            && !empty($expressPayOrderShipping->country)
+            && property_exists($expressPayOrderShipping, 'city')
+            && !empty($expressPayOrderShipping->city);
+
+        if (!$hasShippingData) {
+            unset($expressPayData['order_data']['shipping_address']);
+        }
+
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::patch($uri, $websiteId, $expressPayData);
 
         if (is_object($result) && property_exists($result, 'errors') && count($result->errors) > 0) {
