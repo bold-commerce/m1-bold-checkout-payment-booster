@@ -147,6 +147,16 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
+        $orderId = $this->getRequest()->getParam('order_id');
+
+        if ($orderId === null) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setBody(json_encode(['error' => Mage::helper('core')->__('Please provide an order ID.')]));
+
+            return;
+        }
+
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('sales/quote')->load($quoteId);
 
@@ -159,13 +169,13 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         }
 
         $websiteId = $quote->getStore()->getWebsiteId();
-        $uri = '/checkout/orders/{{shopId}}/wallet_pay';
+        $uri = "/checkout/orders/{{shopId}}/wallet_pay/$orderId";
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
         $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
 
         $this->removePlaceholderData($expressPayData);
 
-        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::put($uri, $websiteId, $expressPayData);
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::patch($uri, $websiteId, $expressPayData);
 
         if (is_object($result) && property_exists($result, 'errors') && count($result->errors) > 0) {
             if (is_object($result->errors[0]) && property_exists($result->errors[0], 'message')) {
