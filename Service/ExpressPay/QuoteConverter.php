@@ -96,6 +96,14 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             return [];
         }
 
+        if (!$this->areTotalsCollected) {
+            $shippingAddress->setCollectShippingRates(true);
+
+            $quote->collectTotals();
+
+            $this->areTotalsCollected = true;
+        }
+
         $convertedQuote = [
             'order_data' => [
                 'shipping_address' => [],
@@ -130,9 +138,6 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 ],
             ];
         }
-
-        $shippingAddress->setCollectShippingRates(true);
-        $shippingAddress->collectShippingRates();
 
         $usedRateCodes = [];
         /** @var Mage_Sales_Model_Quote_Address_Rate[] $shippingRates */
