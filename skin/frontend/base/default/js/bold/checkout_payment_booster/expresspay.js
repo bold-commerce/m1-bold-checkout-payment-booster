@@ -10,6 +10,7 @@ const ExpressPay = async config => (async config => {
         'shopDomain',
         'currency',
         'quoteId',
+        'quoteTotals',
         'boldCheckoutData',
         'formKey',
         'regions',
@@ -22,6 +23,7 @@ const ExpressPay = async config => (async config => {
         shopDomain: '',
         currency: '',
         quoteId: 0,
+        quoteTotals: {},
         boldCheckoutData: {},
         formKey: '',
         regions: {},
@@ -189,6 +191,39 @@ const ExpressPay = async config => (async config => {
 
         return shippingMethods;
     };
+
+    /**
+     * @param {Object} requirements
+     * @returns {Object}
+     * @throws Error
+     */
+    const getRequiredOrderData = requirements => {
+        const requiredOrderData = {};
+
+        for (const requirement of requirements) {
+            switch (requirement) {
+                case 'totals':
+                    requiredOrderData[requirement] = {
+                        order_total: config.quoteTotals.grand_total?.value ?? 0,
+                        order_balance: config.quoteTotals.grand_total?.value ?? 0,
+                        shipping_total: config.quoteTotals.shipping?.value ?? 0,
+                        discounts_total: config.quoteTotals.discount?.value ?? 0,
+                        taxes_total: config.quoteTotals.tax?.value ?? 0
+                    };
+
+                    break;
+                case 'customer':
+                case 'items':
+                case 'billing_address':
+                case 'shipping_address':
+                case 'shipping_options':
+                default:
+                    throw new Error(`Requirement ${requirement} not implemented`);
+            }
+        }
+
+        return requiredOrderData;
+    }
 
     /**
      * @param {String} gatewayId
@@ -594,6 +629,14 @@ const ExpressPay = async config => (async config => {
                 }
             ],
             callbacks: {
+                /**
+                 * @param {Object} requirements
+                 * @returns {Object}
+                 * @throws Error
+                 */
+                onRequireOrderData: requirements => {
+                    return getRequiredOrderData(requirements);
+                },
                 /**
                  * @param {String} paymentType
                  * @param {Object} paymentPayload

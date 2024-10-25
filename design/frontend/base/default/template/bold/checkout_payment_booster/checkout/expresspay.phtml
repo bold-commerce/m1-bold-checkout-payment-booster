@@ -21,6 +21,7 @@ $quote = $this->getQuote();
         shopDomain: '<?php echo $this->jsQuoteEscape($this->getShopDomain()) ?>',
         currency: '<?php echo $this->jsQuoteEscape($quote->getQuoteCurrencyCode()) ?>',
         quoteId: '<?php echo $this->jsQuoteEscape($quote->getEntityId()) ?>',
+        quoteTotals: <?php echo json_encode($this->getQuoteTotals()) ?>,
         boldCheckoutData: <?php echo json_encode($this->getBoldCheckoutData()) ?>,
         formKey: '<?php echo $this->getFormKey() ?>',
         regions: <?php echo $this->getRegionsAsJson() ?>,

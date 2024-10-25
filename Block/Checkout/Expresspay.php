@@ -61,6 +61,31 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         return $checkoutSession->getQuote();
     }
 
+    public function getQuoteTotals()
+    {
+        $quote = $this->getQuote();
+
+        if ($quote === null) {
+            return [];
+        }
+
+        $totals = array_map(
+            static function (Mage_Sales_Model_Quote_Address_Total $total) {
+                return [
+                    'code' => $total->getCode(),
+                    'value' => number_format((float)$total->getValue(), 2)
+                ];
+            },
+            $quote->getTotals()
+        );
+        $totals['discount'] = [
+            'code' => 'discount',
+            'value' => number_format((float)($quote->getSubtotal() - $quote->getSubtotalWithDiscount()), 2)
+        ];
+
+        return $totals;
+    }
+
     /**
      * @return stdClass|null
      */
