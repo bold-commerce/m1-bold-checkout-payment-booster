@@ -154,7 +154,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             }
         ); // Work-around for Magento bug causing duplicated shipping rates
 
-        if (count($shippingRates) > 0) {
+        if ($hasRequiredAddressData && count($shippingRates) > 0) {
             $convertedQuote['order_data']['shipping_options'] = array_map(
                 static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode) {
                     return [
