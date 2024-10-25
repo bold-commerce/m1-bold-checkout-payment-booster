@@ -88,7 +88,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
      * @return array
      * @phpstan-return array<string, array<string, array<array<string, array<string, string>|string>|string>>>
      */
-    public function convertShippingInformation(Mage_Sales_Model_Quote $quote, $includeAddress = true)
+    public function convertShippingInformation(Mage_Sales_Model_Quote $quote)
     {
         $shippingAddress = $quote->getShippingAddress();
 
@@ -115,7 +115,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getRegion() !== null
             && $shippingAddress->getCountryId() !== null;
 
-        if ($includeAddress && $hasRequiredAddressData) {
+        if ($hasRequiredAddressData) {
             $streetAddress = $shippingAddress->getStreet();
             $convertedQuote['order_data']['shipping_address'] = [
                 'address_line_1' => isset($streetAddress[0]) ? $streetAddress[0] : '',
@@ -127,7 +127,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ];
         }
 
-        if ($includeAddress && $hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
+        if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
             $convertedQuote['order_data']['selected_shipping_option'] = [
                 'id' => $shippingAddress->getShippingMethod(),
                 'label' => $shippingAddress->getShippingDescription(),
