@@ -684,6 +684,11 @@ const ExpressPay = async config => (async config => {
                         convertExpressPayAddress(expressPayOrder, expressPayOrder.billing_address)
                     );
                     await placeMagentoOrder(paymentPayload.payment_data.order_id);
+                },
+                onErrorPaymentOrder: errors => {
+                    console.error('An unexpected error occurred while processing the Express Pay order.', errors);
+
+                    alert('An unexpected error occurred. Please try again.');
                 }
             }
         };
