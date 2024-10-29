@@ -61,6 +61,9 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         return $checkoutSession->getQuote();
     }
 
+    /**
+     * @return string[][]
+     */
     public function getQuoteTotals()
     {
         $quote = $this->getQuote();
