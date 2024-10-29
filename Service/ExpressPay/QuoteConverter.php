@@ -183,7 +183,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
      */
     public function convertQuoteItems(Mage_Sales_Model_Quote $quote)
     {
-        $quoteItems = $quote->getAllItems();
+        $quoteItems = $quote->getAllVisibleItems();
 
         if (count($quoteItems) === 0) {
             return [];
@@ -280,7 +280,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
 
         if ($quote->getIsVirtual()) {
             /** @var Mage_Sales_Model_Quote_Item[] $quoteItems */
-            $quoteItems = $quote->getAllItems();
+            $quoteItems = $quote->getAllVisibleItems();
             $convertedQuote['order_data']['tax_total']['value'] = number_format(
                 array_sum(
                     array_map(
