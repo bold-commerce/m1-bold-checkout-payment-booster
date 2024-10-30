@@ -614,7 +614,9 @@ const ExpressPay = async config => (async config => {
     const initializePaymentsSdk = async () => {
         let sdkConfiguration;
 
-        await loadScript(config.epsStaticApiUrl + '/js/payments_sdk.js');
+        if (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
+            await loadScript(config.epsStaticApiUrl + '/js/payments_sdk.js');
+        }
 
         sdkConfiguration = {
             eps_url: config.epsApiUrl,
