@@ -98,6 +98,10 @@
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>saveShopInfo</method>
                     </save_shop_info>
+                    <add_domain_to_cors_allow_list>
+                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
+                        <method>addDomainToCorsAllowList</method>
+                    </add_domain_to_cors_allow_list>
                     <set_rsa_config>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
                         <method>setRsaConfig</method>

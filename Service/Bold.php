@@ -13,12 +13,23 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      */
     public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
     {
-        self::clearBoldCheckoutData();
         if (!self::isAvailable()) {
             return;
         }
-        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::getFlowIdForCheckout($quote);
-        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
+        if (self::getPublicOrderId()) {
+            $orderData = Bold_CheckoutPaymentBooster_Service_Order_Resume::resumeOrder(
+                $quote,
+                self::getPublicOrderId()
+            );
+            if ($orderData) {
+                $checkoutData = self::getBoldCheckoutData();
+                $checkoutData->jwt_token = $orderData->jwt_token;
+                $checkoutSession = Mage::getSingleton('checkout/session');
+                $checkoutSession->setBoldCheckoutData($checkoutData);
+                return;
+            }
+        }
+        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);

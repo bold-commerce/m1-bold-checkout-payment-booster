@@ -5,7 +5,6 @@ $installer = $this;
 $installer->startSetup();
 
 $orderTableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
-$quoteTableName = $installer->getTable(Bold_CheckoutPaymentBooster_Model_Quote::RESOURCE);
 
 $createOrderTableSql = <<<SQL
 CREATE TABLE IF NOT EXISTS `{$orderTableName}` (
@@ -21,19 +20,6 @@ CREATE TABLE IF NOT EXISTS `{$orderTableName}` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Bold Order Data';
 SQL;
 
-$createQuoteTableSql = <<<SQL
-CREATE TABLE IF NOT EXISTS `{$quoteTableName}` (
-    `entity_id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'Entity ID',
-    `quote_id` INT UNSIGNED COMMENT 'Magento Quote ID',
-    `public_id` VARCHAR(255) NOT NULL COMMENT 'Bold Order Public ID',
-    `flow_settings` TEXT COMMENT 'Serialized Bold Flow Settings',
-    PRIMARY KEY (`entity_id`),
-    INDEX `IDX_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_ORDER_ID` (`quote_id`),
-    CONSTRAINT FOREIGN KEY (`quote_id`) REFERENCES `{$installer->getTable('sales/quote')}` (`entity_id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='Bold Quote Data';
-SQL;
-
 $installer->run($createOrderTableSql);
-$installer->run($createQuoteTableSql);
 
 $installer->endSetup();

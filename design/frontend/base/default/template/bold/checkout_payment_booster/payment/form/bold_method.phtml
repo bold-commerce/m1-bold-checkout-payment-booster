@@ -11,249 +11,64 @@
     /**
      * Bold order data sync class.
      */
-    let Bold = Class.create({
+    let BoldPaymentMethod = Class.create({
         paymentMethodElement: document.getElementById('p_method_bold').parentNode,
         paymentContainer: document.getElementById('bold-payments-container'),
         paymentCheckbox: document.getElementById('p_method_bold'),
         isAvailable: <?php echo $this->isAvailable(); ?>,
-        groupLabel: '<?php echo $this->getGroupLabel() ?>',
-        boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
-        jwtToken: '<?php echo $this->getJwtToken(); ?>',
-        epsAuthToken: '<?php echo $this->getEpsAuthToken(); ?>',
-        epsUrl: '<?php echo $this->getEpsUrl(); ?>',
-        epsStaticUrl: '<?php echo $this->getEpsStaticUrl(); ?>',
-        epsGatewayId: '<?php echo $this->getEpsGatewayId(); ?>',
-        quoteCurrencyCode: '<?php echo $this->getQuoteCurrencyCode(); ?>',
+        isFastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
         paymentId: null,
-        orderDataFieldMapper: {
-            'address_id': 'billing-address-select',
-            'firstname': 'billing:firstname',
-            'email': 'billing:email',
-            'lastname': 'billing:lastname',
-            'company': 'billing:company',
-            'telephone': 'billing:telephone',
-            'street1': 'billing:street1',
-            'street2': 'billing:street2',
-            'city': 'billing:city',
-            'region_id': 'billing:region_id',
-            'country_id': 'billing:country_id',
-            'postcode': 'billing:postcode'
-        },
-        requiredFields: [
-            'email',
-            'firstname',
-            'lastname',
-            'street1',
-            'postcode',
-            'city',
-            'country_id',
-            'telephone'
-        ],
-        orderPayload: {
-            'address_id': '<?php echo $this->getAddressId() ?>',
-            'email': '<?php echo $this->getCustomerEmail() ?>',
-            'firstname': '<?php echo $this->getFirstName() ?>',
-            'lastname': '<?php echo $this->getLastName() ?>',
-            'company': '<?php echo $this->getCompany() ?>',
-            'telephone': '<?php echo $this->getTelephone() ?>',
-            'street1': '<?php echo $this->getStreet1() ?>',
-            'street2': '<?php echo $this->getStreet2() ?>',
-            'city': '<?php echo $this->getCity() ?>',
-            'region_id': '<?php echo $this->getRegionId() ?>',
-            'country_id': '<?php echo $this->getCountryId() ?>',
-            'postcode': '<?php echo $this->getPostcode() ?>',
-        },
-        shippingAddressFieldsMap: {
-            'firstname': 'shipping:firstname',
-            'lastname': 'shipping:lastname',
-            'company': 'shipping:company',
-            'telephone': 'shipping:telephone',
-            'street1': 'shipping:street1',
-            'street2': 'shipping:street2',
-            'city': 'shipping:city',
-            'region_id': 'shipping:region_id',
-            'country_id': 'shipping:country_id',
-            'postcode': 'shipping:postcode'
-        },
         /**
          * Initialize class.
          *
          * @returns {*|boolean}
          */
-        initialize: function () {
-            if (!window.bold) {
-                window.bold = {
-                    orderData: {}
-                };
-            }
-            this.showPaymentMethod();
-            this.hydrateOrderData();
-            this.subscribeToFieldsChanges();
+        initialize: async function () {
             if (!this.isAvailable) {
                 this.hidePaymentMethod();
                 return;
             }
-            this.initPaymentForm();
+            await this.waitForBaseInstance();
+            await this.renderPaymentForm();
             this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
         },
         /**
-         * Load SPI SDK.
+         * Wait for base instance to be initialized.
          *
-         * @returns {Promise<void>}
+         * @return {Promise<unknown>}
          */
-        initPaymentForm: async function () {
-            await this.loadScript(this.epsStaticUrl + '/js/payments_sdk.js');
-            const initialData = {
-                'eps_url': this.epsUrl,
-                'eps_bucket_url': this.epsStaticUrl,
-                'group_label': this.groupLabel,
-                'trace_id': '<?php echo $this->getPublicOrderID(); ?>',
-                'payment_gateways': [
-                    {
-                        'gateway_id': Number(this.epsGatewayId),
-                        'auth_token': this.epsAuthToken,
-                        'currency': this.quoteCurrencyCode,
+        waitForBaseInstance: function () {
+            return new Promise((resolve) => {
+                const intervalId = setInterval(() => {
+                    if (typeof window.bold.baseInstance !== 'undefined') {
+                        clearInterval(intervalId);
+                        resolve();
                     }
-                ],
-                'callbacks': {
-                    'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
-                        if (paymentType !== 'ppcp') {
-                            return;
-                        }
-                        const walletPayResult = await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + this.jwtToken,
-                            },
-                            body: JSON.stringify(paymentPayload),
-                        });
-                        if (walletPayResult.ok) {
-                            const walletPayResultPayload = await walletPayResult.json();
-                            return walletPayResultPayload.data
-                        } else {
-                            throw 'Unable to create wallet pay order';
-                        }
-                    }.bind(this),
-                    'onUpdatePaymentOrder': async function () {
-                        // We won't handle updating an order from PayPal data, we will disable address changes etc
-                    }.bind(this),
-                    'onApprovePaymentOrder': async function (paymentType, paymentInformation, paymentPayload) {
-                        // A PayPal payment has been completed, we need to capture the payment ID and pass it through
-                        if (paymentType !== 'ppcp') {
-                            return;
-                        }
-
-                        if (!paymentInformation.payment_id) {
-                            console.error('No payment ID provided from PayPal.');
-                            return;
-                        }
-
-                        // Update the payment ID from PayPal
-                        this.paymentId = paymentInformation.payment_id;
-
-                        // Save the payment step to push the customer along
-                        payment.save();
-                    }.bind(this),
-                }
-            };
-            const boldPayments = new window.bold.Payments(initialData);
-            boldPayments.renderPayments('payment_form_bold');
-        },
-        /**
-         * Convert PPCP address to Magento address.
-         *
-         * @param {{}} ppcpAddress
-         * @return {{}}
-         */
-        convertPPCPAddressToMagentoAddress: function (ppcpAddress) {
-            return {
-                'firstname': ppcpAddress.first_name,
-                'lastname': ppcpAddress.last_name,
-                'street1': ppcpAddress.address_line_1,
-                'street2': ppcpAddress.address_line_2,
-                'city': ppcpAddress.city,
-                'postcode': ppcpAddress.postal_code,
-                'country_id': ppcpAddress.country_code,
-                'region': ppcpAddress.state,
-            };
-        },
-        /**
-         * Load specified script with attributes.
-         *
-         * @returns {Promise<void>}
-         */
-        loadScript: async function (src, attributes = {}) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = true;
-                script.onload = resolve;
-                script.onerror = reject;
-                if (attributes.constructor === Object) {
-                    Object.keys(attributes).forEach((key) => {
-                        script.setAttribute(key, attributes[key]);
-                    });
-                }
-                document.head.appendChild(script);
+                }, 100);
+                setTimeout(() => {
+                    clearInterval(intervalId);
+                    resolve();
+                }, 10000);
             });
         },
-
         /**
-         * Subscribe to fields changes for order hydration.
+         * Render payment form considering Fastlane.
          *
          * @returns {void}
          */
-        subscribeToFieldsChanges: function () {
-            Object.values(this.orderDataFieldMapper).each(function (selector) {
-                let field = $(selector);
-                if (field) {
-                    field.observe('change', () => {
-                        setTimeout(() => {
-                            this.hydrateOrderData();
-                        }, 500);
-                    });
+        renderPaymentForm: async function () {
+            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+            const boldPaymentsForm = document.getElementById('payment_form_bold');
+            if (this.isFastlaneAvailable) {
+                await paymentInstance.renderWalletPayments('payment_form_bold', {fastlane: 1});
+                if (boldPaymentsForm.getHTML().trim() === '') {
+                    this.hidePaymentMethod();
                 }
-            }.bind(this));
-        },
-        /**
-         * Update order data payload for order hydration call.
-         *
-         * @returns {void}
-         */
-        updateOrderDataPayload: function () {
-            Object.keys(this.orderDataFieldMapper).forEach(function (key) {
-                let field = this.orderDataFieldMapper[key];
-                if ($(field)) {
-                    this.orderPayload[key] = $(field).value;
-                }
-            }.bind(this));
-        },
-        /**
-         * Validate order data payload for hydration.
-         *
-         * @returns {boolean}
-         */
-        isPayloadValid: function () {
-            let isInvalid = this.requiredFields.some((field) => {
-                return !this.orderPayload[field];
-
-            });
-            if (isInvalid) {
-                return false;
+                return;
             }
-            let regionsRequired = window.billingRegionUpdater || {
-                config: {
-                    regions_required: []
-                }
-            };
-            let isRegionRequired = regionsRequired.config.regions_required.indexOf(this.orderPayload.country_id) !== -1;
-            if (isRegionRequired && !this.orderPayload.region_id) {
-                return false;
-            }
-            return !isInvalid;
+            await paymentInstance.renderPayments('payment_form_bold');
         },
         /**
          * Wait for checkout to initialize.
@@ -286,67 +101,6 @@
             setTimeout(() => {
                 clearInterval(intervalId);
             }, 10000);
-        },
-        /**
-         * Check if already hydrated payload differs from new one.
-         *
-         * @returns {boolean}
-         */
-        isPayloadChanged: function () {
-            if (!window.bold.orderData) {
-                return true;
-            }
-            let isChanged = false;
-            for (let [key, value] of Object.entries(this.orderPayload)) {
-                if (window.bold.orderData[key] !== value) {
-                    isChanged = true;
-                    break;
-                }
-            }
-            return isChanged;
-        },
-        /**
-         * Hydrate Bold order.
-         */
-        hydrateOrderData: function (force = false) {
-            if (Ajax.activeRequestCount > 0) {
-                this.hydrateOrderData.bind(this).delay(0.1);
-                return;
-            }
-            this.updateOrderDataPayload();
-            if (!this.isPayloadValid()) {
-                return;
-            }
-            if (!this.isPayloadChanged() && !force) {
-                return;
-            }
-            new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
-                method: 'post',
-                parameters: Object.assign(
-                    this.orderPayload,
-                    {
-                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'
-                    }
-                ),
-                onSuccess: function () {
-                    if (this.orderPayload.region_id) {
-                        const region = billingRegionUpdater.regions[this.orderPayload.country_id][this.orderPayload.region_id] || null;
-                        if (region) {
-                            this.orderPayload.region = region.code;
-                        }
-                    }
-                    window.bold.orderData = Object.assign({}, this.orderPayload);
-                }.bind(this),
-                onFailure: function () {
-                    this.hidePaymentMethod();
-                    if (window.boldFastlaneInstance) {
-                        window.boldFastlaneInstance.hidePaymentMethod();
-                    }
-                    checkout.setLoadWaiting(false);
-                    window.bold.orderData = {};
-                    console.error('Failed to sync order data');
-                }.bind(this),
-            });
         },
         /**
          * Wrap checkout save method to process order on Bold side first.
@@ -416,17 +170,12 @@
          */
         tokenize: async function () {
             const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
+            const cartData = await window.bold.baseInstance.getCartData();
             const payload = {
-                billing_address: {
-                    first_name: window.bold.orderData.firstname,
-                    last_name: window.bold.orderData.lastname,
-                    address_line_1: window.bold.orderData.street1,
-                    address_line_2: window.bold.orderData.street2,
-                    province_code: window.bold.orderData.region,
-                    city: window.bold.orderData.city,
-                    postal_code: window.bold.orderData.postcode,
-                    country_code: window.bold.orderData.country_id,
-                }
+                customer: cartData.customer,
+                billing_address: cartData.billing_address,
+                shipping_address: cartData.shipping_address || cartData.billing_address,
+                totals: cartData.totals,
             };
             iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
         },
@@ -459,10 +208,22 @@
                             console.error('Failed to tokenize');
                             checkout.setLoadWaiting(false);
                             break;
+                        case 'EVENT_SPI_PAYMENT_ORDER_SCA':
+                            checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_ENABLE_FULLSCREEN':
+                            checkout.setLoadWaiting(false);
+                            break;
+                        case 'EVENT_SPI_DISABLE_FULLSCREEN':
+                            checkout.setLoadWaiting('payment', true);
+                            break;
                     }
                 }
             });
         },
     });
-    const boldInstance = new Bold();
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+    window.bold.boldPaymentMethod = new BoldPaymentMethod();
 </script>

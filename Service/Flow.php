@@ -5,8 +5,7 @@
  */
 class Bold_CheckoutPaymentBooster_Service_Flow
 {
-    const DEFAULT_FLOW_ID = 'bold_booster_m1';
-    const FASTLANE_FLOW_ID = 'bold_booster_fastlane_m1';
+    const DEFAULT_FLOW_ID = 'bold-booster-m1';
     const STAGING_CONFIGURATION_GROUP = '/consumers/checkout-staging/configuration_group/{{shopDomain}}';
     const CONFIGURATION_GROUP = '/consumers/checkout/configuration_group/{{shopDomain}}';
 
@@ -92,24 +91,6 @@ class Bold_CheckoutPaymentBooster_Service_Flow
             $websiteId,
             $flowData
         );
-    }
-
-    /**
-     * Get Bold flow ID for given quote.
-     *
-     * @param Mage_Sales_Model_Quote $quote
-     * @return string
-     */
-    public static function getFlowIdForCheckout(Mage_Sales_Model_Quote $quote)
-    {
-        $websiteId = $quote->getStore()->getWebsiteId();
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $isFastlaneEnabled = $config->isFastlaneEnabled($websiteId);
-        if ($isFastlaneEnabled && !$quote->getCustomer()->getId()) {
-            return self::FASTLANE_FLOW_ID;
-        }
-        return self::DEFAULT_FLOW_ID;
     }
 
     /**
