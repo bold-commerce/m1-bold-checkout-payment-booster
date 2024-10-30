@@ -112,4 +112,13 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     {
         return Mage::helper('directory')->getRegionJsonByStore($this->getQuote()->getStoreId());
     }
+
+    /**
+     * @return bool
+     */
+    public function isFastlaneEnabled()
+    {
+        return Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE)
+            ->isFastlaneEnabled(Mage::app()->getStore()->getWebsiteId());
+    }
 }

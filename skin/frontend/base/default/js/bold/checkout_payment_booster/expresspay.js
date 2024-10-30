@@ -725,8 +725,13 @@ const ExpressPay = async config => (async config => {
         /**
          * @returns {Promise<void>}
          */
-        render: async () => {
-            await boldPayments.renderWalletPayments(config.paymentsContainer);
+        render: async isFastlaneEnabled => {
+            await boldPayments.renderWalletPayments(
+                config.paymentsContainer,
+                {
+                    fastlane: isFastlaneEnabled
+                }
+            );
         }
     };
 })(config);

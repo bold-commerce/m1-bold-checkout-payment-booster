@@ -36,5 +36,7 @@ $quote = $this->getQuote();
         getOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/getOrder')) ?>',
     };
 
-    ExpressPay(expressPayConfig).then(async expressPay => await expressPay.render());
+    ExpressPay(expressPayConfig).then(
+        async expressPay => await expressPay.render(<?php var_export($this->isFastlaneEnabled()) ?>)
+    );
 </script>
