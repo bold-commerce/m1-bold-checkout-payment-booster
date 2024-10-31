@@ -31,8 +31,35 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $post['street'] = $post['street2']
             ? $post['street1'] . "\n" . $post['street2']
             : $post['street1'];
-        $this->addAddressDataToQuote($quote, $post);
+        $this->addBillingAddressDataToQuote($quote, $post);
         Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+    }
+
+    public function updateCartAddressAction()
+    {
+        if (!$this->_validateFormKey()) {
+            return;
+        }
+        $post = $this->getRequest()->getPost();
+        unset($post['form_key']);
+        if (empty($post)) {
+            Mage::throwException('No data provided.');
+        }
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        if (!$quote->getId()) {
+            Mage::throwException('No quote found.');
+        }
+        $billingAddressData = isset($post['billing'])
+            ? Mage::helper('core')->jsonDecode($post['billing'])
+            : [];
+        $shippingAddressData = isset($post['shipping'])
+            ? Mage::helper('core')->jsonDecode($post['shipping'])
+            : [];
+        $billingAddressData = $billingAddressData ?: [];
+        $shippingAddressData = $shippingAddressData ?: [];
+        $this->addBillingAddressDataToQuote($quote, $billingAddressData);
+        $this->addShippingAddressDataToQuote($quote, $shippingAddressData);
+        $quote->collectTotals()->save();
     }
 
     /**
@@ -48,6 +75,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
         $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
+        $cartData['shipping_options'] = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::getShippingOptions($quote);
         $this->getResponse()->setBody(json_encode($cartData));
     }
 
@@ -55,12 +83,16 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      * Add post data to quote billing address.
      *
      * @param Mage_Sales_Model_Quote $quote
-     * @param array $post
+     * @param array $addressData
      * @return void
      */
-    private function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
+    private function addBillingAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $addressData = [])
     {
-        $quote->getBillingAddress()->addData($post)->save();
+        $addressData = $this->cleanUpAddressData($addressData);
+        if (!$addressData) {
+            return;
+        }
+        $quote->getBillingAddress()->addData($addressData)->save();
         if (!$quote->getCustomerEmail()) {
             $quote->setCustomerEmail($quote->getBillingAddress()->getEmail());
         }
@@ -70,5 +102,27 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         if (!$quote->getCustomerLastname()) {
             $quote->setCustomerLastname($quote->getBillingAddress()->getLastname());
         }
+    }
+
+    private function addShippingAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $addressData)
+    {
+        $addressData = $this->cleanUpAddressData($addressData);
+        if (!$addressData) {
+            return;
+        }
+        $quote->getShippingAddress()->addData($addressData)->save();
+    }
+
+    private function cleanUpAddressData(array $addressData)
+    {
+        foreach ($addressData as $key => $value) {
+            if ($value === null) {
+                unset($addressData[$key]);
+            }
+            if ($key === 'street' && is_array($value) && $value[0] === null) {
+                unset($addressData[$key]);
+            }
+        }
+        return $addressData;
     }
 }

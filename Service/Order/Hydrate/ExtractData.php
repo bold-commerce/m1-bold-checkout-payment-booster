@@ -57,6 +57,35 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
     }
 
     /**
+     * Retrieve shipping options.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @return array
+     */
+    public static function getShippingOptions(Mage_Sales_Model_Quote $quote)
+    {
+        $shippingAddress = $quote->getShippingAddress();
+        $shippingAddress->setCollectShippingRates(1);
+        $shippingAddress->collectShippingRates();
+        $shippingMethods = $shippingAddress->getGroupedAllShippingRates();
+        $shippingOptions = [];
+        foreach ($shippingMethods as $carrierCode => $methods) {
+            foreach ($methods as $method) {
+                $shippingOptions[] = [
+                    'carrier_code' => $carrierCode,
+                    'method_code' => $method->getMethod(),
+                    'carrier_title' => $method->getCarrierTitle(),
+                    'method_title' => $method->getMethodTitle(),
+                    'price' => self::convertToCents($method->getPrice()),
+                    'is_selected' => $method->getCode() === $shippingAddress->getShippingMethod(),
+                ];
+            }
+        }
+
+        return $shippingOptions;
+    }
+
+    /**
      * Retrieve customer data.
      *
      * @param Mage_Sales_Model_Quote $quote

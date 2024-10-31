@@ -365,7 +365,11 @@
             const paymentTokenResponse = this.fastlaneCardComponent
                 ? await this.fastlaneCardComponent.getPaymentToken({billingAddress: billingAddress})
                 : await this.fastlanePaymentComponent.getPaymentToken();
-            window.bold.baseInstance.updateBillingAddressFormValues(paymentTokenResponse.paymentSource.card.billingAddress);
+            const billingFormValues = window.bold.baseInstance.convertPayPalAddressToMagentoAddress(
+                paymentTokenResponse.paymentSource.card.billingAddress
+            );
+            window.bold.baseInstance.updateBillingAddressFormValues(billingFormValues);
+            await window.bold.baseInstance.hydrateOrderData();
             const cartData = await window.bold.baseInstance.getCartData();
             const tokenizeResponse = await fetch(this.epsUrl + '/' + this.groupLabel + '/tokenize', {
                 method: 'POST',

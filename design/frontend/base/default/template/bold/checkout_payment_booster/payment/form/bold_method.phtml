@@ -29,7 +29,7 @@
                 return;
             }
             await this.waitForBaseInstance();
-            await this.renderPaymentForm();
+            await this.renderPayments();
             this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
@@ -58,17 +58,27 @@
          *
          * @returns {void}
          */
-        renderPaymentForm: async function () {
-            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (this.isFastlaneAvailable) {
-                await paymentInstance.renderWalletPayments('payment_form_bold', {fastlane: 1});
-                if (boldPaymentsForm.getHTML().trim() === '') {
-                    this.hidePaymentMethod();
-                }
+        renderPayments: async function () {
+            const paymentsInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+            if (!this.isFastlaneAvailable) {
+                console.log('Rendering Payments');
+                await paymentsInstance.renderWalletPayments('payment_form_bold');
                 return;
             }
-            await paymentInstance.renderPayments('payment_form_bold');
+            try {
+                console.log('Rendering Wallet Payments');
+                await paymentsInstance.renderWalletPayments(
+                    'payment_form_bold',
+                    /*{
+                        fastlane: true,
+                        shouldRenderSpiFrame: false
+                    }*/
+                );
+            } catch (e) {
+                console.error('Failed to render Fastlane', e);
+                this.hidePaymentMethod();
+            }
+
         },
         /**
          * Wait for checkout to initialize.
