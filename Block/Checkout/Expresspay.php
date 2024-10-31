@@ -81,10 +81,6 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             },
             $quote->getTotals()
         );
-        $totals['discount'] = [
-            'code' => 'discount',
-            'value' => number_format((float)($quote->getSubtotal() - $quote->getSubtotalWithDiscount()), 2)
-        ];
 
         return $totals;
     }
