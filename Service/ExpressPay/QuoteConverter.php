@@ -309,13 +309,22 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
      */
     public function convertDiscount(Mage_Sales_Model_Quote $quote)
     {
+        if (!$this->areTotalsCollected) {
+            $quote->collectTotals();
+
+            $this->areTotalsCollected = true;
+        }
+
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        /** @var Mage_Sales_Model_Quote_Address_Total[] $quoteTotals */
+        $quoteTotals = $quote->getTotals();
+        $discount = array_key_exists('discount', $quoteTotals) ? abs($quoteTotals['discount']->getValue()) : 0;
 
         return [
             'order_data' => [
                 'discount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)($quote->getSubtotal() - $quote->getSubtotalWithDiscount()), 2)
+                    'value' => number_format((float)$discount, 2)
                 ]
             ]
         ];
@@ -336,7 +345,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         }
 
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
-        $excludedTotals = ['subtotal', 'shipping', 'tax', 'grand_total'];
+        $excludedTotals = ['subtotal', 'discount', 'shipping', 'tax', 'grand_total'];
         $customTotals = array_filter(
             $quote->getTotals(),
             static function (Mage_Sales_Model_Quote_Address_Total $total) use ($excludedTotals) {
