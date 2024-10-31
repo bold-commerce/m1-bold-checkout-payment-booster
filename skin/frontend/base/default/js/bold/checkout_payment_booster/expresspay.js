@@ -723,6 +723,7 @@ const ExpressPay = async config => (async config => {
 
     return {
         /**
+         * @param {Boolean} isFastlaneEnabled
          * @returns {Promise<void>}
          */
         render: async isFastlaneEnabled => {
