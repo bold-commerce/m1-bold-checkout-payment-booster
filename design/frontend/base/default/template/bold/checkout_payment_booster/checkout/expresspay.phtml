@@ -22,6 +22,7 @@ $quote = $this->getQuote();
         currency: '<?php echo $this->jsQuoteEscape($quote->getQuoteCurrencyCode()) ?>',
         quoteId: '<?php echo $this->jsQuoteEscape($quote->getEntityId()) ?>',
         quoteTotals: <?php echo json_encode($this->getQuoteTotals()) ?>,
+        quoteIsVirtual: <?php var_export($quote->getIsVirtual()) ?>,
         boldCheckoutData: <?php echo json_encode($this->getBoldCheckoutData()) ?>,
         formKey: '<?php echo $this->getFormKey() ?>',
         regions: <?php echo $this->getRegionsAsJson() ?>,

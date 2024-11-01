@@ -24,6 +24,7 @@ const ExpressPay = async config => (async config => {
         currency: '',
         quoteId: 0,
         quoteTotals: {},
+        quoteIsVirtual: false,
         boldCheckoutData: {},
         formKey: '',
         regions: {},
@@ -660,8 +661,11 @@ const ExpressPay = async config => (async config => {
                  * @returns {Promise<void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
-                    await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
-                    await updateMagentoShippingMethod(paymentPayload.payment_data.shipping_options);
+                    if (!config.quoteIsVirtual) {
+                        await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
+                        await updateMagentoShippingMethod(paymentPayload.payment_data.shipping_options);
+                    }
+
                     await updateExpressPayOrder(paymentPayload.gateway_id, paymentPayload.payment_data.order_id);
                 },
                 /**
@@ -677,10 +681,13 @@ const ExpressPay = async config => (async config => {
                         paymentPayload.gateway_id
                     );
 
-                    await updateMagentoAddress(
-                        'shipping',
-                        convertExpressPayAddress(expressPayOrder, expressPayOrder.shipping_address)
-                    );
+                    if (!config.quoteIsVirtual) {
+                        await updateMagentoAddress(
+                            'shipping',
+                            convertExpressPayAddress(expressPayOrder, expressPayOrder.shipping_address)
+                        );
+                    }
+
                     await updateMagentoAddress(
                         'billing',
                         convertExpressPayAddress(expressPayOrder, expressPayOrder.billing_address)
