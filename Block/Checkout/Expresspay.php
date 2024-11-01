@@ -76,7 +76,7 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             static function (Mage_Sales_Model_Quote_Address_Total $total) {
                 return [
                     'code' => $total->getCode(),
-                    'value' => number_format((float)$total->getValue(), 2)
+                    'value' => number_format((float)$total->getValue(), 2, '.', '')
                 ];
             },
             $quote->getTotals()
@@ -100,7 +100,7 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             static function (Mage_Sales_Model_Quote_Item $quoteItem) {
                 return [
                     'sku' => $quoteItem->getSku(),
-                    'price' => number_format((float)$quoteItem->getPrice(), 2),
+                    'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
                     'name' => $quoteItem->getName()
                 ];
             },

@@ -134,7 +134,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 'type' => 'SHIPPING',
                 'amount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)$shippingAddress->getShippingAmount(), 2)
+                    'value' => number_format((float)$shippingAddress->getShippingAmount(), 2, '.', '')
                 ],
             ];
         }
@@ -163,7 +163,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                         'type' => 'SHIPPING',
                         'amount' => [
                             'currency_code' => $currencyCode,
-                            'value' => number_format((float)$rate->getPrice(), 2)
+                            'value' => number_format((float)$rate->getPrice(), 2, '.', '')
                         ]
                     ];
                 },
@@ -199,7 +199,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                             'sku' => $quoteItem->getSku(),
                             'unit_amount' => [
                                 'currency_code' => $currencyCode,
-                                'value' => number_format((float)$quoteItem->getPrice(), 2)
+                                'value' => number_format((float)$quoteItem->getPrice(), 2, '.', '')
                             ],
                             'quantity' => (int)(ceil($quoteItem->getQty()) ?: $quoteItem->getQty()),
                             'is_shipping_required' => !in_array(
@@ -225,7 +225,9 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                                 $quoteItems
                             )
                         ),
-                        2
+                        2,
+                        '.',
+                        ''
                     )
                 ]
             ]
@@ -255,7 +257,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             'order_data' => [
                 'amount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)$quote->getGrandTotal(), 2)
+                    'value' => number_format((float)$quote->getGrandTotal(), 2, '.', '')
                 ]
             ]
         ];
@@ -290,12 +292,16 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                         $quoteItems
                     )
                 ),
-                2
+                2,
+                '.',
+                ''
             );
         } else {
             $convertedQuote['order_data']['tax_total']['value'] = number_format(
                 (float)($quote->getShippingAddress()->getTaxAmount() ?: 0.00),
-                2
+                2,
+                '.',
+                ''
             );
         }
 
@@ -324,7 +330,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             'order_data' => [
                 'discount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)$discount, 2)
+                    'value' => number_format((float)$discount, 2, '.', '')
                 ]
             ]
         ];
@@ -377,7 +383,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                         'sku' => $total->getCode() ?: '',
                         'unit_amount' => [
                             'currency_code' => $currencyCode ?: '',
-                            'value' => number_format((float)$value, 2)
+                            'value' => number_format((float)$value, 2, '.', '')
                         ],
                         'quantity' => 1,
                         'is_shipping_required' => false
@@ -394,7 +400,9 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         $convertedQuote['order_data']['items'] = array_merge($convertedQuote['order_data']['items'], $totalItems);
         $convertedQuote['order_data']['item_total']['value'] = number_format(
             ((float)$convertedQuote['order_data']['item_total']['value']) + $customTotalsValue,
-            2
+            2,
+            '.',
+            ''
         );
     }
 }

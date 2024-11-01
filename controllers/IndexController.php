@@ -63,7 +63,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
             static function (Mage_Sales_Model_Quote_Address_Total $total) {
                 return [
                     'code' => $total->getCode(),
-                    'value' => number_format((float)$total->getValue(), 2)
+                    'value' => number_format((float)$total->getValue(), 2, '.', '')
                 ];
             },
             $quote->getTotals()
