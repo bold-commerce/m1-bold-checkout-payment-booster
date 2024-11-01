@@ -86,6 +86,31 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     }
 
     /**
+     * @return string[][]
+     */
+    public function getQuoteItems()
+    {
+        $quote = $this->getQuote();
+
+        if ($quote === null) {
+            return [];
+        }
+
+        $quoteItems = array_map(
+            static function (Mage_Sales_Model_Quote_Item $quoteItem) {
+                return [
+                    'sku' => $quoteItem->getSku(),
+                    'price' => number_format((float)$quoteItem->getPrice(), 2),
+                    'name' => $quoteItem->getName()
+                ];
+            },
+            $quote->getAllVisibleItems()
+        );
+
+        return $quoteItems;
+    }
+
+    /**
      * @return stdClass|null
      */
     public function getBoldCheckoutData()
@@ -107,6 +132,14 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     public function getRegionsAsJson()
     {
         return Mage::helper('directory')->getRegionJsonByStore($this->getQuote()->getStoreId());
+    }
+
+    /**
+     * @return string[]
+     */
+    public function getAllowedCountries()
+    {
+        return explode(',', (string)Mage::getStoreConfig('general/country/allow')) ?: [];
     }
 
     /**

@@ -2,7 +2,10 @@ const ExpressPay = async config => (async config => {
     'use strict';
 
     let boldPayments;
+    let cartTotals;
     let shippingMethodsHtml = '';
+    let shippingMethods = [];
+    let selectedShippingMethod = {};
 
     const requiredConfigFields = [
         'epsApiUrl',
@@ -11,6 +14,7 @@ const ExpressPay = async config => (async config => {
         'currency',
         'quoteId',
         'quoteTotals',
+        'quoteItems',
         'boldCheckoutData',
         'formKey',
         'regions',
@@ -24,10 +28,12 @@ const ExpressPay = async config => (async config => {
         currency: '',
         quoteId: 0,
         quoteTotals: {},
+        quoteItems: {},
         quoteIsVirtual: false,
         boldCheckoutData: {},
         formKey: '',
         regions: {},
+        allowedCountries: ['US', 'CA'],
         saveShippingUrl: '/checkout/onepage/saveShipping',
         saveShippingMethodUrl: '/checkout/onepage/saveShippingMethod',
         saveBillingUrl: '/checkout/onepage/saveBilling',
@@ -37,6 +43,7 @@ const ExpressPay = async config => (async config => {
         createOrderUrl: '/checkoutpaymentbooster/expresspay/createOrder',
         updateOrderUrl: '/checkoutpaymentbooster/expresspay/updateOrder',
         getOrderUrl: '/checkoutpaymentbooster/expresspay/getOrder',
+        getCartTotalsUrl: '/checkoutpaymentbooster/index/getCartTotals',
     };
 
     /**
@@ -156,12 +163,12 @@ const ExpressPay = async config => (async config => {
     const parseShippingMethodsFromHtml = () => {
         let domParser;
         let shippingMethodsDocument;
-        let shippingMethods = [];
 
         if (shippingMethodsHtml.length === 0) {
             return;
         }
 
+        shippingMethods = [];
         domParser = new DOMParser();
         shippingMethodsDocument = domParser.parseFromString(shippingMethodsHtml, 'text/html');
 
@@ -169,6 +176,7 @@ const ExpressPay = async config => (async config => {
             .forEach(
                 (dt) => {
                     let methodInput;
+                    let priceElement;
 
                     const dd = dt.nextElementSibling;
                     const shippingMethod = {
@@ -186,11 +194,42 @@ const ExpressPay = async config => (async config => {
                         shippingMethod.code = methodInput.value;
                     }
 
+                    priceElement = dd.querySelector('.price');
+
+                    if (methodInput !== null) {
+                        shippingMethod.price = parseFloat(priceElement.innerText.replace(/[^\d]/g, '') / 100).toFixed(2);
+                    }
+
                     shippingMethods.push(shippingMethod);
                 }
             );
+    };
 
-        return shippingMethods;
+    /**
+     * @returns {
+     *     {
+     *         discounts_total: number
+     *         fees_total: number
+     *         order_balance: number,
+     *         shipping_total: number,
+     *         taxes_total: number,
+     *     }
+     * }
+     */
+    const getOrderTotalsForApplePay = () => {
+        const totals = cartTotals ?? config.quoteTotals;
+        const feesTotal = Object.keys(totals)
+            .filter(key => !['subtotal', 'discount', 'shipping', 'tax', 'grand_total'].includes(totals[key].code))
+            .reduce((accumulator, currentKey) => accumulator + parseFloat(totals[currentKey].value), 0);
+
+        return {
+            discounts_total: parseFloat(Math.abs(totals.discount?.value ?? 0).toString(10)) * 100,
+            fees_total: feesTotal * 100,
+            order_balance: parseFloat(totals.grand_total?.value ?? 0) * 100,
+            shipping_total: config.quoteIsVirtual ? 0
+                : parseFloat(selectedShippingMethod.price ?? totals.shipping?.value ?? 0) * 100,
+            taxes_total: parseFloat(totals.tax?.value ?? 0) * 100
+        };
     };
 
     /**
@@ -203,28 +242,48 @@ const ExpressPay = async config => (async config => {
 
         for (const requirement of requirements) {
             switch (requirement) {
+                case 'items':
+                    requiredOrderData[requirement] = config.quoteItems
+                        .map(
+                            quoteItem => ({
+                                amount: quoteItem.price * 100,
+                                label: quoteItem.name
+                            })
+                        );
+
+                    break;
+                case 'shipping_options':
+                    if (config.quoteIsVirtual) {
+                        requiredOrderData[requirement] = [];
+                    } else {
+                        requiredOrderData[requirement] = shippingMethods.map(
+                            shippingMethod => ({
+                                id: shippingMethod.code,
+                                label: shippingMethod.name,
+                                amount: shippingMethod.price * 100,
+                                is_selected: shippingMethod.code === selectedShippingMethod.code
+                            })
+                        );
+                    }
+
+                    break;
                 case 'totals':
                     requiredOrderData[requirement] = {
                         order_total: config.quoteTotals.grand_total?.value ?? 0,
-                        order_balance: config.quoteTotals.grand_total?.value ?? 0,
-                        shipping_total: config.quoteTotals.shipping?.value ?? 0,
-                        discounts_total: config.quoteTotals.discount?.value ?? 0,
-                        taxes_total: config.quoteTotals.tax?.value ?? 0
+                        ...getOrderTotalsForApplePay()
                     };
 
                     break;
                 case 'customer':
-                case 'items':
                 case 'billing_address':
                 case 'shipping_address':
-                case 'shipping_options':
                 default:
-                    throw new Error(`Requirement ${requirement} not implemented`);
+                    throw new Error(`Requirement "${requirement}" not implemented`);
             }
         }
 
         return requiredOrderData;
-    }
+    };
 
     /**
      * @param {String} gatewayId
@@ -407,36 +466,47 @@ const ExpressPay = async config => (async config => {
      * @throws Error
      */
     const updateMagentoAddress = async (addressType, addressData) => {
+        let street;
+        let magentoAddress;
         let countryRegions = {};
         let regionId;
         let updateAddressResponse;
         let updateAddressResponseData;
 
-        const magentoAddress = {
+        const country = addressData.country_code || addressData.countryCode;
+        const region = addressData.state || addressData.administrativeArea;
+
+        street = [
+            addressData.address_line_1 || addressData.address_line1 || '0 Unprovided St',
+            addressData.address_line_2 || addressData.address_line2 || null
+        ];
+
+        if (addressData.hasOwnProperty('addressLines')) {
+            street = addressData.addressLines;
+        }
+
+        magentoAddress = {
             form_key: config.formKey,
             [addressType]: {
                 address_type: addressType,
                 quote_id: config.quoteId,
-                email: addressData.email ?? null,
-                firstname: addressData.first_name ?? 'Unknown',
-                lastname: addressData.last_name ?? 'Person',
-                street: [
-                    addressData.address_line_1 ?? addressData.address_line1 ?? '0 Unprovided St',
-                    addressData.address_line_2 ?? addressData.address_line2 ?? null
-                ],
-                city: addressData.city,
-                postcode: addressData.postal_code,
-                country_id: addressData.country_code,
-                telephone: addressData.phone ?? '5555551234',
+                email: addressData.email || addressData.emailAddress || null,
+                firstname: addressData.first_name || addressData.givenName || 'Unknown',
+                lastname: addressData.last_name || addressData.familyName || 'Person',
+                street: street,
+                city: addressData.city || addressData.locality,
+                postcode: addressData.postal_code || addressData.postalCode,
+                country_id: country,
+                telephone: addressData.phone || addressData.phoneNumber || '5555551234',
             }
         };
 
-        if (config.regions.hasOwnProperty(addressData.country_code)) {
-            countryRegions = config.regions[addressData.country_code];
+        if (config.regions.hasOwnProperty(country)) {
+            countryRegions = config.regions[country];
         }
 
         for (regionId in countryRegions) {
-            if (countryRegions[regionId].code !== addressData.state) {
+            if (countryRegions[regionId].code !== region) {
                 continue;
             }
 
@@ -486,12 +556,9 @@ const ExpressPay = async config => (async config => {
      * @throws Error
      */
     const updateMagentoShippingMethod = async shippingOptions => {
-        let selectedShippingMethod;
         let shippingMethodFormData;
         let updateShippingMethodResponse;
         let updateShippingMethodResult;
-
-        const shippingMethods = parseShippingMethodsFromHtml();
 
         if (shippingMethods.length === 0) {
             return;
@@ -500,10 +567,14 @@ const ExpressPay = async config => (async config => {
         if (shippingOptions === null) {
             selectedShippingMethod = shippingMethods[0];
         } else {
-            selectedShippingMethod = shippingMethods.find(shippingMethod => shippingMethod.code === shippingOptions.id);
+            selectedShippingMethod = shippingMethods.find(
+                shippingMethod => shippingMethod.code === (shippingOptions.id ?? shippingOptions.identifier)
+            );
         }
 
         if (selectedShippingMethod === undefined) {
+            selectedShippingMethod = {};
+
             return;
         }
 
@@ -612,6 +683,37 @@ const ExpressPay = async config => (async config => {
     /**
      * @returns {Promise<void>}
      */
+    const getCartTotals = async () => {
+        let getCartTotalsResponse;
+
+        const formData = new FormData();
+
+        formData.append('form_key', config.formKey);
+
+        try {
+            getCartTotalsResponse = await fetch(
+                config.getCartTotalsUrl,
+                {
+                    method: 'POST',
+                    body: formData
+                }
+            );
+        } catch (error) {
+            console.error('Could not retrieve cart totals from Magento.', error);
+
+            throw error;
+        }
+
+        try {
+            cartTotals = await getCartTotalsResponse.json();
+        } catch (syntaxError) {
+            cartTotals = null;
+        }
+    };
+
+    /**
+     * @returns {Promise<void>}
+     */
     const initializePaymentsSdk = async () => {
         let sdkConfiguration;
 
@@ -647,7 +749,33 @@ const ExpressPay = async config => (async config => {
                  * @throws Error
                  */
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
-                    const expressPayOrderId = await createExpressPayOrder(String(paymentPayload.gateway_id));
+                    let expressPayOrderId;
+
+                    if (paymentPayload.payment_data.payment_type === 'apple') {
+                        if (
+                            !paymentPayload.payment_data.billing_address.hasOwnProperty('emailAddress')
+                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('emailAddress')
+                        ) {
+                            paymentPayload.payment_data.billing_address.emailAddress =
+                                paymentPayload.payment_data.shipping_address.emailAddress
+                        }
+
+                        if (
+                            !paymentPayload.payment_data.billing_address.hasOwnProperty('phoneNumber')
+                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('phoneNumber')
+                        ) {
+                            paymentPayload.payment_data.billing_address.phoneNumber =
+                                paymentPayload.payment_data.shipping_address.phoneNumber
+                        }
+
+                        if (!config.quoteIsVirtual) {
+                            await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
+                        }
+
+                        await updateMagentoAddress('billing', paymentPayload.payment_data.billing_address);
+                    }
+
+                    expressPayOrderId = await createExpressPayOrder(String(paymentPayload.gateway_id));
 
                     return {
                         payment_data: {
@@ -658,15 +786,30 @@ const ExpressPay = async config => (async config => {
                 /**
                  * @param {String} paymentType
                  * @param {Object} paymentPayload
-                 * @returns {Promise<void>}
+                 * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
                     if (!config.quoteIsVirtual) {
-                        await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
-                        await updateMagentoShippingMethod(paymentPayload.payment_data.shipping_options);
+                        if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
+                            await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
+
+                            parseShippingMethodsFromHtml();
+                        }
+
+                        if (paymentPayload.payment_data.hasOwnProperty('shipping_options')) {
+                            await updateMagentoShippingMethod(paymentPayload.payment_data.shipping_options);
+                        } else {
+                            await updateMagentoShippingMethod(null);
+                        }
                     }
 
-                    await updateExpressPayOrder(paymentPayload.gateway_id, paymentPayload.payment_data.order_id);
+                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                        await updateExpressPayOrder(paymentPayload.gateway_id, paymentPayload.payment_data.order_id);
+                    } else {
+                        await getCartTotals();
+
+                        return getRequiredOrderData(paymentPayload.require_order_data);
+                    }
                 },
                 /**
                  * @param {String} paymentType
@@ -676,22 +819,27 @@ const ExpressPay = async config => (async config => {
                  * @throws Error
                  */
                 onApprovePaymentOrder: async (paymentType, paymentInformation, paymentPayload) => {
-                    const expressPayOrder = await getExpressPayOrder(
-                        paymentPayload.payment_data.order_id,
-                        paymentPayload.gateway_id
-                    );
+                    let expressPayOrder;
 
-                    if (!config.quoteIsVirtual) {
+                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                        expressPayOrder = await getExpressPayOrder(
+                            paymentPayload.payment_data.order_id,
+                            paymentPayload.gateway_id
+                        );
+
+                        if (!config.quoteIsVirtual) {
+                            await updateMagentoAddress(
+                                'shipping',
+                                convertExpressPayAddress(expressPayOrder, expressPayOrder.shipping_address)
+                            );
+                        }
+
                         await updateMagentoAddress(
-                            'shipping',
-                            convertExpressPayAddress(expressPayOrder, expressPayOrder.shipping_address)
+                            'billing',
+                            convertExpressPayAddress(expressPayOrder, expressPayOrder.billing_address)
                         );
                     }
 
-                    await updateMagentoAddress(
-                        'billing',
-                        convertExpressPayAddress(expressPayOrder, expressPayOrder.billing_address)
-                    );
                     await placeMagentoOrder(paymentPayload.payment_data.order_id);
                 },
                 onErrorPaymentOrder: errors => {
@@ -737,7 +885,10 @@ const ExpressPay = async config => (async config => {
             await boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
-                    fastlane: isFastlaneEnabled
+                    allowedCountries: config.allowedCountries,
+                    fastlane: isFastlaneEnabled,
+                    isPhoneRequired: true,
+                    shopName: config.shopDomain,
                 }
             );
         }
