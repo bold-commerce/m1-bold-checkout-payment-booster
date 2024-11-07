@@ -63,7 +63,7 @@
             const boldPaymentsForm = document.getElementById('payment_form_bold');
             if (this.isFastlaneAvailable) {
                 await paymentInstance.renderWalletPayments('payment_form_bold', {fastlane: 1});
-                if (boldPaymentsForm.getHTML().trim() === '') {
+                if (boldPaymentsForm.innerHTML.trim() === '') {
                     this.hidePaymentMethod();
                 }
                 return;
