@@ -850,6 +850,13 @@ const ExpressPay = async config => (async config => {
                 }
             }
         };
+
+        if (config.isFastlaneEnabled) {
+            while (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
         boldPayments = new window.bold.Payments(sdkConfiguration);
     };
 
