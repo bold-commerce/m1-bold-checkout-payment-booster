@@ -59,7 +59,6 @@
          * @returns {void}
          */
         renderPaymentForm: async function () {
-            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
             const boldPaymentsForm = document.getElementById('payment_form_bold');
             if (this.isFastlaneAvailable) {
                 if (boldPaymentsForm.innerHTML.trim() === '') {
@@ -67,6 +66,7 @@
                 }
                 return;
             }
+            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
             await paymentInstance.renderPayments('payment_form_bold');
         },
         /**
