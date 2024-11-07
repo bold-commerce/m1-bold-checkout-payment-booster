@@ -486,7 +486,6 @@
                 }
             };
             this.boldPaymentsInstance = new window.bold.Payments(initialData);
-            this.boldPaymentsInstance.state = {options: {fastlane: this.isFastlaneAvailable}};
             this.buildPaymentsInstanceInProgress = false;
             return this.boldPaymentsInstance;
         },
