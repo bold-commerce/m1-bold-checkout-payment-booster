@@ -22,6 +22,7 @@ const ExpressPay = async config => (async config => {
 
     const defaultConfig = {
         paymentsContainer: 'express-pay-container',
+        isFastlaneEnabled: false,
         epsApiUrl: '',
         epsStaticApiUrl: '',
         shopDomain: '',
@@ -878,15 +879,14 @@ const ExpressPay = async config => (async config => {
 
     return {
         /**
-         * @param {Boolean} isFastlaneEnabled
          * @returns {Promise<void>}
          */
-        render: async isFastlaneEnabled => {
+        render: async () => {
             await boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
                     allowedCountries: config.allowedCountries,
-                    fastlane: isFastlaneEnabled,
+                    fastlane: config.isFastlaneEnabled,
                     isPhoneRequired: true,
                     shopName: config.shopDomain,
                 }
