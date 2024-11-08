@@ -11,6 +11,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     // Main settings
     const PATH_IS_PAYMENT_BOOSTER_ENABLED = 'checkout/bold_checkout_payment_booster/is_payment_booster_enabled';
     const PATH_IS_FASTLANE_ENABLED = 'checkout/bold_checkout_payment_booster/is_fastlane_enabled';
+    const PATH_IS_EXPRESS_PAY_ENABLED = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
     const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
@@ -47,6 +48,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isFastlaneEnabled($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_FASTLANE_ENABLED)
+            && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
+    }
+
+    /**
+     * Check if Express Pay is enabled.
+     *
+     * @param int $websiteId
+     * @return bool
+     */
+    public function isExpressPayEnabled($websiteId)
+    {
+        return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_EXPRESS_PAY_ENABLED)
             && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
     }
 

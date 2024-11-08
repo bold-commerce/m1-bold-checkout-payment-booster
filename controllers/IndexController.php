@@ -79,6 +79,29 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $this->getResponse()->setBody(json_encode($cartData));
     }
 
+    public function getCartTotalsAction()
+    {
+        if (!$this->_validateFormKey()) {
+            return;
+        }
+
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        $cartTotals = array_map(
+            static function (Mage_Sales_Model_Quote_Address_Total $total) {
+                return [
+                    'code' => $total->getCode(),
+                    'value' => number_format((float)$total->getValue(), 2, '.', '')
+                ];
+            },
+            $quote->getTotals()
+        );
+
+        $this->getResponse()
+            ->setHeader('Content-type', 'application/json')
+            ->setBody(json_encode($cartTotals));
+    }
+
     /**
      * Add post data to quote billing address.
      *
