@@ -725,6 +725,19 @@ const ExpressPay = async config => (async config => {
     };
 
     /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixBillingAddressPhoneNumber = paymentData => {
+        if (
+            !paymentData.billing_address.hasOwnProperty('phoneNumber')
+            && paymentData.shipping_address.hasOwnProperty('phoneNumber')
+        ) {
+            paymentData.billing_address.phoneNumber = paymentData.shipping_address.phoneNumber;
+        }
+    }
+
+    /**
      * @returns {Promise<void>}
      */
     const initializePaymentsSdk = async () => {
@@ -766,14 +779,7 @@ const ExpressPay = async config => (async config => {
 
                     if (paymentPayload.payment_data.payment_type === 'apple') {
                         fixAddressEmailAddresses(paymentPayload.payment_data);
-
-                        if (
-                            !paymentPayload.payment_data.billing_address.hasOwnProperty('phoneNumber')
-                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('phoneNumber')
-                        ) {
-                            paymentPayload.payment_data.billing_address.phoneNumber =
-                                paymentPayload.payment_data.shipping_address.phoneNumber
-                        }
+                        fixBillingAddressPhoneNumber(paymentPayload.payment_data);
 
                         if (!config.quoteIsVirtual) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
