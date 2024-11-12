@@ -712,6 +712,19 @@ const ExpressPay = async config => (async config => {
     };
 
     /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixAddressEmailAddresses = paymentData => {
+        if (
+            !paymentData.billing_address.hasOwnProperty('emailAddress')
+            && paymentData.shipping_address.hasOwnProperty('emailAddress')
+        ) {
+            paymentData.billing_address.emailAddress = paymentData.shipping_address.emailAddress;
+        }
+    };
+
+    /**
      * @returns {Promise<void>}
      */
     const initializePaymentsSdk = async () => {
@@ -752,13 +765,7 @@ const ExpressPay = async config => (async config => {
                     let expressPayOrderId;
 
                     if (paymentPayload.payment_data.payment_type === 'apple') {
-                        if (
-                            !paymentPayload.payment_data.billing_address.hasOwnProperty('emailAddress')
-                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('emailAddress')
-                        ) {
-                            paymentPayload.payment_data.billing_address.emailAddress =
-                                paymentPayload.payment_data.shipping_address.emailAddress
-                        }
+                        fixAddressEmailAddresses(paymentPayload.payment_data);
 
                         if (
                             !paymentPayload.payment_data.billing_address.hasOwnProperty('phoneNumber')
