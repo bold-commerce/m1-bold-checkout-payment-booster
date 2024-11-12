@@ -722,6 +722,22 @@ const ExpressPay = async config => (async config => {
         ) {
             paymentData.billing_address.emailAddress = paymentData.shipping_address.emailAddress;
         }
+
+        if (
+            !paymentData.billing_address.hasOwnProperty('emailAddress')
+            && paymentData.hasOwnProperty('customer')
+            && paymentData.customer.hasOwnProperty('email_address')
+        ) {
+            paymentData.billing_address.emailAddress = paymentData.customer.email_address;
+        }
+
+        if (
+            !paymentData.shipping_address.hasOwnProperty('emailAddress')
+            && paymentData.hasOwnProperty('customer')
+            && paymentData.customer.hasOwnProperty('email_address')
+        ) {
+            paymentData.shipping_address.emailAddress = paymentData.customer.email_address;
+        }
     };
 
     /**
