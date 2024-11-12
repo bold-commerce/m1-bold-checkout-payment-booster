@@ -216,7 +216,7 @@ const ExpressPay = async config => (async config => {
      *     }
      * }
      */
-    const getOrderTotalsForApplePay = () => {
+    const getOrderTotalsForApplePayAndGooglePay = () => {
         const totals = cartTotals ?? config.quoteTotals;
         const feesTotal = Object.keys(totals)
             .filter(key => !['subtotal', 'discount', 'shipping', 'tax', 'grand_total'].includes(totals[key].code))
@@ -270,7 +270,7 @@ const ExpressPay = async config => (async config => {
                 case 'totals':
                     requiredOrderData[requirement] = {
                         order_total: config.quoteTotals.grand_total?.value ?? 0,
-                        ...getOrderTotalsForApplePay()
+                        ...getOrderTotalsForApplePayAndGooglePay()
                     };
 
                     break;
