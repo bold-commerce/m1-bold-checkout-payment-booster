@@ -777,7 +777,7 @@ const ExpressPay = async config => (async config => {
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
                     let expressPayOrderId;
 
-                    if (paymentPayload.payment_data.payment_type === 'apple') {
+                    if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         fixAddressEmailAddresses(paymentPayload.payment_data);
                         fixBillingAddressPhoneNumber(paymentPayload.payment_data);
 
@@ -816,7 +816,7 @@ const ExpressPay = async config => (async config => {
                         }
                     }
 
-                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                    if (!['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         await updateExpressPayOrder(paymentPayload.gateway_id, paymentPayload.payment_data.order_id);
                     } else {
                         await getCartTotals();
@@ -834,7 +834,7 @@ const ExpressPay = async config => (async config => {
                 onApprovePaymentOrder: async (paymentType, paymentInformation, paymentPayload) => {
                     let expressPayOrder;
 
-                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                    if (!['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         expressPayOrder = await getExpressPayOrder(
                             paymentPayload.payment_data.order_id,
                             paymentPayload.gateway_id
