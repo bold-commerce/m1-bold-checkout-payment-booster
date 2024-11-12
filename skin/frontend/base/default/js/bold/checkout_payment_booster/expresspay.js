@@ -564,7 +564,10 @@ const ExpressPay = async config => (async config => {
             return;
         }
 
-        if (shippingOptions === null) {
+        if (
+            shippingOptions === null
+            || (shippingOptions.hasOwnProperty('id') && shippingOptions.id === 'shipping_option_unselected')
+        ) {
             selectedShippingMethod = shippingMethods[0];
         } else {
             selectedShippingMethod = shippingMethods.find(
