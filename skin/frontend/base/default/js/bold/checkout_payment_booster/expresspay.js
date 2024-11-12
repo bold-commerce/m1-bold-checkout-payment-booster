@@ -835,19 +835,23 @@ const ExpressPay = async config => (async config => {
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
                     let expressPayOrderId;
 
-                    if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
-                        fixAddressEmailAddresses(paymentPayload.payment_data);
-                        fixBillingAddressPhoneNumber(paymentPayload.payment_data);
-                        fixAddressCustomerNames(paymentPayload.payment_data);
+                    /* We need to work with a copy of the payment payload object to prevent Google Pay from throwing
+                       "invalid value" errors because we add data to it. */
+                    const modifiedPaymentPayload = structuredClone(paymentPayload);
+
+                    if (['apple', 'google'].includes(modifiedPaymentPayload.payment_data.payment_type)) {
+                        fixAddressEmailAddresses(modifiedPaymentPayload.payment_data);
+                        fixBillingAddressPhoneNumber(modifiedPaymentPayload.payment_data);
+                        fixAddressCustomerNames(modifiedPaymentPayload.payment_data);
 
                         if (!config.quoteIsVirtual) {
-                            await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
+                            await updateMagentoAddress('shipping', modifiedPaymentPayload.payment_data.shipping_address);
                         }
 
-                        await updateMagentoAddress('billing', paymentPayload.payment_data.billing_address);
+                        await updateMagentoAddress('billing', modifiedPaymentPayload.payment_data.billing_address);
                     }
 
-                    expressPayOrderId = await createExpressPayOrder(String(paymentPayload.gateway_id));
+                    expressPayOrderId = await createExpressPayOrder(String(modifiedPaymentPayload.gateway_id));
 
                     return {
                         payment_data: {
