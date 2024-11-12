@@ -615,10 +615,11 @@ const ExpressPay = async config => (async config => {
 
     /**
      * @param {String} orderId
+     * @param {String} paymentType
      * @returns {Promise<void>}
      * @throws Error
      */
-    const placeMagentoOrder = async orderId => {
+    const placeMagentoOrder = async (orderId, paymentType) => {
         let placeOrderResponse;
         let placeOrderResult;
 
@@ -672,7 +673,9 @@ const ExpressPay = async config => (async config => {
                 errorMessage = placeOrderResult.error_messages;
             }
 
-            alert(errorMessage.stripTags().toString());
+            if (paymentType !== 'google') { // Google Pay renders thrown errors inside its pop-up
+                alert(errorMessage.stripTags().toString());
+            }
 
             throw new Error(errorMessage);
         }
@@ -916,7 +919,10 @@ const ExpressPay = async config => (async config => {
                         );
                     }
 
-                    await placeMagentoOrder(paymentPayload.payment_data.order_id);
+                    await placeMagentoOrder(
+                        paymentPayload.payment_data.order_id,
+                        paymentPayload.payment_data.payment_type
+                    );
                 },
                 onErrorPaymentOrder: errors => {
                     console.error('An unexpected error occurred while processing the Express Pay order.', errors);
