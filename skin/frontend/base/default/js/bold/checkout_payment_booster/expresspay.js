@@ -477,8 +477,8 @@ const ExpressPay = async config => (async config => {
         const region = addressData.state || addressData.administrativeArea;
 
         street = [
-            addressData.address_line_1 || addressData.address_line1 || '0 Unprovided St',
-            addressData.address_line_2 || addressData.address_line2 || null
+            addressData.address_line_1 || addressData.address_line1 || addressData.address1 || '0 Unprovided St',
+            addressData.address_line_2 || addressData.address_line2 || addressData.address2 || null
         ];
 
         if (addressData.hasOwnProperty('addressLines')) {
