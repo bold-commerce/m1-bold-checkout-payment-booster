@@ -754,6 +754,48 @@ const ExpressPay = async config => (async config => {
     }
 
     /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixAddressCustomerNames = paymentData => {
+        if (!paymentData.hasOwnProperty('customer')) {
+            return;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('first_name')
+            && !paymentData.billing_address.hasOwnProperty('first_name')
+            && !paymentData.billing_address.hasOwnProperty('givenName')
+        ) {
+            paymentData.billing_address.first_name = paymentData.customer.first_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('last_name')
+            && !paymentData.billing_address.hasOwnProperty('last_name')
+            && !paymentData.billing_address.hasOwnProperty('familyName')
+        ) {
+            paymentData.billing_address.last_name = paymentData.customer.last_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('first_name')
+            && !paymentData.shipping_address.hasOwnProperty('first_name')
+            && !paymentData.shipping_address.hasOwnProperty('givenName')
+        ) {
+            paymentData.shipping_address.first_name = paymentData.customer.first_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('last_name')
+            && !paymentData.shipping_address.hasOwnProperty('last_name')
+            && !paymentData.shipping_address.hasOwnProperty('familyName')
+        ) {
+            paymentData.shipping_address.last_name = paymentData.customer.last_name;
+        }
+    }
+
+    /**
      * @returns {Promise<void>}
      */
     const initializePaymentsSdk = async () => {
@@ -796,6 +838,7 @@ const ExpressPay = async config => (async config => {
                     if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         fixAddressEmailAddresses(paymentPayload.payment_data);
                         fixBillingAddressPhoneNumber(paymentPayload.payment_data);
+                        fixAddressCustomerNames(paymentPayload.payment_data);
 
                         if (!config.quoteIsVirtual) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
