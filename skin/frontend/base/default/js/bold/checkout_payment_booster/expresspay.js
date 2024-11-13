@@ -22,6 +22,7 @@ const ExpressPay = async config => (async config => {
 
     const defaultConfig = {
         paymentsContainer: 'express-pay-container',
+        isFastlaneEnabled: false,
         epsApiUrl: '',
         epsStaticApiUrl: '',
         shopDomain: '',
@@ -717,7 +718,7 @@ const ExpressPay = async config => (async config => {
     const initializePaymentsSdk = async () => {
         let sdkConfiguration;
 
-        if (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
+        if (!config.isFastlaneEnabled && (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments'))) {
             await loadScript(config.epsStaticApiUrl + '/js/payments_sdk.js');
         }
 
@@ -849,6 +850,13 @@ const ExpressPay = async config => (async config => {
                 }
             }
         };
+
+        if (config.isFastlaneEnabled) {
+            while (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+
         boldPayments = new window.bold.Payments(sdkConfiguration);
     };
 
@@ -878,15 +886,14 @@ const ExpressPay = async config => (async config => {
 
     return {
         /**
-         * @param {Boolean} isFastlaneEnabled
          * @returns {Promise<void>}
          */
-        render: async isFastlaneEnabled => {
+        render: async () => {
             await boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
                     allowedCountries: config.allowedCountries,
-                    fastlane: isFastlaneEnabled,
+                    fastlane: config.isFastlaneEnabled,
                     isPhoneRequired: true,
                     shopName: config.shopDomain,
                 }
