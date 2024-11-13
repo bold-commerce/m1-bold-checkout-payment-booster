@@ -217,7 +217,7 @@ const ExpressPay = async config => (async config => {
      *     }
      * }
      */
-    const getOrderTotalsForApplePay = () => {
+    const getOrderTotalsForApplePayAndGooglePay = () => {
         const totals = cartTotals ?? config.quoteTotals;
         const feesTotal = Object.keys(totals)
             .filter(key => !['subtotal', 'discount', 'shipping', 'tax', 'grand_total'].includes(totals[key].code))
@@ -271,7 +271,7 @@ const ExpressPay = async config => (async config => {
                 case 'totals':
                     requiredOrderData[requirement] = {
                         order_total: config.quoteTotals.grand_total?.value ?? 0,
-                        ...getOrderTotalsForApplePay()
+                        ...getOrderTotalsForApplePayAndGooglePay()
                     };
 
                     break;
@@ -478,8 +478,8 @@ const ExpressPay = async config => (async config => {
         const region = addressData.state || addressData.administrativeArea;
 
         street = [
-            addressData.address_line_1 || addressData.address_line1 || '0 Unprovided St',
-            addressData.address_line_2 || addressData.address_line2 || null
+            addressData.address_line_1 || addressData.address_line1 || addressData.address1 || '0 Unprovided St',
+            addressData.address_line_2 || addressData.address_line2 || addressData.address2 || null
         ];
 
         if (addressData.hasOwnProperty('addressLines')) {
@@ -565,7 +565,10 @@ const ExpressPay = async config => (async config => {
             return;
         }
 
-        if (shippingOptions === null) {
+        if (
+            shippingOptions === null
+            || (shippingOptions.hasOwnProperty('id') && shippingOptions.id === 'shipping_option_unselected')
+        ) {
             selectedShippingMethod = shippingMethods[0];
         } else {
             selectedShippingMethod = shippingMethods.find(
@@ -616,10 +619,11 @@ const ExpressPay = async config => (async config => {
 
     /**
      * @param {String} orderId
+     * @param {String} paymentType
      * @returns {Promise<void>}
      * @throws Error
      */
-    const placeMagentoOrder = async orderId => {
+    const placeMagentoOrder = async (orderId, paymentType) => {
         let placeOrderResponse;
         let placeOrderResult;
 
@@ -673,7 +677,9 @@ const ExpressPay = async config => (async config => {
                 errorMessage = placeOrderResult.error_messages;
             }
 
-            alert(errorMessage.stripTags().toString());
+            if (paymentType !== 'google') { // Google Pay renders thrown errors inside its pop-up
+                alert(errorMessage.stripTags().toString());
+            }
 
             throw new Error(errorMessage);
         }
@@ -711,6 +717,90 @@ const ExpressPay = async config => (async config => {
             cartTotals = null;
         }
     };
+
+    /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixAddressEmailAddresses = paymentData => {
+        if (
+            !paymentData.billing_address.hasOwnProperty('emailAddress')
+            && paymentData.shipping_address.hasOwnProperty('emailAddress')
+        ) {
+            paymentData.billing_address.emailAddress = paymentData.shipping_address.emailAddress;
+        }
+
+        if (
+            !paymentData.billing_address.hasOwnProperty('emailAddress')
+            && paymentData.hasOwnProperty('customer')
+            && paymentData.customer.hasOwnProperty('email_address')
+        ) {
+            paymentData.billing_address.emailAddress = paymentData.customer.email_address;
+        }
+
+        if (
+            !paymentData.shipping_address.hasOwnProperty('emailAddress')
+            && paymentData.hasOwnProperty('customer')
+            && paymentData.customer.hasOwnProperty('email_address')
+        ) {
+            paymentData.shipping_address.emailAddress = paymentData.customer.email_address;
+        }
+    };
+
+    /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixBillingAddressPhoneNumber = paymentData => {
+        if (
+            !paymentData.billing_address.hasOwnProperty('phoneNumber')
+            && paymentData.shipping_address.hasOwnProperty('phoneNumber')
+        ) {
+            paymentData.billing_address.phoneNumber = paymentData.shipping_address.phoneNumber;
+        }
+    }
+
+    /**
+     * @param {Object} paymentData
+     * @returns void
+     */
+    const fixAddressCustomerNames = paymentData => {
+        if (!paymentData.hasOwnProperty('customer')) {
+            return;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('first_name')
+            && !paymentData.billing_address.hasOwnProperty('first_name')
+            && !paymentData.billing_address.hasOwnProperty('givenName')
+        ) {
+            paymentData.billing_address.first_name = paymentData.customer.first_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('last_name')
+            && !paymentData.billing_address.hasOwnProperty('last_name')
+            && !paymentData.billing_address.hasOwnProperty('familyName')
+        ) {
+            paymentData.billing_address.last_name = paymentData.customer.last_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('first_name')
+            && !paymentData.shipping_address.hasOwnProperty('first_name')
+            && !paymentData.shipping_address.hasOwnProperty('givenName')
+        ) {
+            paymentData.shipping_address.first_name = paymentData.customer.first_name;
+        }
+
+        if (
+            paymentData.customer.hasOwnProperty('last_name')
+            && !paymentData.shipping_address.hasOwnProperty('last_name')
+            && !paymentData.shipping_address.hasOwnProperty('familyName')
+        ) {
+            paymentData.shipping_address.last_name = paymentData.customer.last_name;
+        }
+    }
 
     /**
      * @returns {Promise<void>}
@@ -752,31 +842,23 @@ const ExpressPay = async config => (async config => {
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
                     let expressPayOrderId;
 
-                    if (paymentPayload.payment_data.payment_type === 'apple') {
-                        if (
-                            !paymentPayload.payment_data.billing_address.hasOwnProperty('emailAddress')
-                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('emailAddress')
-                        ) {
-                            paymentPayload.payment_data.billing_address.emailAddress =
-                                paymentPayload.payment_data.shipping_address.emailAddress
-                        }
+                    /* We need to work with a copy of the payment payload object to prevent Google Pay from throwing
+                       "invalid value" errors because we add data to it. */
+                    const modifiedPaymentPayload = structuredClone(paymentPayload);
 
-                        if (
-                            !paymentPayload.payment_data.billing_address.hasOwnProperty('phoneNumber')
-                            && paymentPayload.payment_data.shipping_address.hasOwnProperty('phoneNumber')
-                        ) {
-                            paymentPayload.payment_data.billing_address.phoneNumber =
-                                paymentPayload.payment_data.shipping_address.phoneNumber
-                        }
+                    if (['apple', 'google'].includes(modifiedPaymentPayload.payment_data.payment_type)) {
+                        fixAddressEmailAddresses(modifiedPaymentPayload.payment_data);
+                        fixBillingAddressPhoneNumber(modifiedPaymentPayload.payment_data);
+                        fixAddressCustomerNames(modifiedPaymentPayload.payment_data);
 
                         if (!config.quoteIsVirtual) {
-                            await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
+                            await updateMagentoAddress('shipping', modifiedPaymentPayload.payment_data.shipping_address);
                         }
 
-                        await updateMagentoAddress('billing', paymentPayload.payment_data.billing_address);
+                        await updateMagentoAddress('billing', modifiedPaymentPayload.payment_data.billing_address);
                     }
 
-                    expressPayOrderId = await createExpressPayOrder(String(paymentPayload.gateway_id));
+                    expressPayOrderId = await createExpressPayOrder(String(modifiedPaymentPayload.gateway_id));
 
                     return {
                         payment_data: {
@@ -804,7 +886,7 @@ const ExpressPay = async config => (async config => {
                         }
                     }
 
-                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                    if (!['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         await updateExpressPayOrder(paymentPayload.gateway_id, paymentPayload.payment_data.order_id);
                     } else {
                         await getCartTotals();
@@ -822,7 +904,7 @@ const ExpressPay = async config => (async config => {
                 onApprovePaymentOrder: async (paymentType, paymentInformation, paymentPayload) => {
                     let expressPayOrder;
 
-                    if (paymentPayload.payment_data.payment_type !== 'apple') {
+                    if (!['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         expressPayOrder = await getExpressPayOrder(
                             paymentPayload.payment_data.order_id,
                             paymentPayload.gateway_id
@@ -841,7 +923,10 @@ const ExpressPay = async config => (async config => {
                         );
                     }
 
-                    await placeMagentoOrder(paymentPayload.payment_data.order_id);
+                    await placeMagentoOrder(
+                        paymentPayload.payment_data.order_id,
+                        paymentPayload.payment_data.payment_type
+                    );
                 },
                 onErrorPaymentOrder: errors => {
                     console.error('An unexpected error occurred while processing the Express Pay order.', errors);
