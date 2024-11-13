@@ -59,16 +59,21 @@
          * @returns {void}
          */
         renderPaymentForm: async function () {
-            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
             const boldPaymentsForm = document.getElementById('payment_form_bold');
             if (this.isFastlaneAvailable) {
-                await paymentInstance.renderWalletPayments('payment_form_bold', {fastlane: 1});
-                if (boldPaymentsForm.getHTML().trim() === '') {
+                if (boldPaymentsForm.innerHTML.trim() === '') {
                     this.hidePaymentMethod();
                 }
                 return;
             }
-            await paymentInstance.renderPayments('payment_form_bold');
+            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+            await paymentInstance.renderPayments(
+                'payment_form_bold',
+                {
+                    fastlane: !!this.isFastlaneAvailable,
+                    shouldRenderSpiFrame: !this.isFastlaneAvailable
+                }
+            );
         },
         /**
          * Wait for checkout to initialize.

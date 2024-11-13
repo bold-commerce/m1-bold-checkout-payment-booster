@@ -185,7 +185,10 @@
             }
             this.buildFastlaneInstanceInProgress = true;
             const boldPaymentsInstance = await this.getBoldPaymentsInstance();
-            this.gatewayData = (await boldPaymentsInstance.getFastlaneClientInit())[this.epsGatewayId] || null;
+            const fastlaneClient = await boldPaymentsInstance.getFastlaneClientInit({
+                shouldLoadScript: true
+            });
+            this.gatewayData = fastlaneClient[this.epsGatewayId] || null;
             if (!this.gatewayData) {
                 return null;
             }
@@ -242,14 +245,6 @@
          * @private
          */
         buildPpcpFastlaneInstance: async function () {
-            const debugMode = this.gatewayData.is_test_mode ? '&debug=true' : '';
-            await this.loadScript(
-                `https://www.paypal.com/sdk/js?client-id=${this.gatewayData.client_id}&components=fastlane${debugMode}`,
-                {
-                    'data-user-id-token': this.gatewayData.client_token,
-                    'data-client-metadata-id': this.publicOrderId,
-                }
-            );
             return window.paypal.Fastlane();
         },
         /**
@@ -491,7 +486,6 @@
                 }
             };
             this.boldPaymentsInstance = new window.bold.Payments(initialData);
-            this.boldPaymentsInstance.state = {options: {fastlane: this.isFastlaneAvailable}};
             this.buildPaymentsInstanceInProgress = false;
             return this.boldPaymentsInstance;
         },

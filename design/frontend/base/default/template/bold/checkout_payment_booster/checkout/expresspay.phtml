@@ -16,6 +16,7 @@ $quote = $this->getQuote();
 
 <script type="text/javascript">
     const expressPayConfig = {
+        isFastlaneEnabled: <?php var_export($this->isFastlaneEnabled()) ?>,
         epsApiUrl: '<?php echo $this->escapeUrl($this->getEpsApiUrl()) ?>',
         epsStaticApiUrl: '<?php echo $this->escapeUrl($this->getEpsStaticApiUrl()) ?>',
         shopDomain: '<?php echo $this->jsQuoteEscape($this->getShopDomain()) ?>',
@@ -41,6 +42,6 @@ $quote = $this->getQuote();
     };
 
     ExpressPay(expressPayConfig).then(
-        async expressPay => await expressPay.render(<?php var_export($this->isFastlaneEnabled()) ?>)
+        async expressPay => await expressPay.render()
     );
 </script>
