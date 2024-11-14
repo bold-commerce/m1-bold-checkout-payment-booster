@@ -28,5 +28,7 @@ class Bold_CheckoutPaymentBooster_Observer_CartObserver
         } catch (Exception $exception) {
             Mage::log($exception->getMessage(), Zend_Log::CRIT);
         }
+
+        Mage::getSingleton('checkout/session')->setCartWasUpdated(false);
     }
 }
