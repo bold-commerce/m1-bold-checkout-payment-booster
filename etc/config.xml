@@ -39,6 +39,14 @@
     </global>
     <frontend>
         <events>
+            <controller_action_predispatch_checkout_cart_index>
+                <observers>
+                    <initialize_bold_order>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CartObserver</class>
+                        <method>execute</method>
+                    </initialize_bold_order>
+                </observers>
+            </controller_action_predispatch_checkout_cart_index>
             <controller_action_predispatch_checkout_onepage_index>
                 <observers>
                     <init_bold_order>
