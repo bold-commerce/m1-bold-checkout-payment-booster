@@ -21,6 +21,11 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         }
     }
 
+    public function isCheckoutActive()
+    {
+        return $this->getAction()->getFullActionName() === 'checkout_onepage_index';
+    }
+
     /**
      * @return string
      */
