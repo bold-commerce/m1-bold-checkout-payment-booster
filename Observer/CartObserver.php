@@ -14,6 +14,13 @@ class Bold_CheckoutPaymentBooster_Observer_CartObserver
      */
     public function execute(Varien_Event_Observer $event)
     {
+        if (
+            !Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE)
+                ->isExpressPayEnabledInCart(Mage::app()->getStore()->getWebsiteId())
+        ) {
+            return;
+        }
+
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
 
