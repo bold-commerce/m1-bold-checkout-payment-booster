@@ -52,7 +52,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     }
 
     /**
-     * Check if Express Pay is enabled.
+     * Check if Express Pay is enabled in Checkout.
      *
      * @param int $websiteId
      * @return bool
