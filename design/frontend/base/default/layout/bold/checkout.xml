@@ -1,12 +1,14 @@
 <?xml version="1.0"?>
 <layout version="0.1.0">
-    <checkout_cart_index>
+    <default>
         <reference name="head">
-            <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart">
+            <action method="addItem">
                 <type>skin_js</type>
                 <name>js/bold/checkout_payment_booster/expresspay.js</name>
             </action>
         </reference>
+    </default>
+    <checkout_cart_index>
         <reference name="checkout.cart.methods">
             <block
                     type="bold_checkout_payment_booster/checkout_expresspay"
@@ -20,10 +22,6 @@
     </checkout_cart_index>
     <checkout_onepage_index>
         <reference name="head">
-            <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled">
-                <type>skin_js</type>
-                <name>js/bold/checkout_payment_booster/expresspay.js</name>
-            </action>
             <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled">
                 <type>skin_css</type>
                 <name>css/bold/checkout_payment_booster/expresspay.css</name>
