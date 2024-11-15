@@ -808,7 +808,13 @@ const ExpressPay = async config => (async config => {
     const initializePaymentsSdk = async () => {
         let sdkConfiguration;
 
-        if (!config.isFastlaneEnabled && (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments'))) {
+        const isCheckoutActive = window.location.pathname === '/checkout/onepage/';
+
+        if (
+            (isCheckoutActive && !config.isFastlaneEnabled)
+            || !window.hasOwnProperty('bold')
+            || !window.bold.hasOwnProperty('Payments')
+        ) {
             await loadScript(config.epsStaticApiUrl + '/js/payments_sdk.js');
         }
 
@@ -936,7 +942,7 @@ const ExpressPay = async config => (async config => {
             }
         };
 
-        if (config.isFastlaneEnabled) {
+        if (isCheckoutActive && config.isFastlaneEnabled) {
             while (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
