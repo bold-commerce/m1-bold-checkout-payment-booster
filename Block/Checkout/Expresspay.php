@@ -11,7 +11,19 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
 
-        return $config->isExpressPayEnabled($websiteId);
+        switch ($this->getAction()->getFullActionName()) {
+            case 'checkout_cart_index':
+                return $config->isExpressPayEnabledInCart($websiteId);
+            case 'checkout_onepage_index':
+                return $config->isExpressPayEnabled($websiteId);
+            default:
+                return false;
+        }
+    }
+
+    public function isCheckoutActive()
+    {
+        return $this->getAction()->getFullActionName() === 'checkout_onepage_index';
     }
 
     /**
