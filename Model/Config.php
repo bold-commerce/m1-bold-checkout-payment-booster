@@ -13,6 +13,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_IS_FASTLANE_ENABLED = 'checkout/bold_checkout_payment_booster/is_fastlane_enabled';
     const PATH_IS_EXPRESS_PAY_ENABLED = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled';
     const PATH_IS_EXPRESS_PAY_ENABLED_CART = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart';
+    const PATH_IS_EXPRESS_PAY_ENABLED_MINICART = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_minicart';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
     const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
@@ -73,6 +74,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isExpressPayEnabledInCart($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_EXPRESS_PAY_ENABLED_CART)
+            && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
+    }
+
+    /**
+     * Check if Express Pay is enabled in the Mini Cart pop-up.
+     *
+     * @param int $websiteId
+     * @return bool
+     */
+    public function isExpressPayEnabledInMiniCart($websiteId)
+    {
+        return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_EXPRESS_PAY_ENABLED_MINICART)
             && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
     }
 

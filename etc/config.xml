@@ -136,6 +136,7 @@
                 <is_fastlane_enabled>0</is_fastlane_enabled>
                 <is_expresspay_enabled>0</is_expresspay_enabled>
                 <is_expresspay_enabled_cart>0</is_expresspay_enabled_cart>
+                <is_expresspay_enabled_minicart>0</is_expresspay_enabled_minicart>
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>
