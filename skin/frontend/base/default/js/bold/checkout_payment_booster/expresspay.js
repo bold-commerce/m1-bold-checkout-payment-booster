@@ -960,6 +960,8 @@ const ExpressPay = async config => (async config => {
             }
 
             console.error('Could not initialize Express Pay.', validationErrors);
+
+            return;
         }
 
         config = {...defaultConfig, ...config};
