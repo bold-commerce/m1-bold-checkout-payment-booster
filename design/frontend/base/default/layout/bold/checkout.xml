@@ -12,8 +12,8 @@
         <reference name="checkout.cart.methods">
             <block
                     type="bold_checkout_payment_booster/checkout_expresspay"
-                    name="bold_booster_expresspay"
-                    as="bold.booster.expresspay"
+                    name="cart_bold_booster_expresspay"
+                    as="cart.bold.booster.expresspay"
                     template="bold/checkout_payment_booster/checkout/expresspay.phtml"
                     after="-"
                     ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart"
@@ -30,8 +30,8 @@
         <reference name="content">
             <block
                 type="bold_checkout_payment_booster/checkout_expresspay"
-                name="bold_booster_expresspay"
-                as="bold.booster.expresspay"
+                name="checkout_bold_booster_expresspay"
+                as="checkout.bold.booster.expresspay"
                 template="bold/checkout_payment_booster/checkout/expresspay.phtml"
                 before="checkout.onepage"
                 ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled"
