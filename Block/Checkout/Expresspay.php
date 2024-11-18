@@ -16,7 +16,8 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
 
         switch ($this->getBlockAlias()) {
             case 'cart_sidebar.bold.booster.expresspay':
-                return $config->isExpressPayEnabledInMiniCart($websiteId);
+                return $this->getAction()->getFullActionName() !== 'checkout_cart_index'
+                    && $config->isExpressPayEnabledInMiniCart($websiteId);
             case 'cart.bold.booster.expresspay':
                 return $config->isExpressPayEnabledInCart($websiteId);
             case 'checkout.bold.booster.expresspay':
