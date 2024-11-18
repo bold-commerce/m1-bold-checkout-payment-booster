@@ -1,26 +1,21 @@
 <?php
 
 /**
- * Observer for `controller_action_predispatch_checkout_cart_index` event
+ * Observer for `controller_action_predispatch` event
+ *
+ * @see Mage_Core_Controller_Varien_Action::preDispatch
  */
-class Bold_CheckoutPaymentBooster_Observer_CartObserver
+class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
 {
     /**
      * Initialize Bold order
      *
-     * @param Varien_Event_Observer $event
+     * @param Varien_Event_Observer $observer
      * @return void
      * @throws Exception
      */
-    public function execute(Varien_Event_Observer $event)
+    public function initializeBoldOrder(Varien_Event_Observer $observer)
     {
-        if (
-            !Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE)
-                ->isExpressPayEnabledInCart(Mage::app()->getStore()->getWebsiteId())
-        ) {
-            return;
-        }
-
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
 
