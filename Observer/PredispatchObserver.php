@@ -19,6 +19,10 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
 
+        if (count($quote->getAllVisibleItems()) === 0) {
+            return;
+        }
+
         try {
             Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
 
