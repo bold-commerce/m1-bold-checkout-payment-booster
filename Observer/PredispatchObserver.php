@@ -14,6 +14,7 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
         'catalog_category_view',
         'catalog_product_view',
         'checkout_cart_index',
+        'checkout_onepage_index',
         'customer_account_create',
         'customer_account_login',
         'customer_account_index',
