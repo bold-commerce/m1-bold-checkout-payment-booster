@@ -7,6 +7,20 @@
                 <name>js/bold/checkout_payment_booster/expresspay.js</name>
             </action>
         </reference>
+        <reference name="cart_sidebar.extra_actions">
+            <block
+                type="bold_checkout_payment_booster/checkout_expresspay"
+                name="cart_sidebar_bold_booster_expresspay"
+                as="cart_sidebar.bold.booster.expresspay"
+                template="bold/checkout_payment_booster/checkout/expresspay.phtml"
+                after="-"
+                ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_minicart"
+            >
+                <action method="setPaymentsContainerId">
+                    <paymentsContainerId>minicart-express-pay-container</paymentsContainerId>
+                </action>
+            </block>
+        </reference>
     </default>
     <checkout_cart_index>
         <reference name="checkout.cart.methods">
