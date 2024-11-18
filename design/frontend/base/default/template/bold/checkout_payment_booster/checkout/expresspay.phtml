@@ -17,6 +17,7 @@ $quote = $this->getQuote();
 </section>
 
 <script type="text/javascript">
+(function () {
     const expressPayConfig = {
         paymentsContainer: '<?php echo $this->getPaymentsContainerId() ?>',
         isFastlaneEnabled: <?php var_export($this->isFastlaneEnabled()) ?>,
@@ -47,4 +48,5 @@ $quote = $this->getQuote();
     ExpressPay(expressPayConfig).then(
         async expressPay => await expressPay.render()
     );
+})();
 </script>
