@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @method Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay setPaymentsContainerId(string $paymentsContainerId)
+ */
 class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Block_Template
 {
     /**
@@ -11,10 +14,14 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
 
-        switch ($this->getAction()->getFullActionName()) {
-            case 'checkout_cart_index':
+        switch ($this->getBlockAlias()) {
+            case 'cart_sidebar.bold.booster.expresspay':
+                return $this->getAction()->getFullActionName() !== 'checkout_cart_index'
+                    && $this->getAction()->getFullActionName() !== 'checkout_onepage_index'
+                    && $config->isExpressPayEnabledInMiniCart($websiteId);
+            case 'cart.bold.booster.expresspay':
                 return $config->isExpressPayEnabledInCart($websiteId);
-            case 'checkout_onepage_index':
+            case 'checkout.bold.booster.expresspay':
                 return $config->isExpressPayEnabled($websiteId);
             default:
                 return false;
@@ -24,6 +31,16 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     public function isCheckoutActive()
     {
         return $this->getAction()->getFullActionName() === 'checkout_onepage_index';
+    }
+
+    /**
+     * @return string
+     */
+    public function getPaymentsContainerId()
+    {
+        $paymentsContainerId = $this->getData('payments_container_id');
+
+        return $paymentsContainerId !== null ? $paymentsContainerId : 'express-pay-container';
     }
 
     /**

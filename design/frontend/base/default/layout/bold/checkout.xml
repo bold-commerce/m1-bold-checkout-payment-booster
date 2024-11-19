@@ -1,17 +1,33 @@
 <?xml version="1.0"?>
 <layout version="0.1.0">
-    <checkout_cart_index>
+    <default>
         <reference name="head">
-            <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart">
+            <action method="addItem">
                 <type>skin_js</type>
                 <name>js/bold/checkout_payment_booster/expresspay.js</name>
             </action>
         </reference>
+        <reference name="cart_sidebar.extra_actions">
+            <block
+                type="bold_checkout_payment_booster/checkout_expresspay"
+                name="cart_sidebar_bold_booster_expresspay"
+                as="cart_sidebar.bold.booster.expresspay"
+                template="bold/checkout_payment_booster/checkout/expresspay.phtml"
+                after="-"
+                ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_minicart"
+            >
+                <action method="setPaymentsContainerId">
+                    <paymentsContainerId>minicart-express-pay-container</paymentsContainerId>
+                </action>
+            </block>
+        </reference>
+    </default>
+    <checkout_cart_index>
         <reference name="checkout.cart.methods">
             <block
                     type="bold_checkout_payment_booster/checkout_expresspay"
-                    name="bold_booster_expresspay"
-                    as="bold.booster.expresspay"
+                    name="cart_bold_booster_expresspay"
+                    as="cart.bold.booster.expresspay"
                     template="bold/checkout_payment_booster/checkout/expresspay.phtml"
                     after="-"
                     ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart"
@@ -21,10 +37,6 @@
     <checkout_onepage_index>
         <reference name="head">
             <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled">
-                <type>skin_js</type>
-                <name>js/bold/checkout_payment_booster/expresspay.js</name>
-            </action>
-            <action method="addItem" ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled">
                 <type>skin_css</type>
                 <name>css/bold/checkout_payment_booster/expresspay.css</name>
             </action>
@@ -32,8 +44,8 @@
         <reference name="content">
             <block
                 type="bold_checkout_payment_booster/checkout_expresspay"
-                name="bold_booster_expresspay"
-                as="bold.booster.expresspay"
+                name="checkout_bold_booster_expresspay"
+                as="checkout.bold.booster.expresspay"
                 template="bold/checkout_payment_booster/checkout/expresspay.phtml"
                 before="checkout.onepage"
                 ifconfig="checkout/bold_checkout_payment_booster/is_expresspay_enabled"
