@@ -19,7 +19,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
         $body = [
             'flow_id' => Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID,
             'order_type' => 'simple_order',
-            'cart_id' => $quote->getId(),
+            'cart_id' => $quote->getId() ?: '',
         ];
         $orderData = Bold_CheckoutPaymentBooster_Service_BoldClient::post(
             self::SIMPLE_ORDER_URI,
