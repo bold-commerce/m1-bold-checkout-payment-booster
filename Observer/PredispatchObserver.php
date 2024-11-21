@@ -50,19 +50,16 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
      */
     public function initializeBoldOrder(Varien_Event_Observer $observer)
     {
-        if (
-            !in_array(
-                strtolower($observer->getEvent()->getControllerAction()->getFullActionName()),
-                $this->allowedActions
-            )
-        ) {
+        $actionName = $observer->getEvent()->getControllerAction()->getFullActionName();
+
+        if (!in_array(strtolower($actionName), $this->allowedActions)) {
             return;
         }
 
         /** @var Mage_Sales_Model_Quote $quote */
         $quote = Mage::getModel('checkout/cart')->getQuote();
 
-        if (count($quote->getAllVisibleItems()) === 0) {
+        if (count($quote->getAllVisibleItems()) === 0 && $actionName !== 'catalog_product_view') {
             return;
         }
 
