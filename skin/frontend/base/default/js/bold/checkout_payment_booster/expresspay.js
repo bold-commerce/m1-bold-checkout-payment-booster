@@ -1,6 +1,7 @@
 const ExpressPay = async (config, isProductPageActive) => (async (config, isProductPageActive) => {
     'use strict';
 
+    let errorRendered = false;
     let boldPayments;
     let cartTotals;
     let shippingMethodsHtml = '';
@@ -935,6 +936,12 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     );
                 },
                 onErrorPaymentOrder: errors => {
+                    if (errorRendered) {
+                        errorRendered = false;
+
+                        return;
+                    }
+
                     console.error('An unexpected error occurred while processing the Express Pay order.', errors);
 
                     alert('An unexpected error occurred. Please try again.');
