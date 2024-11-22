@@ -960,7 +960,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             config.paymentsContainer ?? defaultConfig.paymentsContainer
         );
 
-        if (validationErrors.length > 0) {
+        if (!isProductPageActive && validationErrors.length > 0) {
             if (expressPayContainer !== null) {
                 expressPayContainer.style.display = 'none';
             }
