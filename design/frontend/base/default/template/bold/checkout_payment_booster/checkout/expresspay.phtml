@@ -45,7 +45,7 @@ $quote = $this->getQuote();
         getCartTotalsUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/index/getCartTotals')) ?>',
     };
 
-    ExpressPay(expressPayConfig).then(
+    ExpressPay(expressPayConfig, <?php var_export($this->isProductPageActive()) ?>).then(
         async expressPay => await expressPay.render()
     );
 })();

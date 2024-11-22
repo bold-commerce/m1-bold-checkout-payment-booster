@@ -1,4 +1,4 @@
-const ExpressPay = async config => (async config => {
+const ExpressPay = async (config, isProductPageActive) => (async (config, isProductPageActive) => {
     'use strict';
 
     let boldPayments;
@@ -993,4 +993,4 @@ const ExpressPay = async config => (async config => {
             );
         }
     };
-})(config);
+})(config, isProductPageActive);
