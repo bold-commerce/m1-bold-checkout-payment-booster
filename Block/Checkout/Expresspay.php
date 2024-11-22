@@ -99,6 +99,23 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     }
 
     /**
+     * @return string
+     */
+    public function getCurrency()
+    {
+        $quote = $this->getQuote();
+        $storeCurrency = Mage::app()->getStore()->getCurrentCurrencyCode();
+
+        if ($quote === null) {
+            return $storeCurrency;
+        }
+
+        $currency = $quote->getQuoteCurrencyCode();
+
+        return !empty($currency) ? $currency : $storeCurrency;
+    }
+
+    /**
      * @return string[][]
      */
     public function getQuoteTotals()
