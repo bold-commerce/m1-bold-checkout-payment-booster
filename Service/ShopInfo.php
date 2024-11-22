@@ -46,6 +46,13 @@ class Bold_CheckoutPaymentBooster_Service_ShopInfo
         ];
         $url = $config->getApiUrl($websiteId) . self::SHOP_INFO_URI;
 
+        if (strpos($url, 'bold.ninja') !== false) {
+            $parseApiUrl = parse_url($url);
+            $scheme = $parseApiUrl['scheme'];
+            $host = $parseApiUrl['host'];
+            $url = $scheme . '://' . $host .self::SHOP_INFO_URI;
+        }
+
         $shopInfo = json_decode(
             Bold_CheckoutPaymentBooster_Service_Client_Http::call(
                 'GET',

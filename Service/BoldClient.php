@@ -157,8 +157,29 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        return $config->getApiUrl($websiteId)
+        $url = $config->getApiUrl($websiteId)
             . '/'
             . ltrim(str_replace('{{shopId}}', $shopId, $path), '/');
+
+        if (strpos($url, 'sidekick') !== false && strpos($url, '.bold.ninja') !== false) {
+            $parseApiUrl = parse_url($url);
+            $scheme = $parseApiUrl['scheme'];
+            $host = $parseApiUrl['host'];
+            $path = ltrim($parseApiUrl['path'],'/');
+            $pathParts = explode('/', $path);
+            $newPath = "$scheme://$host";
+
+            foreach($pathParts as $part) {
+                if (strpos($part, '.bold.ninja') !== false) {
+                    $newPath = $newPath.'/'.'sidekick-'.$part;
+                } else {
+                    $newPath = $newPath.'/'.$part;
+                }
+            }
+
+            $url = $newPath;
+        }
+
+        return $url;
     }
 }
