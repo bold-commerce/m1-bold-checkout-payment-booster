@@ -36,6 +36,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         formKey: '',
         regions: {},
         allowedCountries: ['US', 'CA'],
+        defaultProductQuantity: 1,
         saveShippingUrl: '/checkout/onepage/saveShipping',
         saveShippingMethodUrl: '/checkout/onepage/saveShippingMethod',
         saveBillingUrl: '/checkout/onepage/saveBilling',

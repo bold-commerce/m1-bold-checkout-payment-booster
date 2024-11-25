@@ -33,6 +33,8 @@ $quote = $this->getQuote();
         formKey: '<?php echo $this->getFormKey() ?>',
         regions: <?php echo $this->getRegionsAsJson() ?>,
         allowedCountries: <?php echo json_encode($this->getAllowedCountries()) ?>,
+        defaultProductQuantity: <?php echo $this->getDefaultProductQuantity() ?>,
+        addProductToCartUrl: '<?php echo $this->escapeUrl($this->getProductAddToCartUrl()) ?>',
         saveShippingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShipping')) ?>',
         saveShippingMethodUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShippingMethod')) ?>',
         saveBillingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveBilling')) ?>',
