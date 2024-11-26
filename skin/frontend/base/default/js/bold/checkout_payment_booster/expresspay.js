@@ -508,11 +508,13 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         const quantityInputs = document.querySelectorAll('.product-view .qty-wrapper .qty');
 
         if (quantityInputs.length === 1) {
-            quantity = quantityInputs[0].value;
+            quantity = Number(quantityInputs[0].value);
 
             if (quantity === 0) {
                 quantity = config.defaultProductQuantity;
             }
+
+            quantities.push(quantity);
 
             addToCartFormData.append('qty', quantity);
         }
