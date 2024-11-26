@@ -98,6 +98,37 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     };
 
     /**
+     * @param {Array|String} errorMessages
+     * @returns void
+     */
+    const renderProductPageErrors = errorMessages => {
+        const messageContainer = document.getElementById('messages_product_view');
+        const messageItems = [];
+
+        if (messageContainer === null) {
+            return;
+        }
+
+        if (!Array.isArray(errorMessages)) {
+            errorMessages = [errorMessages];
+        }
+
+        errorMessages.forEach(errorMessage => {
+            messageItems.push(`<li><span>${errorMessage}</span></li>`);
+        });
+
+        messageContainer.innerHTML = `
+            <ul class="messages">
+                <li class="notice-msg">
+                    <ul>
+                        ${messageItems.join('\n')}
+                    </ul>
+                </li>
+            </ul>
+        `;
+    };
+
+    /**
      * @param {Object} order
      * @param {Object} address
      * @returns {Object}
@@ -461,6 +492,72 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         }
 
         return getOrderResult;
+    };
+
+    /**
+     * @returns {Promise<void>}
+     * @throws Error
+     */
+    const addProductToMagentoCart = async () => {
+        let addToCartFormData = new FormData();
+        let quantity = 0;
+        let quantities = [];
+        let errorMessage;
+
+        const quantityInputs = document.querySelectorAll('.product-view .add-to-cart-wrapper .qty');
+
+        if (quantityInputs.length === 1) {
+            quantity = quantityInputs[0].value;
+
+            if (quantity === 0) {
+                quantity = config.defaultProductQuantity;
+            }
+
+            addToCartFormData.append('qty', quantity);
+        }
+
+        if (quantityInputs.length > 1) {
+            quantityInputs.forEach(
+                quantityInput => {
+                    quantity = Number(quantityInput.value);
+
+                    quantities.push(quantity);
+
+                    if (quantity === 0) {
+                        return;
+                    }
+
+                    addToCartFormData.append(quantityInput.name, quantity);
+                }
+            );
+        }
+
+        if (quantities.reduce((total, newQuantity) => total + newQuantity, 0) === 0) {
+            errorMessage = 'Please specify the quantity of product(s).';
+            errorRendered = true;
+
+            renderProductPageErrors(errorMessage);
+
+            throw new Error(errorMessage);
+        }
+
+        try {
+            await fetch(
+                config.addProductToCartUrl,
+                {
+                    method: 'POST',
+                    body: addToCartFormData
+                }
+            );
+        } catch (error) {
+            errorMessage = 'Could not add product to cart.';
+
+            renderProductPageErrors(errorMessage);
+
+            console.error(errorMessage, error);
+
+            throw error;
+        }
     };
 
     /**
@@ -841,6 +938,16 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  */
                 onRequireOrderData: requirements => {
                     return getRequiredOrderData(requirements);
+                },
+                /**
+                 * @param {String} paymentType
+                 * @returns {Promise<void>}
+                 * @throws Error
+                 */
+                onClickPaymentOrder: async (paymentType) => {
+                    if (isProductPageActive) {
+                        await addProductToMagentoCart(paymentType);
+                    }
                 },
                 /**
                  * @param {String} paymentType
