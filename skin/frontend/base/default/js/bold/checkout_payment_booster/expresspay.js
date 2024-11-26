@@ -7,6 +7,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     let shippingMethodsHtml = '';
     let shippingMethods = [];
     let selectedShippingMethod = {};
+    let isProductInCart = true;
 
     const requiredConfigFields = [
         'epsApiUrl',
@@ -558,6 +559,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
             throw error;
         }
+
+        isProductInCart = true;
     };
 
     /**
@@ -937,6 +940,10 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @throws Error
                  */
                 onRequireOrderData: requirements => {
+                    if (isProductPageActive && !isProductInCart) {
+                        throw new Error('No product(s) in cart');
+                    }
+
                     return getRequiredOrderData(requirements);
                 },
                 /**
@@ -946,6 +953,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  */
                 onClickPaymentOrder: async (paymentType) => {
                     if (isProductPageActive) {
+                        isProductInCart = false;
+
                         await addProductToMagentoCart(paymentType);
                     }
                 },
@@ -957,10 +966,15 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  */
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
                     let expressPayOrderId;
+                    let modifiedPaymentPayload;
+
+                    if (isProductPageActive && !isProductInCart) {
+                        throw new Error('No product(s) in cart');
+                    }
 
                     /* We need to work with a copy of the payment payload object to prevent Google Pay from throwing
                        "invalid value" errors because we add data to it. */
-                    const modifiedPaymentPayload = structuredClone(paymentPayload);
+                    modifiedPaymentPayload = structuredClone(paymentPayload);
 
                     if (['apple', 'google'].includes(modifiedPaymentPayload.payment_data.payment_type)) {
                         fixAddressEmailAddresses(modifiedPaymentPayload.payment_data);
@@ -988,6 +1002,10 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
+                    if (isProductPageActive && !isProductInCart) {
+                        throw new Error('No product(s) in cart');
+                    }
+
                     if (!config.quoteIsVirtual) {
                         if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
