@@ -215,6 +215,24 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     }
 
     /**
+     * @return string
+     */
+    public function getProductAddToCartUrl()
+    {
+        /** @var Mage_Catalog_Model_Product|null $product */
+        $product = Mage::registry('current_product');
+
+        if ($product === null) {
+            return '';
+        }
+
+        /** @var Mage_Checkout_Helper_Cart $cartHelper */
+        $cartHelper = Mage::helper('checkout/cart');
+
+        return $cartHelper->getAddUrl($product);
+    }
+
+    /**
      * @return bool
      */
     public function isFastlaneEnabled()
