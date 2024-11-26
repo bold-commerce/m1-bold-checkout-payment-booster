@@ -505,7 +505,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         let quantities = [];
         let errorMessage;
 
-        const quantityInputs = document.querySelectorAll('.product-view .add-to-cart-wrapper .qty');
+        const quantityInputs = document.querySelectorAll('.product-view .qty-wrapper .qty');
 
         if (quantityInputs.length === 1) {
             quantity = quantityInputs[0].value;
