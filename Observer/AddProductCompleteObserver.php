@@ -21,5 +21,6 @@ class Bold_CheckoutPaymentBooster_Observer_AddProductCompleteObserver
         $checkoutSession = Mage::getSingleton('checkout/session');
 
         $checkoutSession->setNoCartRedirect(true);
+        $checkoutSession->setCartWasUpdated(false);
     }
 }
