@@ -500,7 +500,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
      * @throws Error
      */
     const addProductToMagentoCart = async () => {
-        let addToCartFormData = new FormData();
+        let addToCartFormData;
         let quantity = 0;
         let quantities = [];
         let errorMessage;
@@ -515,6 +515,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             throw new Error('Invalid product to add cart form');
         }
 
+        addToCartFormData = new FormData(productAddToCartForm);
+
         if (quantityInputs.length === 1) {
             quantity = Number(quantityInputs[0].value);
 
@@ -523,8 +525,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             }
 
             quantities.push(quantity);
-
-            addToCartFormData.append('qty', quantity);
         }
 
         if (quantityInputs.length > 1) {
@@ -537,8 +537,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     }
 
                     quantities.push(quantity);
-
-                    addToCartFormData.append(quantityInput.name, quantity);
                 }
             );
         }
