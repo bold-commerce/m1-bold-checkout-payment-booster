@@ -38,6 +38,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         regions: {},
         allowedCountries: ['US', 'CA'],
         defaultProductQuantity: 1,
+        productPrice: 0.00,
         addProductToCartUrl: '/checkout/cart/add',
         saveShippingUrl: '/checkout/onepage/saveShipping',
         saveShippingMethodUrl: '/checkout/onepage/saveShippingMethod',
@@ -274,7 +275,13 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
      * @throws Error
      */
     const getRequiredOrderData = requirements => {
+        let orderTotal = config.quoteTotals.grand_total?.value ?? 0;
+
         const requiredOrderData = {};
+
+        if (isProductPageActive && Number(orderTotal) === 0) {
+            orderTotal = config.productPrice;
+        }
 
         for (const requirement of requirements) {
             switch (requirement) {
@@ -305,7 +312,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     break;
                 case 'totals':
                     requiredOrderData[requirement] = {
-                        order_total: config.quoteTotals.grand_total?.value ?? 0,
+                        order_total: orderTotal,
                         ...getOrderTotalsForApplePayAndGooglePay()
                     };
 

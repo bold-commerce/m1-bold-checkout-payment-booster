@@ -215,6 +215,36 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     }
 
     /**
+     * @return float
+     */
+    public function getProductPrice()
+    {
+        /** @var Mage_Catalog_Model_Product|null $product */
+        $product = Mage::registry('current_product');
+
+        if ($product === null) {
+            return 0.00;
+        }
+
+        if ($product->getTypeId() === Mage_Catalog_Model_Product_Type::TYPE_BUNDLE) {
+            return $product->getPriceModel()->getTotalPrices($product, 'min');
+        }
+
+        if ($product->getTypeId() === Mage_Catalog_Model_Product_Type::TYPE_GROUPED) {
+            $groupedProductPrices = array_map(
+                static function (Mage_Catalog_Model_Product $product) {
+                    return $product->getFinalPrice();
+                },
+                $product->getTypeInstance(true)->getAssociatedProducts($product)
+            );
+
+            return min($groupedProductPrices);
+        }
+
+        return $product->getFinalPrice();
+    }
+
+    /**
      * @return string
      */
     public function getProductAddToCartUrl()
