@@ -547,6 +547,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             throw new Error(errorMessage);
         }
 
+        addToCartFormData.append('source', 'expresspay');
+
         try {
             await fetch(
                 config.addProductToCartUrl,

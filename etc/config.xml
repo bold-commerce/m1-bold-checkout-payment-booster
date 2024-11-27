@@ -47,6 +47,14 @@
                     </initialize_bold_order>
                 </observers>
             </controller_action_predispatch>
+            <checkout_cart_add_product_complete>
+                <observers>
+                    <express_pay_add_to_cart>
+                        <class>Bold_CheckoutPaymentBooster_Observer_AddProductCompleteObserver</class>
+                        <method>execute</method>
+                    </express_pay_add_to_cart>
+                </observers>
+            </checkout_cart_add_product_complete>
             <checkout_submit_all_after>
                 <observers>
                     <update_bold_order_status>
