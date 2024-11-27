@@ -505,7 +505,15 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         let quantities = [];
         let errorMessage;
 
+        const productAddToCartForm = document.getElementById('product_addtocart_form');
+        const validator = new Validation(productAddToCartForm);
         const quantityInputs = document.querySelectorAll('.product-view .qty-wrapper .qty');
+
+        if (!validator.validate()) {
+            errorRendered = true;
+
+            throw new Error('Invalid product to add cart form');
+        }
 
         if (quantityInputs.length === 1) {
             quantity = Number(quantityInputs[0].value);
