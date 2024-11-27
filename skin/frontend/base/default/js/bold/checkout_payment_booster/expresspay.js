@@ -1009,9 +1009,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
-                    if (isProductPageActive && !isProductInCart) {
-                        throw new Error('No product(s) in cart');
-                    }
 
                     if (!config.quoteIsVirtual) {
                         if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
