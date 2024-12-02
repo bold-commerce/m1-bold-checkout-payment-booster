@@ -959,11 +959,13 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @throws Error
                  */
                 onClickPaymentOrder: async (paymentType) => {
-                    if (isProductPageActive) {
-                        isProductInCart = false;
-
-                        await addProductToMagentoCart(paymentType);
+                    if (!isProductPageActive) {
+                        return;
                     }
+
+                    isProductInCart = false;
+
+                    await addProductToMagentoCart(paymentType);
                 },
                 /**
                  * @param {String} paymentType
