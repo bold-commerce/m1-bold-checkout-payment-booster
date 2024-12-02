@@ -984,10 +984,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @throws Error
                  */
                 onRequireOrderData: requirements => {
-                    if (isProductPageActive && !isProductInCart) {
-                        throw new Error('No product(s) in cart');
-                    }
-
                     return getRequiredOrderData(requirements);
                 },
                 /**
