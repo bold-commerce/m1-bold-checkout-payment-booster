@@ -92,6 +92,28 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         }
     }
 
+    public function updateOrderShippingMethod(Varien_Event_Observer $event)
+    {
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+        if (!$publicOrderId) {
+            return;
+        }
+
+        $request = $event->getRequest();
+        if ($request->getParam('source') === 'expresspay') {
+            return;
+        }
+
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = $event->getQuote();
+        try {
+            Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
+        } catch (Mage_Core_Exception $e) {
+            Mage::log($e->getMessage(), Zend_Log::CRIT);
+            Mage::throwException(Mage::helper('core')->__('Bold update failed.'));
+        }
+    }
+
     /**
      * Add Bold transaction data to order payment.
      *
