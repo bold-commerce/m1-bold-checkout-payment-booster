@@ -3,6 +3,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
     let errorRendered = false;
     let boldPayments;
+    let addToCartPromise;
     let cartTotals;
     let cartItems;
     let shippingMethodsHtml = '';
@@ -1001,7 +1002,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     isProductInCart = false;
 
                     if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
-                        addProductToMagentoCart().then(
+                        addToCartPromise = addProductToMagentoCart().then(
                             async () => {
                                 await getCartTotals();
                                 await getCartItems();
@@ -1057,6 +1058,10 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
+                    if (isProductPageActive && addToCartPromise !== undefined) {
+                        await addToCartPromise;
+                    }
+
                     if (!config.quoteIsVirtual) {
                         if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
