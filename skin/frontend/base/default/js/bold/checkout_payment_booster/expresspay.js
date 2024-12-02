@@ -1009,7 +1009,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
-
                     if (!config.quoteIsVirtual) {
                         if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
