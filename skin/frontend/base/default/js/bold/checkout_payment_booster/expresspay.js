@@ -299,6 +299,9 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                         );
 
                     break;
+                case 'shipping_address':
+                    requiredOrderData[requirement] = [];
+                    break;
                 case 'shipping_options':
                     if (config.quoteIsVirtual) {
                         requiredOrderData[requirement] = [];
@@ -323,7 +326,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     break;
                 case 'customer':
                 case 'billing_address':
-                case 'shipping_address':
                 default:
                     throw new Error(`Requirement "${requirement}" not implemented`);
             }
