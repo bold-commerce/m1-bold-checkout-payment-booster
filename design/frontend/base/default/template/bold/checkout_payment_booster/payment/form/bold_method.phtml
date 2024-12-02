@@ -33,6 +33,7 @@
             this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
+            this.successUrl = '<?php echo $this->getUrl('checkout/onepage/success') ?>';
         },
         /**
          * Wait for base instance to be initialized.
@@ -46,11 +47,216 @@
                         clearInterval(intervalId);
                         resolve();
                     }
-                }, 100);
-                setTimeout(() => {
-                    clearInterval(intervalId);
-                    resolve();
-                }, 10000);
+                ],
+                'callbacks': {
+                    'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
+                        console.log('ON CREATE PAYMENT ORDER CALLBACK RECEIVED WITH DATA: ', paymentPayload);
+                        if (paymentType !== 'ppcp') {
+                            return;
+                        }
+                        const walletPayResult = await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': 'Bearer ' + this.jwtToken,
+                            },
+                            body: JSON.stringify(paymentPayload),
+                        });
+                        if (walletPayResult.ok) {
+                            console.log('Payment order created.');
+                            const walletPayResultPayload = await walletPayResult.json();
+                            return walletPayResultPayload.data
+                        } else {
+                            throw 'Unable to create wallet pay order';
+                        }
+                    }.bind(this),
+                    'onUpdatePaymentOrder': async function () {
+                        // We won't handle updating an order from PayPal data, we will disable address changes etc
+                    }.bind(this),
+                    'onApprovePaymentOrder': async function (paymentType, paymentInformation, paymentPayload) {
+                        // A PayPal payment has been completed, we need to capture the payment ID and pass it through
+                        if (paymentType !== 'ppcp') {
+                            return;
+                        }
+
+                        if (!paymentInformation.payment_id) {
+                            console.error('No payment ID provided from PayPal.');
+                            return;
+                        }
+
+                        // Update the payment ID from PayPal
+                        this.paymentId = paymentInformation.payment_id;
+
+                        // Save the payment step to push the customer along
+                        // payment.save();
+                        if (checkout.loadWaiting!=false) return;
+                        var validator = new Validation(payment.form);
+                        if (payment.validate() && validator.validate()) {
+                            checkout.setLoadWaiting('payment');
+                            new Ajax.Request(
+                                payment.saveUrl,
+                                {
+                                    method:'post',
+                                    onComplete: function(){
+                                        checkout.setLoadWaiting(false);
+                                    }.bindAsEventListener(this),
+                                    onSuccess: function(transport) {
+                                        console.log('LOOKS LIKE WE GOT A PURMENT SUCCESS: ', transport);
+                                        var response = transport.responseJSON || transport.responseText.evalJSON(true) || {};
+
+                                        /*
+                                         * if there is an error in payment, need to show error message
+                                         */
+                                        if (response.error) {
+                                            if (response.fields) {
+                                                var fields = response.fields.split(',');
+                                                for (var i = 0; i < fields.length; i++) {
+                                                    var field = null;
+                                                    if (field = $(fields[i])) {
+                                                        Validation.ajaxError(field, response.error);
+                                                    }
+                                                }
+                                                return;
+                                            }
+                                            if (Object.isString(response.message)) {
+                                                alert(response.message.stripTags().toString());
+                                            } else {
+                                                alert(response.error.stripTags().toString());
+                                            }
+                                            return;
+                                        } else {
+                                            console.log('NO PAYMENT ERRORS! SHOULD BE PROCEEDING...');
+                                        }
+
+                                        //if (checkout.loadWaiting!=false) return;
+                                        // checkout.setLoadWaiting('review'); // This crashes because we removed the `setNextStep` call.
+                                        var params = Form.serialize(payment.form); // This is correct.
+                                        var agreementsForm = $('checkout-agreements');
+                                        if (agreementsForm) {
+                                            console.log('OKAY AGREEMENTS FORM');
+                                            params += '&'+Form.serialize(agreementsForm);
+                                        } else {
+                                            console.log('NO AGREEMENTS FORM');
+                                        }
+                                        params.save = true;
+                                        new Ajax.Request(
+                                            '<?php echo $this->getUrl('checkout/onepage/saveOrder') ?>',
+                                            {
+                                                method:'post',
+                                                parameters:params,
+                                                onComplete: function(transport){
+                                                    checkout.setLoadWaiting(false, this.isSuccess);
+                                                }.bindAsEventListener(this),
+                                                onSuccess: function(transport){
+                                                    console.log('HEY HEY REVIEW SUCCESS RIGHT HERE: ', transport);
+                                                    if (transport) {
+                                                        var response = transport.responseJSON || transport.responseText.evalJSON(true) || {};
+
+                                                        if (response.redirect) {
+                                                            this.isSuccess = true;
+                                                            console.log("REDIRECTING: ", response.redirect);
+                                                            location.href = encodeURI(response.redirect);
+                                                            return;
+                                                        }
+                                                        if (response.success) {
+                                                            this.isSuccess = true;
+                                                            console.log("IS SUCCESS: ", this.successUrl);
+                                                            location.href = encodeURI(this.successUrl);
+                                                        }
+                                                        else{
+                                                            var msg = response.error_messages;
+                                                            if (Object.isArray(msg)) {
+                                                                msg = msg.join("\n").stripTags().toString();
+                                                            }
+                                                            if (msg) {
+                                                                alert(msg);
+                                                            }
+                                                        }
+
+                                                        console.log('SOMETHING ELSE HAPPENED: ', response);
+
+                                                        if (response.update_section) {
+                                                            $('checkout-'+response.update_section.name+'-load').update(response.update_section.html);
+                                                        }
+
+                                                        if (response.goto_section) {
+                                                            checkout.gotoSection(response.goto_section, true);
+                                                        }
+                                                    }
+                                                }.bindAsEventListener(this),
+                                                onFailure: checkout.ajaxFailure.bind(checkout)
+                                            }
+                                        );
+                                    }.bindAsEventListener(this),
+                                    onFailure: checkout.ajaxFailure.bind(checkout),
+                                    parameters: Form.serialize(payment.form)
+                                }
+                            );
+                        }
+
+                        // Auto-place the order and direct to the thank-you page
+
+                    }.bind(this),
+                    'onScaPaymentOrder': async function (type, payload) {
+                        const url = `${this.boldApiUrl}payments/on_sca`;
+                        const orderId = payload.order_id;
+
+                        if (type === 'ppcp') {
+                            const scaResult = await fetch(url, {
+                                method: 'POST',
+                                headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${this.jwtToken}`},
+                                body: JSON.stringify({'order_id': orderId, 'public_order_id': '<?php echo $this->getPublicOrderID(); ?>'}),
+                            });
+                            if (!scaResult.ok) {
+                                throw new Error('SCA failed');
+                            }
+                            const data = await scaResult.json();
+                            return {card: data};
+
+                        }
+                        throw new Error('Unsupported payment type');
+                    }.bind(this)
+                }
+            };
+            const boldPayments = new window.bold.Payments(initialData);
+            boldPayments.renderPayments('payment_form_bold');
+        },
+        /**
+         * Convert PPCP address to Magento address.
+         *
+         * @param {{}} ppcpAddress
+         * @return {{}}
+         */
+        convertPPCPAddressToMagentoAddress: function (ppcpAddress) {
+            return {
+                'firstname': ppcpAddress.first_name,
+                'lastname': ppcpAddress.last_name,
+                'street1': ppcpAddress.address_line_1,
+                'street2': ppcpAddress.address_line_2,
+                'city': ppcpAddress.city,
+                'postcode': ppcpAddress.postal_code,
+                'country_id': ppcpAddress.country_code,
+                'region': ppcpAddress.state,
+            };
+        },
+        /**
+         * Load specified script with attributes.
+         *
+         * @returns {Promise<void>}
+         */
+        loadScript: async function (src, attributes = {}) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                if (attributes.constructor === Object) {
+                    Object.keys(attributes).forEach((key) => {
+                        script.setAttribute(key, attributes[key]);
+                    });
+                }
+                document.head.appendChild(script);
             });
         },
         /**
