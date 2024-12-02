@@ -46,6 +46,7 @@ $quote = $this->getQuote();
         updateOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/updateOrder')) ?>',
         getOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/getOrder')) ?>',
         getCartTotalsUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/index/getCartTotals')) ?>',
+        getCartItemsUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/index/getCartItems')) ?>',
     };
 
     ExpressPay(expressPayConfig, <?php var_export($this->isProductPageActive()) ?>).then(

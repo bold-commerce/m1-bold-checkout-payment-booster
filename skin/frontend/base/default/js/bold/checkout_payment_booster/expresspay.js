@@ -4,6 +4,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     let errorRendered = false;
     let boldPayments;
     let cartTotals;
+    let cartItems;
     let shippingMethodsHtml = '';
     let shippingMethods = [];
     let selectedShippingMethod = {};
@@ -50,6 +51,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         updateOrderUrl: '/checkoutpaymentbooster/expresspay/updateOrder',
         getOrderUrl: '/checkoutpaymentbooster/expresspay/getOrder',
         getCartTotalsUrl: '/checkoutpaymentbooster/index/getCartTotals',
+        getCartItemsUrl: '/checkoutpaymentbooster/index/getCartItems',
     };
 
     /**
@@ -277,6 +279,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     const getRequiredOrderData = requirements => {
         let orderTotal = config.quoteTotals.grand_total?.value ?? 0;
 
+        const quoteItems = cartItems ?? config.quoteItems;
         const requiredOrderData = {};
 
         if (isProductPageActive && Number(orderTotal) === 0) {
@@ -286,7 +289,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         for (const requirement of requirements) {
             switch (requirement) {
                 case 'items':
-                    requiredOrderData[requirement] = config.quoteItems
+                    requiredOrderData[requirement] = quoteItems
                         .map(
                             quoteItem => ({
                                 amount: quoteItem.price * 100,
@@ -829,6 +832,37 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     };
 
     /**
+     * @returns {Promise<void>}
+     */
+    const getCartItems = async () => {
+        let getCartItemsResponse;
+
+        const formData = new FormData();
+
+        formData.append('form_key', config.formKey);
+
+        try {
+            getCartItemsResponse = await fetch(
+                config.getCartItemsUrl,
+                {
+                    method: 'POST',
+                    body: formData
+                }
+            );
+        } catch (error) {
+            console.error('Could not retrieve cart totals from Magento.', error);
+
+            throw error;
+        }
+
+        try {
+            cartItems = await getCartItemsResponse.json();
+        } catch (syntaxError) {
+            cartItems = null;
+        }
+    };
+
+    /**
      * @param {Object} paymentData
      * @returns void
      */
@@ -955,15 +989,26 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                 },
                 /**
                  * @param {String} paymentType
+                 * @param {Object} paymentPayload
                  * @returns {Promise<void>}
                  * @throws Error
                  */
-                onClickPaymentOrder: async (paymentType) => {
+                onClickPaymentOrder: async (paymentType, paymentPayload) => {
                     if (!isProductPageActive) {
                         return;
                     }
 
                     isProductInCart = false;
+
+                    if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
+                        addProductToMagentoCart().then(
+                            async () => {
+                                await getCartItems();
+                            }
+                        );
+
+                        return;
+                    }
 
                     await addProductToMagentoCart(paymentType);
                 },
