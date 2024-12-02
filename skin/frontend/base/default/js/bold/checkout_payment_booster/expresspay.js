@@ -1010,7 +1010,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                         return;
                     }
 
-                    await addProductToMagentoCart(paymentType);
+                    await addProductToMagentoCart();
                 },
                 /**
                  * @param {String} paymentType
