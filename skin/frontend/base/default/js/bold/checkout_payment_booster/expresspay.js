@@ -1003,6 +1003,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
                         addProductToMagentoCart().then(
                             async () => {
+                                await getCartTotals();
                                 await getCartItems();
                             }
                         );
