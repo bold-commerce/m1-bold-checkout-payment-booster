@@ -21,7 +21,7 @@ class Bold_CheckoutPaymentBooster_Observer_BeforeAddToCartObserver
         $request = $controllerAction->getRequest();
         $isExpressPayOrder = $request->getParam('source') === 'expresspay';
         $shouldEmptyCart = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE)
-            ->shouldEmptyCartForExpressPayOnProductPage();
+            ->shouldEmptyCartForExpressPayOnProductPage(null);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         /** @var Mage_Sales_Model_Quote $quote */
