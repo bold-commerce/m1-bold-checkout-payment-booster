@@ -344,6 +344,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         let createOrderResult;
         let errorMessage;
 
+        const quoteId = !isProductPageActive ? config.quoteId : '';
+
         try {
             createOrderResponse = await fetch(
                 config.createOrderUrl,
@@ -356,7 +358,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     body: JSON.stringify(
                         {
                             form_key: config.formKey,
-                            quote_id: config.quoteId,
+                            quote_id: quoteId,
                             gateway_id: gatewayId
                         }
                     )
