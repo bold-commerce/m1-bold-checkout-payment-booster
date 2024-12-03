@@ -47,6 +47,14 @@
                     </initialize_bold_order>
                 </observers>
             </controller_action_predispatch>
+            <controller_action_predispatch_checkout_cart_add>
+                <observers>
+                    <express_pay_reset_existing_quote>
+                        <class>Bold_CheckoutPaymentBooster_Observer_BeforeAddToCartObserver</class>
+                        <method>resetQuote</method>
+                    </express_pay_reset_existing_quote>
+                </observers>
+            </controller_action_predispatch_checkout_cart_add>
             <checkout_cart_add_product_complete>
                 <observers>
                     <express_pay_add_to_cart>
@@ -129,6 +137,7 @@
                 <is_expresspay_enabled_cart>0</is_expresspay_enabled_cart>
                 <is_expresspay_enabled_minicart>0</is_expresspay_enabled_minicart>
                 <is_expresspay_enabled_pdp>0</is_expresspay_enabled_pdp>
+                <expresspay_empty_cart_pdp>0</expresspay_empty_cart_pdp>
             </bold_checkout_payment_booster>
             <bold_checkout_payment_booster_advanced>
                 <api_url>https://api.boldcommerce.com/</api_url>

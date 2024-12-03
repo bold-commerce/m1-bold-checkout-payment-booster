@@ -15,6 +15,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_IS_EXPRESS_PAY_ENABLED_CART = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_cart';
     const PATH_IS_EXPRESS_PAY_ENABLED_MINICART = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_minicart';
     const PATH_IS_EXPRESS_PAY_ENABLED_PDP = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_pdp';
+    const PATH_EXPRESS_PAY_EMPTY_CART_PDP = 'checkout/bold_checkout_payment_booster/expresspay_empty_cart_pdp';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
     const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
@@ -99,6 +100,18 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isExpressPayEnabledOnProductPage($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_EXPRESS_PAY_ENABLED_PDP)
+            && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
+    }
+
+    /**
+     * Check if cart should be emptied before adding Express Pay products to cart from Product pages.
+     *
+     * @param int $websiteId
+     * @return bool
+     */
+    public function shouldEmptyCartForExpressPayOnProductPage($websiteId)
+    {
+        return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_EXPRESS_PAY_EMPTY_CART_PDP)
             && Mage::helper('core')->isModuleOutputEnabled('Bold_CheckoutPaymentBooster');
     }
 
