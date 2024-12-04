@@ -17,8 +17,11 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         switch ($this->getBlockAlias()) {
             case 'cart_sidebar.bold.booster.expresspay':
                 return $this->getAction()->getFullActionName() !== 'checkout_cart_index'
+                    && $this->getAction()->getFullActionName() !== 'catalog_product_view'
                     && $this->getAction()->getFullActionName() !== 'checkout_onepage_index'
                     && $config->isExpressPayEnabledInMiniCart($websiteId);
+            case 'product.detail.bold.booster.expresspay':
+                return $config->isExpressPayEnabledOnProductPage($websiteId);
             case 'cart.bold.booster.expresspay':
                 return $config->isExpressPayEnabledInCart($websiteId);
             case 'checkout.bold.booster.expresspay':
@@ -31,6 +34,11 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     public function isCheckoutActive()
     {
         return $this->getAction()->getFullActionName() === 'checkout_onepage_index';
+    }
+
+    public function isProductPageActive()
+    {
+        return $this->getAction()->getFullActionName() === 'catalog_product_view';
     }
 
     /**
@@ -88,6 +96,23 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         $checkoutSession = Mage::getSingleton('checkout/session');
 
         return $checkoutSession->getQuote();
+    }
+
+    /**
+     * @return string
+     */
+    public function getCurrency()
+    {
+        $quote = $this->getQuote();
+        $storeCurrency = Mage::app()->getStore()->getCurrentCurrencyCode();
+
+        if ($quote === null) {
+            return $storeCurrency;
+        }
+
+        $currency = $quote->getQuoteCurrencyCode();
+
+        return !empty($currency) ? $currency : $storeCurrency;
     }
 
     /**
@@ -169,6 +194,72 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     public function getAllowedCountries()
     {
         return explode(',', (string)Mage::getStoreConfig('general/country/allow')) ?: [];
+    }
+
+    /**
+     * @return int|float
+     */
+    public function getDefaultProductQuantity()
+    {
+        /** @var Mage_Catalog_Model_Product|null $product */
+        $product = Mage::registry('current_product');
+
+        if ($product === null) {
+            return 1;
+        }
+
+        /** @var Mage_Catalog_Helper_Product $productHelper */
+        $productHelper = Mage::helper('catalog/product');
+
+        return $productHelper->getDefaultQty($product);
+    }
+
+    /**
+     * @return float
+     */
+    public function getProductPrice()
+    {
+        /** @var Mage_Catalog_Model_Product|null $product */
+        $product = Mage::registry('current_product');
+
+        if ($product === null) {
+            return 0.00;
+        }
+
+        if ($product->getTypeId() === Mage_Catalog_Model_Product_Type::TYPE_BUNDLE) {
+            return $product->getPriceModel()->getTotalPrices($product, 'min');
+        }
+
+        if ($product->getTypeId() === Mage_Catalog_Model_Product_Type::TYPE_GROUPED) {
+            $groupedProductPrices = array_map(
+                static function (Mage_Catalog_Model_Product $product) {
+                    return $product->getFinalPrice();
+                },
+                $product->getTypeInstance(true)->getAssociatedProducts($product)
+            );
+
+            return min($groupedProductPrices);
+        }
+
+        return $product->getFinalPrice();
+    }
+
+    /**
+     * @return string
+     */
+    public function getProductAddToCartUrl()
+    {
+        /** @var Mage_Catalog_Model_Product|null $product */
+        $product = Mage::registry('current_product');
+
+        if ($product === null) {
+            return '';
+        }
+
+        /** @var Mage_Checkout_Helper_Cart $cartHelper */
+        $cartHelper = Mage::helper('checkout/cart');
+
+        return $cartHelper->getAddUrl($product);
     }
 
     /**
