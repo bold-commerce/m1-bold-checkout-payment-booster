@@ -40,6 +40,19 @@
             'postcode': 'billing:postcode',
             'use_for_shipping': 'billing:use_for_shipping_yes'
         },
+        shippingAddressFieldsMap: {
+            'firstname': 'shipping:firstname',
+            'lastname': 'shipping:lastname',
+            'company': 'shipping:company',
+            'telephone': 'shipping:telephone',
+            'street1': 'shipping:street1',
+            'street2': 'shipping:street2',
+            'city': 'shipping:city',
+            'region_id': 'shipping:region_id',
+            'country_id': 'shipping:country_id',
+            'postcode': 'shipping:postcode',
+            'shipping_method': 'shipping_method'
+        },
         orderDataFieldMapper: {
             'address_id': 'billing-address-select',
             'firstname': 'billing:firstname',
@@ -87,7 +100,7 @@
             if (!this.isAvailable) {
                 return false;
             }
-            this.hydrateOrderData();
+            await this.hydrateOrderData();
             this.subscribeToBillingAddressFieldsChanges();
             if (!this.isFastlaneAvailable) {
                 return;
@@ -231,11 +244,10 @@
                     client: clientInstance,
                 }
             );
-            const {deviceData} = dataCollectorInstance;
             return window.braintree.fastlane.create({
                 authorization: this.gatewayData.client_token,
                 client: clientInstance,
-                deviceData: deviceData,
+                deviceData: dataCollectorInstance.deviceData,
             });
         },
         /**
@@ -263,7 +275,11 @@
             checkout.setLoadWaiting('billing', true);
             this.authorizedEmail = emailField.value;
             try {
-                const {identity} = await this.getFastlaneInstance();
+                const fastlaneInstance = await this.getFastlaneInstance();
+                if (!fastlaneInstance) {
+                    return;
+                }
+                const {identity} = fastlaneInstance;
                 const {customerContextId} = await identity.lookupCustomerByEmail(emailField.value);
                 checkout.setLoadWaiting(false);
                 if (!customerContextId) {
@@ -282,7 +298,8 @@
                     checkout.setLoadWaiting('billing', true);
                     this.fastlaneProfileData = profileData;
                     if (profileData.shippingAddress) {
-                        this.updateBillingAddressFormValues(profileData.shippingAddress);
+                        const shippingAddress = this.convertPayPalAddressToMagentoAddress(profileData.shippingAddress);
+                        this.updateBillingAddressFormValues(shippingAddress);
                         this.addAddressButton();
                     }
                     if (window.bold.fastlanePaymentMethod) {
@@ -298,54 +315,75 @@
         /**
          * Fill billing address form with Fastlane address.
          *
-         * @param {{}} fastlaneAddress
+         * @param {{}} formValues
          * @return {void}
          */
-        updateBillingAddressFormValues: function (fastlaneAddress) {
-            const magentoAddress = this.convertFastlaneAddressToMagentoAddress(fastlaneAddress);
+        updateBillingAddressFormValues: function (formValues) {
+            if (!formValues) {
+                return;
+            }
             Object.keys(this.billingAddressFieldsMap).forEach((field) => {
-                if (magentoAddress[field] && document.getElementById(this.billingAddressFieldsMap[field])) {
+                if (formValues[field] && document.getElementById(this.billingAddressFieldsMap[field])) {
                     const element = document.getElementById(this.billingAddressFieldsMap[field]);
                     if (!element) {
                         return;
                     }
-                    element.value = magentoAddress[field];
+                    element.value = formValues[field];
                 }
             });
-            this.hydrateOrderData();
+        },
+        updateShippingAddressFormValues: function (formValues) {
+            Object.keys(this.shippingAddressFieldsMap).forEach((field) => {
+                if (field === 'shipping_method') {
+                    if (formValues[field] && document.getElementById('s_method_' + formValues[field])) {
+                        const element = document.getElementById('s_method_' + formValues[field]);
+                        if (!element) {
+                            return;
+                        }
+                        element.checked = true;
+                    }
+                }
+                if (formValues[field] && document.getElementById(this.shippingAddressFieldsMap[field])) {
+                    const element = document.getElementById(this.shippingAddressFieldsMap[field]);
+                    if (!element) {
+                        return;
+                    }
+                    element.value = formValues[field];
+                }
+            });
         },
         /**
          * Convert Fastlane address to Magento address.
          *
-         * @param fastlaneAddress {{}}
+         * @param address {{}}
          * @return {{}}
          */
-        convertFastlaneAddressToMagentoAddress: function (fastlaneAddress) {
+        convertPayPalAddressToMagentoAddress: function (address) {
             let magentoAddressRegionId = null;
-            const fastlaneCountryCode = fastlaneAddress.countryCodeAlpha2 || fastlaneAddress.address?.countryCode;
-            const fastlaneRegionCode = fastlaneAddress.region || fastlaneAddress.address?.adminArea1;
-            if (window.billingRegionUpdater.regions[fastlaneCountryCode]) {
-                Object.entries(window.billingRegionUpdater.regions[fastlaneCountryCode]).each((region) => {
+            const countryCode = address.countryCodeAlpha2 || address.address?.countryCode;
+            const regionCode = address.region || address.address?.adminArea1;
+            if (window.billingRegionUpdater.regions[countryCode]) {
+                Object.entries(window.billingRegionUpdater.regions[countryCode]).each((region) => {
                     const [regionId, regionData] = region;
-                    if (regionData.code === fastlaneRegionCode) {
+                    if (regionData.code === regionCode) {
                         magentoAddressRegionId = regionId;
                     }
                 })
             }
-            const telephone = typeof fastlaneAddress.phoneNumber === 'string'
-                ? fastlaneAddress.phoneNumber
-                : fastlaneAddress.phoneNumber?.countryCode + fastlaneAddress.phoneNumber?.nationalNumber;
+            const telephone = typeof address.phoneNumber === 'string'
+                ? address.phoneNumber
+                : address.phoneNumber?.countryCode + address.phoneNumber?.nationalNumber;
             return {
-                'firstname': fastlaneAddress.firstName || fastlaneAddress.name?.firstName,
-                'lastname': fastlaneAddress.lastName || fastlaneAddress.name?.lastName,
-                'company': fastlaneAddress.company,
+                'firstname': address.firstName || address.name?.firstName,
+                'lastname': address.lastName || address.name?.lastName,
+                'company': address.company,
                 'telephone': telephone,
-                'street1': fastlaneAddress.streetAddress || fastlaneAddress.address?.addressLine1,
-                'street2': fastlaneAddress.extendedAddress || fastlaneAddress.address?.addressLine2,
-                'city': fastlaneAddress.locality || fastlaneAddress.address?.adminArea2,
+                'street1': address.streetAddress || address.address?.addressLine1,
+                'street2': address.extendedAddress || address.address?.addressLine2,
+                'city': address.locality || address.address?.adminArea2,
                 'region_id': magentoAddressRegionId,
-                'postcode': fastlaneAddress.postalCode || fastlaneAddress.address?.postalCode,
-                'country_id': fastlaneCountryCode,
+                'postcode': address.postalCode || address.address?.postalCode,
+                'country_id': countryCode,
             };
         },
         /**
@@ -382,7 +420,8 @@
                         if (!editAddressResult.selectionChanged) {
                             return;
                         }
-                        this.updateBillingAddressFormValues(editAddressResult.selectedAddress);
+                        const address = this.convertToMagentoAddress(editAddressResult.selectedAddress);
+                        this.updateBillingAddressFormValues(address);
                     });
                 });
             });
@@ -442,19 +481,27 @@
                         }
                         throw 'Unable to create wallet pay order';
                     }.bind(this),
-                    'onUpdatePaymentOrder': async function () {
-                        // We won't handle updating an order from PayPal data, we will disable address changes etc
-                    }.bind(this),
-                    'onApprovePaymentOrder': async function (paymentType, paymentInformation) {
-                        // A PayPal payment has been completed, we need to capture the payment ID and pass it through
-                        if (paymentType !== 'ppcp') {
-                            return;
+                    'onRequireOrderData': async function (requirements) {
+                        try {
+                            return await this.getRequiredOrderDataAction(requirements);
+                        } catch (e) {
+                            console.error(e);
+                            checkout.setLoadWaiting(false);
+                            throw e;
                         }
+                    }.bind(this),
+                    'onUpdatePaymentOrder': async function (paymentType, paymentPayload) {
+                        return await this.onUpdatePaymentOrderCallback(paymentType, paymentPayload);
+                    }.bind(this),
+                    'onApprovePaymentOrder': async function (paymentType, paymentInformation, paymentApprovalData) {
+                        await this.onApprovePaymentOrderCallback(paymentType, paymentInformation, paymentApprovalData);
                         if (!paymentInformation.payment_id) {
                             console.error('No payment ID provided from PayPal.');
                             return;
                         }
                         window.bold.boldPaymentMethod.paymentId = paymentInformation.payment_id;
+                        payment.switchMethod('bold');
+                        debugger;
                         payment.save();
                     }.bind(this),
                     'onScaPaymentOrder': async function (type, payload) {
@@ -485,9 +532,216 @@
                     }.bind(this)
                 }
             };
-            this.boldPaymentsInstance = new window.bold.Payments(initialData);
+            const paymentsInstance = new window.bold.Payments(initialData);
+            await paymentsInstance.initialize;
+            this.boldPaymentsInstance = paymentsInstance;
             this.buildPaymentsInstanceInProgress = false;
             return this.boldPaymentsInstance;
+        },
+        onApprovePaymentOrderCallback: async function (paymentType, paymentInformation, paymentApprovalData) {
+            if (paymentApprovalData === null) {
+                console.error('Express Pay payment data is not set.');
+                return;
+            }
+            if (paymentType === 'ppcp') {
+                return await this.updateQuotePPCPAction(paymentApprovalData);
+            }
+            await this.updateQuoteBraintreeAction(paymentInformation, paymentApprovalData);
+        },
+        updateQuotePPCPAction: async function (paymentApprovalData) {
+            // todo: implement.
+        },
+        updateQuoteBraintreeAction: async function (paymentInformation, paymentApprovalData) {
+            const paymentData = paymentApprovalData.payment_data;
+            if (paymentData.email) {
+                paymentData.shipping_address['email'] = paymentData.email;
+                paymentData.billing_address['email'] = paymentData.email;
+            }
+            if (paymentData.customer) {
+                if (paymentData.billing_address) {
+                    paymentData.billing_address['email'] = paymentData.customer.email_address;
+                    paymentData.billing_address['first_name'] = paymentData.customer.first_name;
+                    paymentData.billing_address['last_name'] = paymentData.customer.last_name;
+                    paymentData.billing_address['phone'] = paymentData.customer.phone;
+                }
+                if (paymentData.shipping_address) {
+                    paymentData.shipping_address['email'] = paymentData.customer.email_address;
+                    paymentData.shipping_address['first_name'] = paymentData.customer.first_name;
+                    paymentData.shipping_address['last_name'] = paymentData.customer.last_name;
+                    paymentData.shipping_address['phone'] = paymentData.customer.phone;
+                }
+            }
+            const addressData = {};
+            if (paymentData.shipping_address) {
+                addressData['shipping'] = paymentData.shipping_address;
+            }
+            if (paymentData.billing_address) {
+                addressData['billing'] = paymentData.billing_address;
+            }
+            await this.updateQuoteAddresses(addressData);
+        },
+        getRequiredOrderDataAction: async function (requirements) {
+            debugger;
+            const cartData = await this.getCartData();
+            const payload = {};
+            for (const requirement of requirements) {
+                switch (requirement) {
+                    case 'customer':
+                        debugger;
+                        payload[requirement] = {
+                            first_name: cartData.billingAddress.firstname,
+                            last_name: cartData.billingAddress.lastname,
+                            email_address: cartData.customer.email_address || this.getEmailField().value,
+                        };
+                        break;
+                    case 'items':
+                        payload[requirement] = cartData.cart_items.map(item => ({
+                            amount: parseInt(item.price),
+                            label: item.title
+                        }));
+                        break;
+                    case 'billing_address':
+                        debugger;
+                        payload[requirement] = this.convertMagentoAddressAction(cartData.billingAddress);
+                        break;
+                    case 'shipping_address':
+                        debugger;
+                        payload[requirement] = this.convertMagentoAddressAction(cartData.shippingAddress);
+                        break;
+                    case 'shipping_options':
+                        if (!cartData.shipping_options) {
+                            payload[requirement] = [];
+                            break;
+                        }
+                        payload[requirement] = cartData.shipping_options.map(option => ({
+                            label: `${option.carrier_title} - ${option.method_title}`,
+                            amount: parseInt(option.price),
+                            id: `${option.carrier_code}_${option.method_code}`,
+                            is_selected: option.is_selected
+                        }));
+                        break;
+                    case 'totals':
+                        payload[requirement] = {
+                            order_total: parseInt(cartData.totals['order_total'] || 0),
+                            order_balance: parseInt(cartData.totals['order_total'] || 0),
+                            shipping_total: parseInt(cartData.totals['shipping_total'] || 0),
+                            discounts_total: parseInt(cartData.totals['discount_total'] || 0),
+                            fees_total: parseInt(cartData.totals['fee_total'] || 0),
+                            taxes_total: parseInt(cartData.totals['tax_total'] || 0),
+                        };
+                        break;
+                }
+            }
+            debugger;
+            return payload;
+        },
+        onUpdatePaymentOrderCallback: async function (paymentType, paymentPayload) {
+            const paymentData = paymentPayload['payment_data'];
+            const shippingAddress = paymentData['shipping_address'] || {};
+            const shippingOptions = paymentData['shipping_options'] || {};
+            if (shippingOptions) {
+                shippingAddress['shipping_method'] = shippingOptions['id'];
+            }
+            if (shippingAddress) {
+                await this.updateQuoteAddresses({'shipping': shippingAddress});
+            }
+            if (paymentType === 'ppcp') {
+                await this.updateWalletPayOrderAction(paymentData['order_id']);
+            }
+            return await this.getRequiredOrderDataAction(
+                paymentPayload['require_order_data'] || []
+            );
+        },
+        updateQuoteAddresses: async function (addressData) {
+            const shippingAddress = this.convertToMagentoAddress(addressData['shipping']);
+            const billingAddress = this.convertToMagentoAddress(addressData['billing']);
+            this.updateBillingAddressFormValues(billingAddress);
+            this.updateShippingAddressFormValues(shippingAddress);
+            return new Promise((resolve, reject) => {
+                new Ajax.Request('/checkoutpaymentbooster/index/updateCartAddress', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    parameters: {
+                        'shipping': JSON.stringify(shippingAddress),
+                        'billing': JSON.stringify(billingAddress),
+                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'
+                    },
+                    onSuccess: function () {
+                        resolve();
+                    },
+                    onFailure: function () {
+                        reject(new Error('Failed to update cart address'));
+                    }
+                });
+            });
+        },
+        convertToMagentoAddress: function (addressData) {
+            if (!addressData) {
+                return null;
+            }
+            let regions;
+            const countryCode = addressData['country_code'] || addressData['countryCode'];
+            try {
+                regions = billingRegionUpdater.regions[countryCode] || [];
+            } catch (e) {
+                regions = [];
+            }
+
+            let regionId = null;
+            let regionName = null;
+            const state = addressData['state'] || addressData['administrativeArea'];
+            if (regions) {
+                Object.entries(regions).forEach(([key, value]) => {
+                    if (value.code === state || value.name === state) {
+                        regionId = key;
+                        regionName = value.name;
+                    }
+                });
+            }
+            let firstName = addressData['first_name'] || addressData['givenName'] || null;
+            let lastName = addressData['last_name'] || addressData['familyName'] || null;
+            if (!firstName && !lastName) {
+                const nameParts = (addressData['name'] || '').split(' ');
+                if (nameParts.length > 1) {
+                    firstName = nameParts[0];
+                    lastName = nameParts.slice(1).join(' ');
+                }
+            }
+            let street1 = addressData['address1'] || addressData['address_line1'] || addressData['line1'];
+            let street2 = addressData['address2'] || addressData['address_line2'] || addressData['line2'];
+            if (addressData['addressLines']) {
+                street1 = addressData['addressLines'][0] || street1;
+                street2 = addressData['addressLines'][1] || street2;
+            }
+            const region = regionId ? {
+                region: regionName,
+                region_code: state,
+                region_id: regionId
+            } : regionName;
+            return {
+                email: addressData['email'] ?? null,
+                firstname: firstName,
+                lastname: lastName,
+                street: [
+                    street1 || null,
+                    street2 || null,
+                ],
+                city: addressData['city'] || addressData['locality'],
+                region: region,
+                region_id: regionId,
+                telephone: addressData['phoneNumber'] ?? null,
+                postcode: addressData['postal_code'] || addressData['postalCode'],
+                country_id: countryCode,
+                shipping_method: addressData['shipping_method'] || null,
+            };
+        },
+        updateQuoteShippingMethodAction: async function (shippingOptions) {
+
+        },
+        updateWalletPayOrderAction: async function (orderId) {
+
         },
         /**
          * Load specified script with attributes.
@@ -528,8 +782,7 @@
                     });
                 }
             }.bind(this));
-        }
-        ,
+        },
         /**
          * Update order data payload for order hydration call.
          *
@@ -542,8 +795,7 @@
                     this.orderPayload[key] = $(field).value;
                 }
             }.bind(this));
-        }
-        ,
+        },
         /**
          * Validate order data payload for hydration.
          *
@@ -589,7 +841,7 @@
         /**
          * Hydrate Bold order.
          */
-        hydrateOrderData: function () {
+        hydrateOrderData: async function () {
             if (Ajax.activeRequestCount > 0) {
                 this.hydrateOrderData.bind(this).delay(0.1);
                 return;
@@ -601,7 +853,7 @@
             if (!this.isPayloadChanged()) {
                 return;
             }
-            new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
+            return new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
                 method: 'post',
                 parameters: Object.assign(
                     this.orderPayload,
