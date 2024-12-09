@@ -78,6 +78,31 @@
                                 <is_payment_booster_enabled>1</is_payment_booster_enabled>
                             </depends>
                         </is_expresspay_enabled_minicart>
+                        <is_expresspay_enabled_pdp translate="label">
+                            <label>Enable Express Pay on Product Page</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>19</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[Show payment buttons on product detail pages]]></comment>
+                            <depends>
+                                <is_payment_booster_enabled>1</is_payment_booster_enabled>
+                            </depends>
+                        </is_expresspay_enabled_pdp>
+                        <expresspay_empty_cart_pdp translate="label">
+                            <label>Empty Cart Before Adding Express Pay Product</label>
+                            <frontend_type>select</frontend_type>
+                            <source_model>adminhtml/system_config_source_yesno</source_model>
+                            <sort_order>19</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <comment><![CDATA[If "yes," the customer's cart will be cleared prior to adding an item from the product page via Express Pay.]]></comment>
+                            <depends>
+                                <is_payment_booster_enabled>1</is_payment_booster_enabled>
+                                <is_expresspay_enabled_pdp>1</is_expresspay_enabled_pdp>
+                            </depends>
+                        </expresspay_empty_cart_pdp>
                         <api_token>
                             <label>API Token</label>
                             <frontend_type>obscure</frontend_type>
