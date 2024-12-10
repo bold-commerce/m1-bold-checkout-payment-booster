@@ -87,8 +87,6 @@
             if (!this.isAvailable) {
                 return false;
             }
-            this.hydrateOrderData();
-            this.subscribeToBillingAddressFieldsChanges();
             if (!this.isFastlaneAvailable) {
                 return;
             }
@@ -312,7 +310,6 @@
                     element.value = magentoAddress[field];
                 }
             });
-            this.hydrateOrderData();
         },
         /**
          * Convert Fastlane address to Magento address.
@@ -513,24 +510,6 @@
             });
         },
         /**
-         * Subscribe to fields changes for order hydration.
-         *
-         * @returns {void}
-         */
-        subscribeToBillingAddressFieldsChanges: function () {
-            Object.values(this.orderDataFieldMapper).each(function (selector) {
-                let field = $(selector);
-                if (field) {
-                    field.observe('change', () => {
-                        setTimeout(() => {
-                            this.hydrateOrderData();
-                        }, 500);
-                    });
-                }
-            }.bind(this));
-        }
-        ,
-        /**
          * Update order data payload for order hydration call.
          *
          * @returns {void}
@@ -585,48 +564,6 @@
                 }
             }
             return isChanged;
-        },
-        /**
-         * Hydrate Bold order.
-         */
-        hydrateOrderData: function () {
-            if (Ajax.activeRequestCount > 0) {
-                this.hydrateOrderData.bind(this).delay(0.1);
-                return;
-            }
-            this.updateOrderDataPayload();
-            if (!this.isPayloadValid()) {
-                return;
-            }
-            if (!this.isPayloadChanged()) {
-                return;
-            }
-            new Ajax.Request('/checkoutpaymentbooster/index/hydrateOrderData', {
-                method: 'post',
-                parameters: Object.assign(
-                    this.orderPayload,
-                    {
-                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'
-                    }
-                ),
-                onSuccess: function () {
-                    if (this.orderPayload.region_id) {
-                        const region = billingRegionUpdater.regions[this.orderPayload.country_id][this.orderPayload.region_id] || null;
-                        if (region) {
-                            this.orderPayload.region = region.code;
-                        }
-                    }
-                    this.synchronizedOrderData = Object.assign({}, this.orderPayload);
-                }.bind(this),
-                onFailure: function () {
-                    if (window.bold.fastlanePaymentMethod) {
-                        window.bold.fastlanePaymentMethod.hidePaymentMethod();
-                    }
-                    checkout.setLoadWaiting(false);
-                    this.synchronizedOrderData = {};
-                    console.error('Failed to sync order data');
-                }.bind(this),
-            });
         },
         /**
          * Get email field.
