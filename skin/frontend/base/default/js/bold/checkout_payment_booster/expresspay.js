@@ -26,6 +26,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
     const defaultConfig = {
         paymentsContainer: 'express-pay-container',
+        pageSource: 'unknown',
         isFastlaneEnabled: false,
         epsApiUrl: '',
         epsStaticApiUrl: '',
@@ -1178,6 +1179,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                     allowedCountries: config.allowedCountries,
                     fastlane: config.isFastlaneEnabled,
                     isPhoneRequired: true,
+                    pageSource: config.pageSource,
                     shopName: config.shopDomain,
                 }
             );

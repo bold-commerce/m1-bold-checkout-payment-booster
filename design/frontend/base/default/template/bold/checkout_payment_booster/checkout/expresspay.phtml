@@ -20,6 +20,7 @@ $quote = $this->getQuote();
 (function () {
     const expressPayConfig = {
         paymentsContainer: '<?php echo $this->getPaymentsContainerId() ?>',
+        pageSource: '<?php echo $this->getPageSource() ?>',
         isFastlaneEnabled: <?php var_export($this->isFastlaneEnabled()) ?>,
         epsApiUrl: '<?php echo $this->escapeUrl($this->getEpsApiUrl()) ?>',
         epsStaticApiUrl: '<?php echo $this->escapeUrl($this->getEpsStaticApiUrl()) ?>',
