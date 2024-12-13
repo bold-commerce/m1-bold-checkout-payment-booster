@@ -54,6 +54,31 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
     /**
      * @return string
      */
+    public function getPageSource()
+    {
+        switch ($this->getBlockAlias()) {
+            case 'cart_sidebar.bold.booster.expresspay':
+                $pageSource = 'mini-cart';
+                break;
+            case 'product.detail.bold.booster.expresspay':
+                $pageSource = 'product-details';
+                break;
+            case 'cart.bold.booster.expresspay':
+                $pageSource = 'cart';
+                break;
+            case 'checkout.bold.booster.expresspay':
+                $pageSource = 'checkout';
+                break;
+            default:
+                $pageSource = 'unknown';
+        }
+
+        return $pageSource;
+    }
+
+    /**
+     * @return string
+     */
     public function getEpsApiUrl()
     {
         $websiteId = Mage::app()->getStore()->getWebsiteId();
