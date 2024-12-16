@@ -112,8 +112,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ]
         ];
         $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
-        $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getRegion() !== null
-            && $shippingAddress->getCountryId() !== null;
+        $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getCountryId() !== null;
 
         if ($hasRequiredAddressData) {
             $streetAddress = $shippingAddress->getStreet();
