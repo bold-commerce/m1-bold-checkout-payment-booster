@@ -2,7 +2,6 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     'use strict';
 
     let errorRendered = false;
-    let boldPayments;
     let addToCartPromise;
     let cartTotals;
     let cartItems;
@@ -960,6 +959,10 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
         const isCheckoutActive = window.location.pathname === '/checkout/onepage/';
 
+        if (window.hasOwnProperty('boldPayments')) {
+            return;
+        }
+
         if (
             (isCheckoutActive && !config.isFastlaneEnabled)
             || !window.hasOwnProperty('bold')
@@ -1139,7 +1142,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             }
         }
 
-        boldPayments = new window.bold.Payments(sdkConfiguration);
+        window.boldPayments = new window.bold.Payments(sdkConfiguration);
     };
 
     /**
@@ -1173,7 +1176,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
          * @returns {Promise<void>}
          */
         render: async () => {
-            await boldPayments.renderWalletPayments(
+            await window.boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
                     allowedCountries: config.allowedCountries,
