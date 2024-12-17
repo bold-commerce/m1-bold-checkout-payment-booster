@@ -21,8 +21,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
         'lastname',
         'telephone',
         'postcode',
-        'region',
-        'region_id',
     ];
 
     private static $discounts = [];
