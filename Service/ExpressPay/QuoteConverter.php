@@ -127,7 +127,11 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ];
         }
 
-        if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
+        if (
+            $hasRequiredAddressData
+            && $shippingAddress->getShippingMethod() !== ''
+            && strpos($shippingAddress->getShippingMethod(), '_error') === false
+        ) {
             $convertedQuote['order_data']['selected_shipping_option'] = [
                 'id' => $shippingAddress->getShippingMethod(),
                 'label' => $shippingAddress->getShippingDescription(),
@@ -144,15 +148,18 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         $shippingRates = array_filter(
             $shippingAddress->getShippingRatesCollection()->getItems(),
             static function (Mage_Sales_Model_Quote_Address_Rate $rate) use (&$usedRateCodes) {
-                if (in_array($rate->getCode(), $usedRateCodes)) {
+                if (
+                    $rate instanceof Mage_Shipping_Model_Rate_Result_Error
+                    || in_array($rate->getCode(), $usedRateCodes)
+                ) {
                     return false;
                 }
 
-                $usedRateCodes[] = $rate->getCode();
+                $usedRateCodes[] = $rate->getCode(); // Work-around for Magento bug causing duplicated shipping rates
 
                 return true;
             }
-        ); // Work-around for Magento bug causing duplicated shipping rates
+        );
 
         if ($hasRequiredAddressData && count($shippingRates) > 0) {
             $convertedQuote['order_data']['shipping_options'] = array_map(
