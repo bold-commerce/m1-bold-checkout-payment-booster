@@ -618,7 +618,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                 postcode: addressData.postal_code || addressData.postalCode,
                 country_id: country,
                 telephone: addressData.phone || addressData.phoneNumber || '5555551234',
-            }
+            },
+            source: 'expresspay',
         };
 
         if (config.regions.hasOwnProperty(country)) {

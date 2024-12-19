@@ -63,6 +63,14 @@
                     </express_pay_add_to_cart>
                 </observers>
             </checkout_cart_add_product_complete>
+            <controller_action_predispatch_checkout_onepage_saveShipping>
+                <observers>
+                    <express_pay_save_shipping>
+                        <class>Bold_CheckoutPaymentBooster_Observer_BeforeCheckoutSaveShippingObserver</class>
+                        <method>execute</method>
+                    </express_pay_save_shipping>
+                </observers>
+            </controller_action_predispatch_checkout_onepage_saveShipping>
             <checkout_submit_all_after>
                 <observers>
                     <update_bold_order_status>
