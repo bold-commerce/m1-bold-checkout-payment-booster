@@ -1148,7 +1148,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
     /**
      * @returns {Promise<void>}
      */
-    const initialize = async () => {
+    const initialize = () => {
         const validationErrors = validateConfig(config);
         const expressPayContainer = document.getElementById(
             config.paymentsContainer ?? defaultConfig.paymentsContainer
@@ -1166,7 +1166,11 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
         config = {...defaultConfig, ...config};
 
-        await initializePaymentsSdk();
+        if (!window.hasOwnProperty('expressPayInitializationPromise')) {
+            window.expressPayInitializationPromise = initializePaymentsSdk();
+        }
+
+        return window.expressPayInitializationPromise;
     };
 
     await initialize();
