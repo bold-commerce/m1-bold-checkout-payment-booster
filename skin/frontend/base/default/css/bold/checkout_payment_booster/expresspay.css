@@ -10,4 +10,8 @@
 
 #product-detail-express-pay-container {
     clear: left;
+
+    .paypal-buttons > iframe.component-frame {
+        z-index: auto;
+    }
 }
