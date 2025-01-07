@@ -35,6 +35,7 @@ class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
         $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
         try {
             Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterFlow($websiteId);
+            Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterPdpFlow($websiteId);
         } catch (Exception $exception) {
             $this->addErrorMessage($exception->getMessage());
         }
