@@ -11,8 +11,10 @@ class Bold_CheckoutPaymentBooster_Service_Bold
      * @param Mage_Sales_Model_Quote $quote
      * @throws Mage_Core_Exception
      */
-    public static function initBoldCheckoutData(Mage_Sales_Model_Quote $quote)
-    {
+    public static function initBoldCheckoutData(
+        Mage_Sales_Model_Quote $quote,
+        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID
+    ) {
         if (!self::isAvailable()) {
             return;
         }
@@ -29,7 +31,7 @@ class Bold_CheckoutPaymentBooster_Service_Bold
                 return;
             }
         }
-        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote);
+        $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);

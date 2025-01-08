@@ -63,8 +63,19 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
             return;
         }
 
+        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID;
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $isExpressPayEnabledOnProductPage = $config->isExpressPayEnabledOnProductPage(
+            $quote->getStore()->getWebsiteId()
+        );
+
+        if ($actionName === 'catalog_product_view' && $isExpressPayEnabledOnProductPage) {
+            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::PDP_FLOW_ID;
+        }
+
         try {
-            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote, $flowId);
 
             $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
 
