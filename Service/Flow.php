@@ -7,6 +7,7 @@ class Bold_CheckoutPaymentBooster_Service_Flow
 {
     const DEFAULT_FLOW_ID = 'bold-booster-m1';
     const PDP_FLOW_ID = 'bold-booster-pdp-m1';
+    const CART_FLOW_ID = 'bold-booster-cart-m1';
     const STAGING_CONFIGURATION_GROUP = '/consumers/checkout-staging/configuration_group/{{shopDomain}}';
     const CONFIGURATION_GROUP = '/consumers/checkout/configuration_group/{{shopDomain}}';
 
@@ -166,6 +167,40 @@ class Bold_CheckoutPaymentBooster_Service_Flow
             [
                 'flow_id' => self::PDP_FLOW_ID,
                 'flow_name' => 'Bold Booster for PayPal on Product Detail Page',
+                'flow_type' => 'custom',
+            ]
+        );
+    }
+
+    /**
+     * Create|update Payment Booster cart flow for given website.
+     *
+     * @param int $websiteId
+     * @return void
+     */
+    public static function processPaymentBoosterCartFlow($websiteId)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $isExpressPayEnabledInCart = $config->isExpressPayEnabledInCart($websiteId);
+
+        if (!$isExpressPayEnabledInCart) {
+            return;
+        }
+
+        $flows = self::getList($websiteId);
+
+        foreach ($flows as $flow) {
+            if ($flow->flow_id === self::CART_FLOW_ID) {
+                return;
+            }
+        }
+
+        self::createFlow(
+            $websiteId,
+            [
+                'flow_id' => self::CART_FLOW_ID,
+                'flow_name' => 'Bold Booster for PayPal on Cart Page',
                 'flow_type' => 'custom',
             ]
         );
