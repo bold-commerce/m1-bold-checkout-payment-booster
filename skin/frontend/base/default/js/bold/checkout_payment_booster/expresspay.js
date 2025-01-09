@@ -1,8 +1,8 @@
-const ExpressPay = async (config, isProductPageActive) => (async (config, isProductPageActive) => {
+const ExpressPay = async config => (async config => {
     'use strict';
 
+    let isProductPageActive = false;
     let errorRendered = false;
-    let boldPayments;
     let addToCartPromise;
     let cartTotals;
     let cartItems;
@@ -284,7 +284,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         const quoteItems = cartItems ?? config.quoteItems;
         const requiredOrderData = {};
 
-        if (isProductPageActive && Number(orderTotal) === 0) {
+        if (Number(orderTotal) === 0) {
             orderTotal = config.productPrice;
         }
 
@@ -961,6 +961,10 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
         const isCheckoutActive = window.location.pathname === '/checkout/onepage/';
 
+        if (window.hasOwnProperty('boldPayments')) {
+            return;
+        }
+
         if (
             (isCheckoutActive && !config.isFastlaneEnabled)
             || !window.hasOwnProperty('bold')
@@ -997,6 +1001,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @throws Error
                  */
                 onClickPaymentOrder: async (paymentType, paymentPayload) => {
+                    isProductPageActive = paymentPayload.containerId.includes('product-detail');
+
                     if (!isProductPageActive) {
                         return;
                     }
@@ -1140,19 +1146,19 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             }
         }
 
-        boldPayments = new window.bold.Payments(sdkConfiguration);
+        window.boldPayments = new window.bold.Payments(sdkConfiguration);
     };
 
     /**
      * @returns {Promise<void>}
      */
-    const initialize = async () => {
+    const initialize = () => {
         const validationErrors = validateConfig(config);
         const expressPayContainer = document.getElementById(
             config.paymentsContainer ?? defaultConfig.paymentsContainer
         );
 
-        if (!isProductPageActive && validationErrors.length > 0) {
+        if (config.pageSource !== 'product-details' && validationErrors.length > 0) {
             if (expressPayContainer !== null) {
                 expressPayContainer.style.display = 'none';
             }
@@ -1164,7 +1170,11 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
 
         config = {...defaultConfig, ...config};
 
-        await initializePaymentsSdk();
+        if (!window.hasOwnProperty('expressPayInitializationPromise')) {
+            window.expressPayInitializationPromise = initializePaymentsSdk();
+        }
+
+        return window.expressPayInitializationPromise;
     };
 
     await initialize();
@@ -1174,7 +1184,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
          * @returns {Promise<void>}
          */
         render: async () => {
-            await boldPayments.renderWalletPayments(
+            await window.boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
                     allowedCountries: config.allowedCountries,
@@ -1186,4 +1196,4 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             );
         }
     };
-})(config, isProductPageActive);
+})(config);
