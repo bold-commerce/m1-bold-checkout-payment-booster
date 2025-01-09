@@ -1,6 +1,7 @@
-const ExpressPay = async (config, isProductPageActive) => (async (config, isProductPageActive) => {
+const ExpressPay = async config => (async config => {
     'use strict';
 
+    let isProductPageActive = false;
     let errorRendered = false;
     let addToCartPromise;
     let cartTotals;
@@ -283,7 +284,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
         const quoteItems = cartItems ?? config.quoteItems;
         const requiredOrderData = {};
 
-        if (isProductPageActive && Number(orderTotal) === 0) {
+        if (Number(orderTotal) === 0) {
             orderTotal = config.productPrice;
         }
 
@@ -999,6 +1000,8 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
                  * @throws Error
                  */
                 onClickPaymentOrder: async (paymentType, paymentPayload) => {
+                    isProductPageActive = paymentPayload.containerId.includes('product-detail');
+
                     if (!isProductPageActive) {
                         return;
                     }
@@ -1154,7 +1157,7 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             config.paymentsContainer ?? defaultConfig.paymentsContainer
         );
 
-        if (!isProductPageActive && validationErrors.length > 0) {
+        if (config.pageSource !== 'product-details' && validationErrors.length > 0) {
             if (expressPayContainer !== null) {
                 expressPayContainer.style.display = 'none';
             }
@@ -1192,4 +1195,4 @@ const ExpressPay = async (config, isProductPageActive) => (async (config, isProd
             );
         }
     };
-})(config, isProductPageActive);
+})(config);

@@ -33,11 +33,6 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
         return $this->getAction()->getFullActionName() === 'checkout_onepage_index';
     }
 
-    public function isProductPageActive()
-    {
-        return $this->getAction()->getFullActionName() === 'catalog_product_view';
-    }
-
     /**
      * @return string
      */
