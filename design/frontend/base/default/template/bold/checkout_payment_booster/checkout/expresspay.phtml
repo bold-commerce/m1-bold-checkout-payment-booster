@@ -9,7 +9,7 @@ endif;
 $quote = $this->getQuote();
 ?>
 <section id="<?php echo $this->getPaymentsContainerId() ?>" class="express-pay-container">
-    <?php if ($this->isCheckoutActive()): ?>
+    <?php if ($this->isCheckoutActive() && $this->getPageSource() !== 'mini-cart'): ?>
     <header class="page-title">
         <h1><?php echo $this->__('Express Checkout') ?></h1>
     </header>

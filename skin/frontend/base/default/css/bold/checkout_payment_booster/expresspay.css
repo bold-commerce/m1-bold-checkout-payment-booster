@@ -1,4 +1,4 @@
-.express-pay-container:not(#product-detail-express-pay-container) {
+.express-pay-container:not(#product-detail-express-pay-container):not(#minicart-express-pay-container) {
     border-bottom: 1px solid #EDEDED;
     margin-bottom: 15px;
     padding-bottom: 5px;
