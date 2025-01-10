@@ -69,9 +69,14 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
         $isExpressPayEnabledOnProductPage = $config->isExpressPayEnabledOnProductPage(
             $quote->getStore()->getWebsiteId()
         );
+        $isExpressPayEnabledInCart = $config->isExpressPayEnabledInCart($quote->getStore()->getWebsiteId());
 
         if ($actionName === 'catalog_product_view' && $isExpressPayEnabledOnProductPage) {
             $flowId = Bold_CheckoutPaymentBooster_Service_Flow::PDP_FLOW_ID;
+        }
+
+        if ($actionName === 'checkout_cart_index' && $isExpressPayEnabledInCart) {
+            $flowId = Bold_CheckoutPaymentBooster_Service_Flow::CART_FLOW_ID;
         }
 
         try {
