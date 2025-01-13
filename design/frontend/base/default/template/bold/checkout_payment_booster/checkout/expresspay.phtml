@@ -8,19 +8,24 @@ endif;
 
 $quote = $this->getQuote();
 ?>
-<section id="express-pay-container">
+<section id="<?php echo $this->getPaymentsContainerId() ?>" class="express-pay-container">
+    <?php if ($this->isCheckoutActive() && $this->getPageSource() !== 'mini-cart'): ?>
     <header class="page-title">
         <h1><?php echo $this->__('Express Checkout') ?></h1>
     </header>
+    <?php endif; ?>
 </section>
 
 <script type="text/javascript">
+(function () {
     const expressPayConfig = {
+        paymentsContainer: '<?php echo $this->getPaymentsContainerId() ?>',
+        pageSource: '<?php echo $this->getPageSource() ?>',
         isFastlaneEnabled: <?php var_export($this->isFastlaneEnabled()) ?>,
         epsApiUrl: '<?php echo $this->escapeUrl($this->getEpsApiUrl()) ?>',
         epsStaticApiUrl: '<?php echo $this->escapeUrl($this->getEpsStaticApiUrl()) ?>',
         shopDomain: '<?php echo $this->jsQuoteEscape($this->getShopDomain()) ?>',
-        currency: '<?php echo $this->jsQuoteEscape($quote->getQuoteCurrencyCode()) ?>',
+        currency: '<?php echo $this->jsQuoteEscape($this->getCurrency()) ?>',
         quoteId: '<?php echo $this->jsQuoteEscape($quote->getEntityId()) ?>',
         quoteTotals: <?php echo json_encode($this->getQuoteTotals()) ?>,
         quoteIsVirtual: <?php var_export($quote->getIsVirtual()) ?>,
@@ -29,6 +34,9 @@ $quote = $this->getQuote();
         formKey: '<?php echo $this->getFormKey() ?>',
         regions: <?php echo $this->getRegionsAsJson() ?>,
         allowedCountries: <?php echo json_encode($this->getAllowedCountries()) ?>,
+        defaultProductQuantity: <?php echo $this->getDefaultProductQuantity() ?>,
+        productPrice: <?php echo $this->getProductPrice() ?>,
+        addProductToCartUrl: '<?php echo $this->escapeUrl($this->getProductAddToCartUrl()) ?>',
         saveShippingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShipping')) ?>',
         saveShippingMethodUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveShippingMethod')) ?>',
         saveBillingUrl: '<?php echo $this->escapeUrl($this->getUrl('checkout/onepage/saveBilling')) ?>',
@@ -39,9 +47,9 @@ $quote = $this->getQuote();
         updateOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/updateOrder')) ?>',
         getOrderUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/expresspay/getOrder')) ?>',
         getCartTotalsUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/index/getCartTotals')) ?>',
+        getCartItemsUrl: '<?php echo $this->escapeUrl($this->getUrl('checkoutpaymentbooster/index/getCartItems')) ?>',
     };
 
-    ExpressPay(expressPayConfig).then(
-        async expressPay => await expressPay.render()
-    );
+    ExpressPay(expressPayConfig).then(async expressPay => await expressPay.render());
+})();
 </script>

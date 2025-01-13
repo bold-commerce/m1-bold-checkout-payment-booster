@@ -1,11 +1,15 @@
 const ExpressPay = async config => (async config => {
     'use strict';
 
-    let boldPayments;
+    let isProductPageActive = false;
+    let errorRendered = false;
+    let addToCartPromise;
     let cartTotals;
+    let cartItems;
     let shippingMethodsHtml = '';
     let shippingMethods = [];
     let selectedShippingMethod = {};
+    let isProductInCart = true;
 
     const requiredConfigFields = [
         'epsApiUrl',
@@ -22,6 +26,7 @@ const ExpressPay = async config => (async config => {
 
     const defaultConfig = {
         paymentsContainer: 'express-pay-container',
+        pageSource: 'unknown',
         isFastlaneEnabled: false,
         epsApiUrl: '',
         epsStaticApiUrl: '',
@@ -35,6 +40,9 @@ const ExpressPay = async config => (async config => {
         formKey: '',
         regions: {},
         allowedCountries: ['US', 'CA'],
+        defaultProductQuantity: 1,
+        productPrice: 0.00,
+        addProductToCartUrl: '/checkout/cart/add',
         saveShippingUrl: '/checkout/onepage/saveShipping',
         saveShippingMethodUrl: '/checkout/onepage/saveShippingMethod',
         saveBillingUrl: '/checkout/onepage/saveBilling',
@@ -45,6 +53,7 @@ const ExpressPay = async config => (async config => {
         updateOrderUrl: '/checkoutpaymentbooster/expresspay/updateOrder',
         getOrderUrl: '/checkoutpaymentbooster/expresspay/getOrder',
         getCartTotalsUrl: '/checkoutpaymentbooster/index/getCartTotals',
+        getCartItemsUrl: '/checkoutpaymentbooster/index/getCartItems',
     };
 
     /**
@@ -92,6 +101,37 @@ const ExpressPay = async config => (async config => {
 
             document.head.appendChild(script);
         });
+    };
+
+    /**
+     * @param {Array|String} errorMessages
+     * @returns void
+     */
+    const renderProductPageErrors = errorMessages => {
+        const messageContainer = document.getElementById('messages_product_view');
+        const messageItems = [];
+
+        if (messageContainer === null) {
+            return;
+        }
+
+        if (!Array.isArray(errorMessages)) {
+            errorMessages = [errorMessages];
+        }
+
+        errorMessages.forEach(errorMessage => {
+            messageItems.push(`<li><span>${errorMessage}</span></li>`);
+        });
+
+        messageContainer.innerHTML = `
+            <ul class="messages">
+                <li class="notice-msg">
+                    <ul>
+                        ${messageItems.join('\n')}
+                    </ul>
+                </li>
+            </ul>
+        `;
     };
 
     /**
@@ -239,12 +279,19 @@ const ExpressPay = async config => (async config => {
      * @throws Error
      */
     const getRequiredOrderData = requirements => {
+        let orderTotal = config.quoteTotals.grand_total?.value ?? 0;
+
+        const quoteItems = cartItems ?? config.quoteItems;
         const requiredOrderData = {};
+
+        if (Number(orderTotal) === 0) {
+            orderTotal = config.productPrice;
+        }
 
         for (const requirement of requirements) {
             switch (requirement) {
                 case 'items':
-                    requiredOrderData[requirement] = config.quoteItems
+                    requiredOrderData[requirement] = quoteItems
                         .map(
                             quoteItem => ({
                                 amount: quoteItem.price * 100,
@@ -252,6 +299,9 @@ const ExpressPay = async config => (async config => {
                             })
                         );
 
+                    break;
+                case 'shipping_address':
+                    requiredOrderData[requirement] = [];
                     break;
                 case 'shipping_options':
                     if (config.quoteIsVirtual) {
@@ -270,14 +320,13 @@ const ExpressPay = async config => (async config => {
                     break;
                 case 'totals':
                     requiredOrderData[requirement] = {
-                        order_total: config.quoteTotals.grand_total?.value ?? 0,
+                        order_total: orderTotal,
                         ...getOrderTotalsForApplePayAndGooglePay()
                     };
 
                     break;
                 case 'customer':
                 case 'billing_address':
-                case 'shipping_address':
                 default:
                     throw new Error(`Requirement "${requirement}" not implemented`);
             }
@@ -296,6 +345,8 @@ const ExpressPay = async config => (async config => {
         let createOrderResult;
         let errorMessage;
 
+        const quoteId = !isProductPageActive ? config.quoteId : '';
+
         try {
             createOrderResponse = await fetch(
                 config.createOrderUrl,
@@ -308,7 +359,7 @@ const ExpressPay = async config => (async config => {
                     body: JSON.stringify(
                         {
                             form_key: config.formKey,
-                            quote_id: config.quoteId,
+                            quote_id: quoteId,
                             gateway_id: gatewayId
                         }
                     )
@@ -461,6 +512,74 @@ const ExpressPay = async config => (async config => {
     };
 
     /**
+     * @returns {Promise<void>}
+     * @throws Error
+     */
+    const addProductToMagentoCart = async () => {
+        let addToCartFormData;
+        let quantity = 0;
+        let quantities = [];
+        let errorMessage;
+
+        const productAddToCartForm = document.getElementById('product_addtocart_form');
+        const validator = new Validation(productAddToCartForm);
+        const quantityInputs = document.querySelectorAll('.product-view .qty-wrapper .qty');
+
+        if (!validator.validate()) {
+            errorRendered = true;
+
+            throw new Error('Invalid product to add cart form');
+        }
+
+        addToCartFormData = new FormData(productAddToCartForm);
+
+        if (quantityInputs.length > 0) {
+            quantityInputs.forEach(
+                quantityInput => {
+                    quantity = Number(quantityInput.value);
+
+                    if (quantity === 0) {
+                        return;
+                    }
+
+                    quantities.push(quantity);
+                }
+            );
+        }
+
+        if (quantities.reduce((total, newQuantity) => total + newQuantity, 0) === 0) {
+            errorMessage = 'Please specify the quantity of product(s).';
+            errorRendered = true;
+
+            renderProductPageErrors(errorMessage);
+
+            throw new Error(errorMessage);
+        }
+
+        addToCartFormData.append('source', 'expresspay');
+
+        try {
+            await fetch(
+                config.addProductToCartUrl,
+                {
+                    method: 'POST',
+                    body: addToCartFormData
+                }
+            );
+        } catch (error) {
+            errorMessage = 'Could not add product to cart.';
+
+            renderProductPageErrors(errorMessage);
+
+            console.error(errorMessage, error);
+
+            throw error;
+        }
+
+        isProductInCart = true;
+    };
+
+    /**
      * @param {String} addressType
      * @param {Object} addressData
      * @returns {Promise<void>}
@@ -499,7 +618,8 @@ const ExpressPay = async config => (async config => {
                 postcode: addressData.postal_code || addressData.postalCode,
                 country_id: country,
                 telephone: addressData.phone || addressData.phoneNumber || '5555551234',
-            }
+            },
+            source: 'expresspay',
         };
 
         if (config.regions.hasOwnProperty(country)) {
@@ -719,6 +839,37 @@ const ExpressPay = async config => (async config => {
     };
 
     /**
+     * @returns {Promise<void>}
+     */
+    const getCartItems = async () => {
+        let getCartItemsResponse;
+
+        const formData = new FormData();
+
+        formData.append('form_key', config.formKey);
+
+        try {
+            getCartItemsResponse = await fetch(
+                config.getCartItemsUrl,
+                {
+                    method: 'POST',
+                    body: formData
+                }
+            );
+        } catch (error) {
+            console.error('Could not retrieve cart totals from Magento.', error);
+
+            throw error;
+        }
+
+        try {
+            cartItems = await getCartItemsResponse.json();
+        } catch (syntaxError) {
+            cartItems = null;
+        }
+    };
+
+    /**
      * @param {Object} paymentData
      * @returns void
      */
@@ -808,7 +959,17 @@ const ExpressPay = async config => (async config => {
     const initializePaymentsSdk = async () => {
         let sdkConfiguration;
 
-        if (!config.isFastlaneEnabled && (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments'))) {
+        const isCheckoutActive = window.location.pathname === '/checkout/onepage/';
+
+        if (window.hasOwnProperty('boldPayments')) {
+            return;
+        }
+
+        if (
+            (isCheckoutActive && !config.isFastlaneEnabled)
+            || !window.hasOwnProperty('bold')
+            || !window.bold.hasOwnProperty('Payments')
+        ) {
             await loadScript(config.epsStaticApiUrl + '/js/payments_sdk.js');
         }
 
@@ -836,15 +997,48 @@ const ExpressPay = async config => (async config => {
                 /**
                  * @param {String} paymentType
                  * @param {Object} paymentPayload
+                 * @returns {Promise<void>}
+                 * @throws Error
+                 */
+                onClickPaymentOrder: async (paymentType, paymentPayload) => {
+                    isProductPageActive = paymentPayload.containerId.includes('product-detail');
+
+                    if (!isProductPageActive) {
+                        return;
+                    }
+
+                    isProductInCart = false;
+
+                    if (['apple', 'google'].includes(paymentPayload.payment_data.payment_type)) {
+                        addToCartPromise = addProductToMagentoCart().then(
+                            async () => {
+                                await getCartTotals();
+                                await getCartItems();
+                            }
+                        );
+
+                        return;
+                    }
+
+                    await addProductToMagentoCart();
+                },
+                /**
+                 * @param {String} paymentType
+                 * @param {Object} paymentPayload
                  * @returns {Promise<Object>}
                  * @throws Error
                  */
                 onCreatePaymentOrder: async (paymentType, paymentPayload) => {
                     let expressPayOrderId;
+                    let modifiedPaymentPayload;
+
+                    if (isProductPageActive && !isProductInCart) {
+                        throw new Error('No product(s) in cart');
+                    }
 
                     /* We need to work with a copy of the payment payload object to prevent Google Pay from throwing
                        "invalid value" errors because we add data to it. */
-                    const modifiedPaymentPayload = structuredClone(paymentPayload);
+                    modifiedPaymentPayload = structuredClone(paymentPayload);
 
                     if (['apple', 'google'].includes(modifiedPaymentPayload.payment_data.payment_type)) {
                         fixAddressEmailAddresses(modifiedPaymentPayload.payment_data);
@@ -872,6 +1066,10 @@ const ExpressPay = async config => (async config => {
                  * @returns {Promise<Object|void>}
                  */
                 onUpdatePaymentOrder: async (paymentType, paymentPayload) => {
+                    if (isProductPageActive && addToCartPromise !== undefined) {
+                        await addToCartPromise;
+                    }
+
                     if (!config.quoteIsVirtual) {
                         if (paymentPayload.payment_data.hasOwnProperty('shipping_address')) {
                             await updateMagentoAddress('shipping', paymentPayload.payment_data.shipping_address);
@@ -929,6 +1127,12 @@ const ExpressPay = async config => (async config => {
                     );
                 },
                 onErrorPaymentOrder: errors => {
+                    if (errorRendered) {
+                        errorRendered = false;
+
+                        return;
+                    }
+
                     console.error('An unexpected error occurred while processing the Express Pay order.', errors);
 
                     alert('An unexpected error occurred. Please try again.');
@@ -936,35 +1140,41 @@ const ExpressPay = async config => (async config => {
             }
         };
 
-        if (config.isFastlaneEnabled) {
+        if (isCheckoutActive && config.isFastlaneEnabled) {
             while (!window.hasOwnProperty('bold') || !window.bold.hasOwnProperty('Payments')) {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
 
-        boldPayments = new window.bold.Payments(sdkConfiguration);
+        window.boldPayments = new window.bold.Payments(sdkConfiguration);
     };
 
     /**
      * @returns {Promise<void>}
      */
-    const initialize = async () => {
+    const initialize = () => {
         const validationErrors = validateConfig(config);
         const expressPayContainer = document.getElementById(
             config.paymentsContainer ?? defaultConfig.paymentsContainer
         );
 
-        if (validationErrors.length > 0) {
+        if (config.pageSource !== 'product-details' && validationErrors.length > 0) {
             if (expressPayContainer !== null) {
                 expressPayContainer.style.display = 'none';
             }
 
             console.error('Could not initialize Express Pay.', validationErrors);
+
+            return;
         }
 
         config = {...defaultConfig, ...config};
 
-        await initializePaymentsSdk();
+        if (!window.hasOwnProperty('expressPayInitializationPromise')) {
+            window.expressPayInitializationPromise = initializePaymentsSdk();
+        }
+
+        return window.expressPayInitializationPromise;
     };
 
     await initialize();
@@ -974,12 +1184,13 @@ const ExpressPay = async config => (async config => {
          * @returns {Promise<void>}
          */
         render: async () => {
-            await boldPayments.renderWalletPayments(
+            await window.boldPayments.renderWalletPayments(
                 config.paymentsContainer,
                 {
                     allowedCountries: config.allowedCountries,
                     fastlane: config.isFastlaneEnabled,
                     isPhoneRequired: true,
+                    pageSource: config.pageSource,
                     shopName: config.shopDomain,
                 }
             );

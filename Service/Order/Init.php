@@ -14,12 +14,14 @@ class Bold_CheckoutPaymentBooster_Service_Order_Init
      * @return stdClass
      * @throws Mage_Core_Exception
      */
-    public static function init(Mage_Sales_Model_Quote $quote)
-    {
+    public static function init(
+        Mage_Sales_Model_Quote $quote,
+        $flowId = Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID
+    ) {
         $body = [
-            'flow_id' => Bold_CheckoutPaymentBooster_Service_Flow::DEFAULT_FLOW_ID,
+            'flow_id' => $flowId,
             'order_type' => 'simple_order',
-            'cart_id' => $quote->getId(),
+            'cart_id' => $quote->getId() ?: '',
         ];
         $orderData = Bold_CheckoutPaymentBooster_Service_BoldClient::post(
             self::SIMPLE_ORDER_URI,

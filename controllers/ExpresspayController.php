@@ -46,14 +46,21 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('sales/quote')->load($quoteId);
+        if ($quoteId !== '') {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getModel('sales/quote')->load($quoteId);
+            $errorMessage = Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId);
+        } else {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getSingleton('checkout/session')->getQuote();
+            $errorMessage = Mage::helper('core')->__('Active quote not found.', $quoteId);
+        }
 
         if ($quote->getId() === null) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
                 ->setHeader('Content-Type', 'application/json')
-                ->setBody(json_encode(['error' => Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId)]));
+                ->setBody(json_encode(['error' => $errorMessage]));
 
             return;
         }
@@ -157,13 +164,20 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        /** @var Mage_Sales_Model_Quote $quote */
-        $quote = Mage::getModel('sales/quote')->load($quoteId);
+        if ($quoteId !== '') {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getModel('sales/quote')->load($quoteId);
+            $errorMessage = Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId);
+        } else {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getSingleton('checkout/session')->getQuote();
+            $errorMessage = Mage::helper('core')->__('Active quote not found.', $quoteId);
+        }
 
         if ($quote->getId() === null) {
             $this->getResponse()
                 ->setHttpResponseCode(400)
-                ->setBody(json_encode(['error' => Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId)]));
+                ->setBody(json_encode(['error' => $errorMessage]));
 
             return;
         }
