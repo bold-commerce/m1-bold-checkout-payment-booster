@@ -87,14 +87,6 @@
                     </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
-            <checkout_controller_onepage_save_shipping_method>
-                <observers>
-                    <update_bold_shipping>
-                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
-                        <method>updateOrderShippingMethod</method>
-                    </update_bold_shipping>
-                </observers>
-            </checkout_controller_onepage_save_shipping_method>
         </events>
         <routers>
             <checkoutpaymentbooster>
