@@ -18,6 +18,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
         $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
+        $cartData['shipping_options'] = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::getQuoteShippingOptions($quote);
         $this->getResponse()->setBody(json_encode($cartData));
     }
 
@@ -33,7 +34,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
             static function (Mage_Sales_Model_Quote_Address_Total $total) {
                 return [
                     'code' => $total->getCode(),
-                    'value' => number_format((float)$total->getValue(), 2, '.', '')
+                    'value' => number_format((float)$total->getValue(), 2, '.', ''),
                 ];
             },
             $quote->getTotals()
@@ -57,7 +58,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
                 return [
                     'sku' => $quoteItem->getSku(),
                     'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
-                    'name' => $quoteItem->getName()
+                    'name' => $quoteItem->getName(),
                 ];
             },
             $quote->getAllVisibleItems()
@@ -66,26 +67,5 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $this->getResponse()
             ->setHeader('Content-type', 'application/json')
             ->setBody(json_encode($quoteItems));
-    }
-
-    /**
-     * Add post data to quote billing address.
-     *
-     * @param Mage_Sales_Model_Quote $quote
-     * @param array $post
-     * @return void
-     */
-    private function addAddressDataToQuote(Mage_Sales_Model_Quote $quote, array $post)
-    {
-        $quote->getBillingAddress()->addData($post)->save();
-        if (!$quote->getCustomerEmail()) {
-            $quote->setCustomerEmail($quote->getBillingAddress()->getEmail());
-        }
-        if (!$quote->getCustomerFirstname()) {
-            $quote->setCustomerFirstname($quote->getBillingAddress()->getFirstname());
-        }
-        if (!$quote->getCustomerLastname()) {
-            $quote->setCustomerLastname($quote->getBillingAddress()->getLastname());
-        }
     }
 }
