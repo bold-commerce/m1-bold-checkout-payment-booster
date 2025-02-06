@@ -25,9 +25,21 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     protected function _construct()
     {
         parent::_construct();
-        $this->quote = Mage::getSingleton('checkout/session')->getQuote();
-        $this->billingAddress = Mage::getSingleton('checkout/session')->getQuote()->getBillingAddress();
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $this->quote = $checkoutSession->getQuote();
+        $this->billingAddress = $this->quote->getBillingAddress();
         $this->setTemplate('bold/checkout_payment_booster/payment/form/base.phtml');
+    }
+
+    /**
+     * Get customer quote ID.
+     *
+     * @return int
+     */
+    public function getQuoteId()
+    {
+        return $this->quote->getId();
     }
 
     /**
@@ -39,7 +51,9 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Payment_Fastlane $fastlane */
         $fastlane = Mage::getModel('bold_checkout_payment_booster/payment_fastlane');
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $quote = $checkoutSession->getQuote();
         $isAvailable = $fastlane->isAvailable($quote);
 
         return (int)$isAvailable;
@@ -135,7 +149,11 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        return $config->getShopDomain($this->quote->getStore()->getWebsiteId());
+        try {
+            return $config->getShopDomain($this->quote->getStore()->getWebsiteId());
+        } catch (Mage_Core_Exception $e) {
+            return '';
+        }
     }
 
     /**
@@ -155,100 +173,6 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     }
 
     /**
-     * Get quote address id.
-     *
-     * @return string
-     */
-    public function getAddressId()
-    {
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
-        if (!$quote->getCustomer()->getId()) {
-            return '';
-        }
-        return $this->billingAddress->getId() ?: '';
-    }
-
-    /**
-     * Get quote address street 1.
-     *
-     * @return string
-     */
-    public function getStreet1()
-    {
-        return $this->billingAddress->getStreet1() ?: '';
-    }
-
-    /**
-     * Get quote address city.
-     *
-     * @return string
-     */
-    public function getCity()
-    {
-        return $this->billingAddress->getCity() ?: '';
-    }
-
-    /**
-     * Get quote address country id.
-     *
-     * @return string
-     */
-    public function getCountryId()
-    {
-        return $this->billingAddress->getCountryId() ?: '';
-    }
-
-    /**
-     * Get quote address postcode.
-     *
-     * @return string
-     */
-    public function getPostcode()
-    {
-        return $this->billingAddress->getPostcode() ?: '';
-    }
-
-    /**
-     * Get quote address region id.
-     *
-     * @return string
-     */
-    public function getRegionId()
-    {
-        return $this->billingAddress->getRegionId() ?: '';
-    }
-
-    /**
-     * Get quote address street 2.
-     *
-     * @return string
-     */
-    public function getStreet2()
-    {
-        return $this->billingAddress->getStreet2() ?: '';
-    }
-
-    /**
-     * Get quote address street.
-     *
-     * @return string
-     */
-    public function getTelephone()
-    {
-        return $this->billingAddress->getTelephone() ?: '';
-    }
-
-    /**
-     * Get quote address company.
-     *
-     * @return string
-     */
-    public function getCompany()
-    {
-        return $this->billingAddress->getCompany() ?: '';
-    }
-
-    /**
      * Get quote customer email.
      *
      * @return string
@@ -259,33 +183,15 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     }
 
     /**
-     * Get quote customer first name.
-     *
-     * @return string
-     */
-    public function getFirstName()
-    {
-        return $this->billingAddress->getFirstname() ?: '';
-    }
-
-    /**
-     * Get quote customer last name.
-     *
-     * @return string
-     */
-    public function getLastName()
-    {
-        return $this->billingAddress->getLastname() ?: '';
-    }
-
-    /**
      * Check if Bold payment method is available.
      *
      * @return int
      */
     public function isAvailable()
     {
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        /** @var Mage_Checkout_Model_Session $checkoutSession */
+        $checkoutSession = Mage::getSingleton('checkout/session');
+        $quote = $checkoutSession->getQuote();
         return (int)(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId() && !$quote->getIsMultiShipping());
     }
 

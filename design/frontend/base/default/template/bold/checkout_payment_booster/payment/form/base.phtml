@@ -14,7 +14,6 @@
         fastlaneInstance: null,
         fastlaneProfileData: null,
         gatewayData: null,
-        synchronizedOrderData: null,
         buildFastlaneInstanceInProgress: false,
         buildPaymentsInstanceInProgress: false,
         isAvailable: <?php echo $this->isAvailable(); ?>,
@@ -39,44 +38,6 @@
             'country_id': 'billing:country_id',
             'postcode': 'billing:postcode',
             'use_for_shipping': 'billing:use_for_shipping_yes'
-        },
-        orderDataFieldMapper: {
-            'address_id': 'billing-address-select',
-            'firstname': 'billing:firstname',
-            'email': 'billing:email',
-            'lastname': 'billing:lastname',
-            'company': 'billing:company',
-            'telephone': 'billing:telephone',
-            'street1': 'billing:street1',
-            'street2': 'billing:street2',
-            'city': 'billing:city',
-            'region_id': 'billing:region_id',
-            'country_id': 'billing:country_id',
-            'postcode': 'billing:postcode'
-        },
-        requiredFields: [
-            'email',
-            'firstname',
-            'lastname',
-            'street1',
-            'postcode',
-            'city',
-            'country_id',
-            'telephone'
-        ],
-        orderPayload: {
-            'address_id': '<?php echo $this->getAddressId() ?>',
-            'email': '<?php echo $this->getCustomerEmail() ?>',
-            'firstname': '<?php echo $this->getFirstName() ?>',
-            'lastname': '<?php echo $this->getLastName() ?>',
-            'company': '<?php echo $this->getCompany() ?>',
-            'telephone': '<?php echo $this->getTelephone() ?>',
-            'street1': '<?php echo $this->getStreet1() ?>',
-            'street2': '<?php echo $this->getStreet2() ?>',
-            'city': '<?php echo $this->getCity() ?>',
-            'region_id': '<?php echo $this->getRegionId() ?>',
-            'country_id': '<?php echo $this->getCountryId() ?>',
-            'postcode': '<?php echo $this->getPostcode() ?>',
         },
         /**
          * Initialize class.
@@ -425,19 +386,13 @@
                         if (paymentType !== 'ppcp') {
                             return;
                         }
-                        const walletPayResult = await fetch(this.boldApiUrl + 'wallet_pay/create_order', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': 'Bearer ' + this.jwtToken,
-                            },
-                            body: JSON.stringify(paymentPayload),
-                        });
-                        if (walletPayResult.ok) {
-                            const walletPayResultPayload = await walletPayResult.json();
-                            return walletPayResultPayload.data
+                        try {
+                            const createOrderResult = await this.createExpressOrder(paymentPayload);
+                            return {payment_data: {id: createOrderResult.order_id}};
+                        } catch (e) {
+                            console.error('Failed to create express order', e);
+                            throw e;
                         }
-                        throw 'Unable to create wallet pay order';
                     }.bind(this),
                     'onUpdatePaymentOrder': async function () {
                         // We won't handle updating an order from PayPal data, we will disable address changes etc
@@ -479,7 +434,15 @@
                         }
                         const data = await scaResult.json();
                         return {card: data};
-                    }.bind(this)
+                    }.bind(this),
+                    'onRequireOrderData': async function (requirements) {
+                        try {
+                            return await this.onRequireOrderDataCallback(requirements);
+                        } catch (e) {
+                            checkout.setLoadWaiting('billing', false);
+                            throw e;
+                        }
+                    }.bind(this),
                 }
             };
             this.boldPaymentsInstance = new window.bold.Payments(initialData);
@@ -510,62 +473,6 @@
             });
         },
         /**
-         * Update order data payload for order hydration call.
-         *
-         * @returns {void}
-         */
-        updateOrderDataPayload: function () {
-            Object.keys(this.orderDataFieldMapper).forEach(function (key) {
-                let field = this.orderDataFieldMapper[key];
-                if ($(field)) {
-                    this.orderPayload[key] = $(field).value;
-                }
-            }.bind(this));
-        }
-        ,
-        /**
-         * Validate order data payload for hydration.
-         *
-         * @returns {boolean}
-         */
-        isPayloadValid: function () {
-            let isInvalid = this.requiredFields.some((field) => {
-                return !this.orderPayload[field];
-
-            });
-            if (isInvalid) {
-                return false;
-            }
-            let regionsRequired = window.billingRegionUpdater || {
-                config: {
-                    regions_required: []
-                }
-            };
-            let isRegionRequired = regionsRequired.config.regions_required.indexOf(this.orderPayload.country_id) !== -1;
-            if (isRegionRequired && !this.orderPayload.region_id) {
-                return false;
-            }
-            return !isInvalid;
-        },
-        /**
-         * Check if already hydrated payload differs from new one.
-         *
-         * @returns {boolean}
-         */
-        isPayloadChanged: function () {
-            if (!this.synchronizedOrderData) {
-                return true;
-            }
-            let isChanged = false;
-            for (let [key, value] of Object.entries(this.orderPayload)) {
-                if (this.synchronizedOrderData[key] !== value) {
-                    isChanged = true;
-                    break;
-                }
-            }
-            return isChanged;
-        },
-        /**
          * Get email field.
          *
          * @return {HTMLElement}
@@ -593,6 +500,84 @@
                 });
             });
         },
+        /**
+         * Call backend to create express order.
+         *
+         * @param paymentPayload
+         * @return {Promise<unknown>}
+         */
+        createExpressOrder: async function (paymentPayload) {
+            return new Promise((resolve, reject) => {
+                new Ajax.Request('/checkoutpaymentbooster/expresspay/createOrder', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    parameters: {
+                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>',
+                        quote_id: '<?php echo $this->getQuoteId(); ?>',
+                        gateway_id: paymentPayload.gateway_id,
+                    },
+                    onSuccess: function (response) {
+                        resolve(JSON.parse(response.responseText));
+                    },
+                    onFailure: function () {
+                        reject(new Error('Failed to create express order'));
+                    }
+                });
+            });
+        },
+        /**
+         * Handle order data requirements.
+         *
+         * @param requirements
+         * @return {Promise<{}>}
+         */
+        onRequireOrderDataCallback: async function (requirements) {
+            const orderData = {};
+            const cartData = await this.getCartData();
+            for (const requirement of requirements) {
+                switch (requirement) {
+                    case 'customer':
+                        let billingAddress = cartData.billingAddress();
+                        const email = cartData.customer.email;
+
+                        orderData[requirement] = {
+                            first_name: billingAddress.firstname,
+                            last_name: billingAddress.lastname,
+                            email_address: email,
+                        };
+                        break;
+                    case 'items':
+                        orderData[requirement] = cartData.cart_items.map(item => ({
+                            amount: item.price,
+                            label: item.title
+                        }));
+                        break;
+                    case 'billing_address':
+                        orderData[requirement] = cartData.billing_address;
+                        break;
+                    case 'shipping_address':
+                        orderData[requirement] = cartData.shipping_address;
+                        break;
+                    case 'shipping_options':
+                        orderData[requirement] = cartData.shipping_options;
+                        break;
+                    case 'totals':
+                        const totals = cartData.totals;
+                        orderData[requirement] = {
+                            order_total: totals.order_total,
+                            shipping_total: totals.shipping_total,
+                            discounts_total: totals.discount_total,
+                            fees_total: totals.fee_total || 0,
+                            taxes_total: totals.tax_total,
+                        };
+                        break;
+                }
+            }
+            return orderData;
+        },
+
     });
     document.observe('dom:loaded', function () {
         if (typeof window.bold === 'undefined') {

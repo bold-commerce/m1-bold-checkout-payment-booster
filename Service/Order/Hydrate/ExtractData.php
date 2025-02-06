@@ -266,4 +266,29 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
     {
         return (int)round(floatval($amount) * 100);
     }
+
+    /**
+     * Extract shipping options from quote.
+     *
+     * @param Mage_Sales_Model_Quote $quote
+     * @return array
+     */
+    public static function getQuoteShippingOptions(Mage_Sales_Model_Quote $quote)
+    {
+        $quote->collectTotals();
+        $shippingOptions = [];
+        if ($quote->isVirtual()) {
+            return $shippingOptions;
+        }
+        /** @var Mage_Sales_Model_Quote_Address_Rate $rate */
+        foreach ($quote->getShippingAddress()->getShippingRatesCollection()->getItems() as $rate) {
+            $shippingOptions[] = [
+                'rate_id' => $rate->getCode(),
+                'label' => $rate->getCarrierTitle() . ' - ' . $rate->getMethodTitle(),
+                'amount' => self::convertToCents($rate->getPrice()),
+                'is_selected' => $rate->getCode() === $quote->getShippingAddress()->getShippingMethod(),
+            ];
+        }
+        return $shippingOptions;
+    }
 }
