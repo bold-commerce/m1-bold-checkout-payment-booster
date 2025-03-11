@@ -1,0 +1,17 @@
+name: Update Modules
+run-name: Update Modules
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-modules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+        - name: run the test
+          env:
+            GH_TOKEN: ${{ secrets.GIT_KEY }}
+          run: gh api repos/bold-commerce/magento-2.3-sandbox-store/dispatches -F "event_type"="update_stores"
