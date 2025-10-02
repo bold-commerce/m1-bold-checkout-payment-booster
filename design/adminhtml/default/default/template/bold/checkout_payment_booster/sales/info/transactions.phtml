@@ -1,0 +1,56 @@
+<?php /** @var $this Bold_CheckoutPaymentBooster_Block_Adminhtml_Sales_Info_Transactions */ ?>
+<?php $_transactions = $this->getBoldTransactions(); ?>
+
+<?php if ($this->shouldDisplay()): ?>
+<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #ddd;">
+    <div style="margin-bottom: 10px; color: #666; font-weight: bold;"><?php echo $this->__('Last Transaction Details') ?></div>
+    <?php if ($_transactions && is_array($_transactions)): ?>
+    <?php 
+    // Sort transactions by date in descending order (most recent first)
+    usort($_transactions, function($a, $b) {
+        $dateA = isset($a['processed_at']) ? strtotime($a['processed_at']) : 0;
+        $dateB = isset($b['processed_at']) ? strtotime($b['processed_at']) : 0;
+        return $dateB - $dateA; // Descending order
+    });
+    
+    // Get the most recent transaction (first after sorting)
+    $_lastTransaction = $_transactions[0];
+    ?>
+    <?php if (isset($_lastTransaction['processed_at'])): ?>
+        <div style="margin-bottom: 8px; font-weight: bold;"><?php echo $this->escapeHtml($_lastTransaction['processed_at']) ?></div>
+    <?php endif; ?>
+    <?php if (isset($_lastTransaction['provider'])): ?>
+        <div style="margin-bottom: 4px;">Gateway: <?php echo $this->escapeHtml($_lastTransaction['provider']) ?></div>
+    <?php endif; ?>
+    <?php if (isset($_lastTransaction['provider_id'])): ?>
+        <div style="margin-bottom: 4px;">Transaction ID: <?php echo $this->escapeHtml($_lastTransaction['provider_id']) ?></div>
+    <?php endif; ?>
+    <?php if (isset($_lastTransaction['financial_status'])): ?>
+        <div style="margin-bottom: 8px;">
+            <?php
+            $status = $_lastTransaction['financial_status'];
+            $statusColor = '';
+            switch (strtolower($status)) {
+                case 'paid':
+                case 'completed':
+                    $statusColor = 'color: green; font-weight: bold;';
+                    break;
+                case 'refunded':
+                    $statusColor = 'color: orange; font-weight: bold;';
+                    break;
+                case 'failed':
+                case 'declined':
+                    $statusColor = 'color: red; font-weight: bold;';
+                    break;
+                case 'pending':
+                    $statusColor = 'color: blue; font-weight: bold;';
+                    break;
+                default:
+                    $statusColor = 'font-weight: bold;';
+            }
+            ?>
+        </div>
+    <?php endif; ?>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
