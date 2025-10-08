@@ -207,6 +207,18 @@
                             <show_in_website>1</show_in_website>
                             <comment><![CDATA[ Log requests in var/log/bold_checkout_payment_booster.log for debugging purposes. ]]></comment>
                         </is_log_enabled>
+                        <export_logs translate="label">
+                            <label>Export Logs</label>
+                            <frontend_type>button</frontend_type>
+                            <frontend_model>bold_checkout_payment_booster/adminhtml_system_config_button_exportLogs</frontend_model>
+                            <sort_order>40</sort_order>
+                            <show_in_default>0</show_in_default>
+                            <show_in_website>1</show_in_website>
+                            <depends>
+                                <is_log_enabled>1</is_log_enabled>
+                            </depends>
+                            <comment><![CDATA[ Download the Bold Checkout Payment Booster log file for debugging purposes. ]]></comment>
+                        </export_logs>
                     </fields>
                 </bold_checkout_payment_booster_advanced>
             </groups>
