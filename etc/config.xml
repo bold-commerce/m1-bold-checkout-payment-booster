@@ -10,6 +10,11 @@
             <bold_checkout_payment_booster>
                 <class>Bold_CheckoutPaymentBooster_Block</class>
             </bold_checkout_payment_booster>
+            <adminhtml>
+                <rewrite>
+                    <sales_order_payment>Bold_CheckoutPaymentBooster_Block_Adminhtml_Sales_Order_Payment</sales_order_payment>
+                </rewrite>
+            </adminhtml>
         </blocks>
         <models>
             <bold_checkout_payment_booster>
