@@ -187,9 +187,11 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
      * @param Mage_Sales_Model_Order $order
      * @param array $data
      * @return void
+     * @throws Mage_Core_Exception
      */
     private static function savePaymentInformation(Mage_Sales_Model_Order $order, array $data)
     {
+        $config = Mage::getModel('bold_checkout_payment_booster/config');
         if (!isset($data['payments']) || !is_array($data['payments'])) {
             return;
         }
@@ -244,8 +246,6 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
 
                 if (!$exists) {
                     $existingTransactions[] = $transactionRecord;
-
-                    $config = Mage::getModel('bold_checkout_payment_booster/config');
                     if ($config->isLogEnabled($order->getStore()->getWebsiteId())) {
                         Mage::log(
                             sprintf(
@@ -262,7 +262,6 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
                         );
                     }
                 } else {
-                    $config = Mage::getModel('bold_checkout_payment_booster/config');
                     if ($config->isLogEnabled($order->getStore()->getWebsiteId())) {
                         Mage::log(
                             sprintf(
@@ -277,7 +276,6 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
                     }
                 }
             } else {
-                $config = Mage::getModel('bold_checkout_payment_booster/config');
                 if ($config->isLogEnabled($order->getStore()->getWebsiteId())) {
                     Mage::log(
                         sprintf(
@@ -311,9 +309,6 @@ class Bold_CheckoutPaymentBooster_Api_Order_Payment
         }
 
         $payment->save();
-
-        $config = Mage::getModel('bold_checkout_payment_booster/config');
-
 
         if ($config->isLogEnabled($order->getStore()->getWebsiteId())) {
             Mage::log(
