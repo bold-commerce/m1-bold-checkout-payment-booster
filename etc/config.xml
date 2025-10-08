@@ -141,6 +141,17 @@
             </updates>
         </layout>
     </adminhtml>
+    <admin>
+	<routers>
+	  <boldcheckout>
+	    <use>admin</use>
+		<args>
+		  <module>Bold_CheckoutPaymentBooster</module>
+		  <frontName>admin_bold</frontName>
+		</args>
+	  </boldcheckout>
+	</routers>
+  </admin>
     <default>
         <checkout>
             <bold_checkout_payment_booster>
