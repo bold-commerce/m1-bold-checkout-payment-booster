@@ -126,14 +126,17 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ];
         }
 
+        $shippingAmount = $shippingAddress->getShippingAmount();
+
         if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
+
             $convertedQuote['order_data']['selected_shipping_option'] = [
                 'id' => $shippingAddress->getShippingMethod(),
                 'label' => $shippingAddress->getShippingDescription(),
                 'type' => 'SHIPPING',
                 'amount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)$shippingAddress->getShippingAmount(), 2, '.', '')
+                    'value' => number_format((float)$shippingAmount, 2, '.', '')
                 ],
             ];
         }
@@ -154,15 +157,20 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         );
 
         if ($hasRequiredAddressData && count($shippingRates) > 0) {
+            $selectedMethod = $shippingAddress->getShippingMethod();
+
             $convertedQuote['order_data']['shipping_options'] = array_map(
-                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode) {
+                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode, $selectedMethod, $shippingAmount) {
+                    // Use actual shipping amount for selected method, rate price for others
+                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getPrice();
+
                     return [
                         'id' => $rate->getCode(),
                         'label' => trim("{$rate->getCarrierTitle()} - {$rate->getMethodTitle()}", ' -'),
                         'type' => 'SHIPPING',
                         'amount' => [
                             'currency_code' => $currencyCode,
-                            'value' => number_format((float)$rate->getPrice(), 2, '.', '')
+                            'value' => number_format((float)$displayAmount, 2, '.', '')
                         ]
                     ];
                 },
@@ -252,11 +260,13 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             $this->areTotalsCollected = true;
         }
 
+        $grandTotal = (float)$quote->getGrandTotal();
+
         return [
             'order_data' => [
                 'amount' => [
                     'currency_code' => $currencyCode,
-                    'value' => number_format((float)$quote->getGrandTotal(), 2, '.', '')
+                    'value' => number_format($grandTotal, 2, '.', '')
                 ]
             ]
         ];
@@ -296,8 +306,12 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 ''
             );
         } else {
+            // Use the shipping address tax amount which should include all taxes
+            $shippingAddress = $quote->getShippingAddress();
+            $totalTaxAmount = (float)($shippingAddress->getTaxAmount() ?: 0.00);
+
             $convertedQuote['order_data']['tax_total']['value'] = number_format(
-                (float)($quote->getShippingAddress()->getTaxAmount() ?: 0.00),
+                $totalTaxAmount,
                 2,
                 '.',
                 ''
