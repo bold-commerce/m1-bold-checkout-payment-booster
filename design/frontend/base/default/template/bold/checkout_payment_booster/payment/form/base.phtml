@@ -517,6 +517,7 @@
                         form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>',
                         quote_id: '<?php echo $this->getQuoteId(); ?>',
                         gateway_id: paymentPayload.gateway_id,
+                        shipping_strategy: paymentPayload.shipping_strategy || 'dynamic'
                     },
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
