@@ -70,6 +70,8 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
         $expressPayData = $quoteConverter->convertFullQuote($quote, $gatewayId);
 
+        $expressPayData['shipping_strategy'] = $this->getRequest()->getParam('shipping_strategy') ?? 'dynamic';
+
         $this->removePlaceholderData($expressPayData);
 
         $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post($uri, $websiteId, $expressPayData);
