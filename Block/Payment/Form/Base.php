@@ -127,7 +127,7 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
      */
     public function getQuoteCurrencyCode()
     {
-        return $this->quote->getQuoteCurrencyCode();
+        return $this->quote->getBaseCurrencyCode();
     }
 
     /**

@@ -127,7 +127,7 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             return $storeCurrency;
         }
 
-        $currency = $quote->getQuoteCurrencyCode();
+        $currency = $quote->getBaseCurrencyCode();
 
         return !empty($currency) ? $currency : $storeCurrency;
     }
@@ -143,15 +143,33 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             return [];
         }
 
-        $totals = array_map(
-            static function (Mage_Sales_Model_Quote_Address_Total $total) {
-                return [
-                    'code' => $total->getCode(),
-                    'value' => number_format((float)$total->getValue(), 2, '.', '')
-                ];
-            },
-            $quote->getTotals()
-        );
+        $address = $quote->getShippingAddress();
+        $totals = [];
+
+        // Core totals
+        $totals[] = ['code' => 'subtotal', 'value' => number_format((float)$quote->getBaseSubtotal(), 2, '.', '')];
+        $totals[] = ['code' => 'shipping', 'value' => number_format((float)$address->getBaseShippingAmount(), 2, '.', '')];
+        $totals[] = ['code' => 'tax',      'value' => number_format((float)$address->getBaseTaxAmount(), 2, '.', '')];
+        $totals[] = ['code' => 'discount', 'value' => number_format(abs((float)$quote->getBaseDiscountAmount()), 2, '.', '')];
+        $totals[] = ['code' => 'grand_total', 'value' => number_format((float)$quote->getBaseGrandTotal(), 2, '.', '')];
+
+        // Catch any custom totals added by extensions (fees, surcharges, etc.)
+        foreach ($quote->getTotals() as $code => $total) {
+            if (in_array($code, ['subtotal','shipping','tax','discount','grand_total'], true)) {
+                continue;
+            }
+
+            $baseValue = (float)$total->getBaseValue();
+            if ($baseValue === 0.0 && method_exists($total, 'getValue')) {
+                // If base is missing but store value exists, skip (don’t guess)
+                continue;
+            }
+
+            $totals[] = [
+                'code'  => $code,
+                'value' => number_format($baseValue, 2, '.', '')
+            ];
+        }
 
         return $totals;
     }
@@ -171,7 +189,7 @@ class Bold_CheckoutPaymentBooster_Block_Checkout_Expresspay extends Mage_Core_Bl
             static function (Mage_Sales_Model_Quote_Item $quoteItem) {
                 return [
                     'sku' => $quoteItem->getSku(),
-                    'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
+                    'price' => number_format((float)$quoteItem->getBasePrice(), 2, '.', ''),
                     'name' => $quoteItem->getName()
                 ];
             },

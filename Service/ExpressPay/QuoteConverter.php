@@ -111,7 +111,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 'shipping_options' => []
             ]
         ];
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
         $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getCountryId() !== null;
 
         if ($hasRequiredAddressData) {
@@ -126,7 +126,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             ];
         }
 
-        $shippingAmount = $shippingAddress->getShippingAmount();
+        $shippingAmount = $shippingAddress->getBaseShippingAmount();
 
         if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
 
@@ -162,7 +162,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             $convertedQuote['order_data']['shipping_options'] = array_map(
                 static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode, $selectedMethod, $shippingAmount) {
                     // Use actual shipping amount for selected method, rate price for others
-                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getPrice();
+                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getBasePrice();
 
                     return [
                         'id' => $rate->getCode(),
@@ -196,7 +196,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             return [];
         }
 
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
         $convertedQuote = [
             'order_data' => [
                 'items' => array_map(
@@ -206,7 +206,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                             'sku' => $quoteItem->getSku(),
                             'unit_amount' => [
                                 'currency_code' => $currencyCode,
-                                'value' => number_format((float)$quoteItem->getPrice(), 2, '.', '')
+                                'value' => number_format((float)$quoteItem->getBasePrice(), 2, '.', '')
                             ],
                             'quantity' => (int)(ceil($quoteItem->getQty()) ?: $quoteItem->getQty()),
                             'is_shipping_required' => !in_array(
@@ -227,7 +227,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                         array_sum(
                             array_map(
                                 static function (Mage_Sales_Model_Quote_Item $quoteItem) {
-                                    return $quoteItem->getPrice() * $quoteItem->getQty();
+                                    return $quoteItem->getBasePrice() * $quoteItem->getQty();
                                 },
                                 $quoteItems
                             )
@@ -252,7 +252,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
      */
     public function convertTotal(Mage_Sales_Model_Quote $quote)
     {
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
 
         if (!$this->areTotalsCollected) {
             $quote->collectTotals();
@@ -260,7 +260,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             $this->areTotalsCollected = true;
         }
 
-        $grandTotal = (float)$quote->getGrandTotal();
+        $grandTotal = (float)$quote->getBaseGrandTotal();
 
         return [
             'order_data' => [
@@ -279,7 +279,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
      */
     public function convertTaxes(Mage_Sales_Model_Quote $quote)
     {
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
         $convertedQuote = [
             'order_data' => [
                 'tax_total' => [
@@ -296,7 +296,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
                 array_sum(
                     array_map(
                         static function (Mage_Sales_Model_Quote_Item $item) {
-                            return $item->getTaxAmount() ?: 0.00;
+                            return $item->getBaseTaxAmount() ?: 0.00;
                         },
                         $quoteItems
                     )
@@ -308,7 +308,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
         } else {
             // Use the shipping address tax amount which should include all taxes
             $shippingAddress = $quote->getShippingAddress();
-            $totalTaxAmount = (float)($shippingAddress->getTaxAmount() ?: 0.00);
+            $totalTaxAmount = (float)($shippingAddress->getBaseTaxAmount() ?: 0.00);
 
             $convertedQuote['order_data']['tax_total']['value'] = number_format(
                 $totalTaxAmount,
@@ -334,7 +334,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             $this->areTotalsCollected = true;
         }
 
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
         /** @var Mage_Sales_Model_Quote_Address_Total[] $quoteTotals */
         $quoteTotals = $quote->getTotals();
         $discount = array_key_exists('discount', $quoteTotals) ? abs($quoteTotals['discount']->getValue()) : 0;
@@ -363,7 +363,7 @@ class Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter
             $this->areTotalsCollected = true;
         }
 
-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
+        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
         $excludedTotals = ['subtotal', 'discount', 'shipping', 'tax', 'grand_total'];
         $customTotals = array_filter(
             $quote->getTotals(),

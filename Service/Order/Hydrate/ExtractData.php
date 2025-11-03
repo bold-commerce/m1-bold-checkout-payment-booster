@@ -167,7 +167,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
 
         return [
             'rate_name' => $quote->getShippingAddress()->getShippingDescription() ?: '',
-            'cost' => self::convertToCents($quote->getShippingAddress()->getShippingAmount()),
+            'cost' => self::convertToCents($quote->getShippingAddress()->getBaseShippingAmount()),
         ];
     }
 
@@ -219,24 +219,46 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
     private static function getTotals(Mage_Sales_Model_Quote $quote)
     {
         $totals = $quote->getTotals();
-        $subTotal = isset($totals['subtotal']['value_excl_tax'])
-            ? $totals['subtotal']['value_excl_tax']
-            : $totals['subtotal']['value'];
-        $shippingTotal = isset($totals['shipping']['value_excl_tax'])
-            ? $totals['shipping']['value_excl_tax']
-            : $totals['shipping']['value'];
-        $grandTotal = isset($totals['grand_total']['value_incl_tax'])
-            ? $totals['grand_total']['value_incl_tax']
-            : $totals['grand_total']['value'];
+
+        // Get base values directly from quote and address (no math)
+        $subTotal = $quote->getBaseSubtotal();
+        $shippingTotal = $quote->getShippingAddress()->getBaseShippingAmount();
+        $grandTotal = $quote->getBaseGrandTotal();
+        $taxTotal = $quote->getShippingAddress()->getBaseTaxAmount();
+        $discountTotal = abs((float)$quote->getBaseDiscountAmount());
+
+        // Fallback: check totals array if something is missing
+        if (!$subTotal && isset($totals['subtotal'])) {
+            $subTotal = (float)$totals['subtotal']->getBaseValue();
+        }
+        if (!$shippingTotal && isset($totals['shipping'])) {
+            $shippingTotal = (float)$totals['shipping']->getBaseValue();
+        }
+        if (!$grandTotal && isset($totals['grand_total'])) {
+            $grandTotal = (float)$totals['grand_total']->getBaseValue();
+        }
+        if (!$taxTotal && isset($totals['tax'])) {
+            $taxTotal = (float)$totals['tax']->getBaseValue();
+        }
+        if (!$discountTotal && isset($totals['discount'])) {
+            $discountTotal = abs((float)$totals['discount']->getBaseValue());
+        }
+
+        // Processed totals in cents
         $processedTotals = [
-            'sub_total' => self::convertToCents($subTotal),
-            'tax_total' => isset($totals['tax']['value']) && $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
-            'discount_total' => self::getDiscountTotal(),
+            'sub_total'      => self::convertToCents($subTotal),
+            'tax_total'      => self::convertToCents($taxTotal),
+            'discount_total' => self::convertToCents($discountTotal),
             'shipping_total' => self::convertToCents($shippingTotal),
-            'order_total' => self::convertToCents($grandTotal),
+            'order_total'    => self::convertToCents($grandTotal),
         ];
-        $calculatedGrandTotal = $processedTotals['sub_total'] + $processedTotals['tax_total']
-            + $processedTotals['shipping_total'] - $processedTotals['discount_total'];
+
+        // Adjust mismatched grand totals (same logic as before)
+        $calculatedGrandTotal = $processedTotals['sub_total']
+            + $processedTotals['tax_total']
+            + $processedTotals['shipping_total']
+            - $processedTotals['discount_total'];
+
         if ($calculatedGrandTotal > $processedTotals['order_total']
             && $calculatedGrandTotal === $processedTotals['order_total'] + $processedTotals['tax_total']) {
             $processedTotals['order_total'] = $calculatedGrandTotal;
