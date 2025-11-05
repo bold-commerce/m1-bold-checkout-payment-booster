@@ -1,0 +1,501 @@
+From a462aeee998ebd25536f0ff3c63ef625110ba8e9 Mon Sep 17 00:00:00 2001
+Date: Mon, 20 Oct 2025 19:39:04 -0300
+Subject: [PATCH 1/3] CHK-9345: Fix calculation when shipping includes tax
+
+---
+ Service/ExpressPay/QuoteConverter.php | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/Service/ExpressPay/QuoteConverter.php b/Service/ExpressPay/QuoteConverter.php
+index 3e1fcc0..c72dd10 100644
+--- a/Service/ExpressPay/QuoteConverter.php
++++ b/Service/ExpressPay/QuoteConverter.php
+@@ -126,14 +126,17 @@ public function convertShippingInformation(Mage_Sales_Model_Quote $quote)
+             ];
+         }
+ 
++        $shippingAmount = $shippingAddress->getShippingAmount();
++
+         if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
++
+             $convertedQuote['order_data']['selected_shipping_option'] = [
+                 'id' => $shippingAddress->getShippingMethod(),
+                 'label' => $shippingAddress->getShippingDescription(),
+                 'type' => 'SHIPPING',
+                 'amount' => [
+                     'currency_code' => $currencyCode,
+-                    'value' => number_format((float)$shippingAddress->getShippingAmount(), 2, '.', '')
++                    'value' => number_format((float)$shippingAmount, 2, '.', '')
+                 ],
+             ];
+         }
+@@ -154,15 +157,20 @@ static function (Mage_Sales_Model_Quote_Address_Rate $rate) use (&$usedRateCodes
+         );
+ 
+         if ($hasRequiredAddressData && count($shippingRates) > 0) {
++            $selectedMethod = $shippingAddress->getShippingMethod();
++
+             $convertedQuote['order_data']['shipping_options'] = array_map(
+-                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode) {
++                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode, $selectedMethod, $shippingAmount) {
++                    // Use actual shipping amount for selected method, rate price for others
++                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getPrice();
++
+                     return [
+                         'id' => $rate->getCode(),
+                         'label' => trim("{$rate->getCarrierTitle()} - {$rate->getMethodTitle()}", ' -'),
+                         'type' => 'SHIPPING',
+                         'amount' => [
+                             'currency_code' => $currencyCode,
+-                            'value' => number_format((float)$rate->getPrice(), 2, '.', '')
++                            'value' => number_format((float)$displayAmount, 2, '.', '')
+                         ]
+                     ];
+                 },
+@@ -252,11 +260,13 @@ public function convertTotal(Mage_Sales_Model_Quote $quote)
+             $this->areTotalsCollected = true;
+         }
+ 
++        $grandTotal = (float)$quote->getGrandTotal();
++
+         return [
+             'order_data' => [
+                 'amount' => [
+                     'currency_code' => $currencyCode,
+-                    'value' => number_format((float)$quote->getGrandTotal(), 2, '.', '')
++                    'value' => number_format($grandTotal, 2, '.', '')
+                 ]
+             ]
+         ];
+@@ -296,8 +306,12 @@ static function (Mage_Sales_Model_Quote_Item $item) {
+                 ''
+             );
+         } else {
++            // Use the shipping address tax amount which should include all taxes
++            $shippingAddress = $quote->getShippingAddress();
++            $totalTaxAmount = (float)($shippingAddress->getTaxAmount() ?: 0.00);
++
+             $convertedQuote['order_data']['tax_total']['value'] = number_format(
+-                (float)($quote->getShippingAddress()->getTaxAmount() ?: 0.00),
++                $totalTaxAmount,
+                 2,
+                 '.',
+                 ''
+
+From 076c3cd40289b2d01ae1dc502499fd244bb3ff04 Mon Sep 17 00:00:00 2001
+From: Carol Castro <carol.castro@boldcommerce.com>
+Date: Mon, 3 Nov 2025 10:43:10 -0300
+Subject: [PATCH 2/3] Using base currency
+
+---
+ Api/Payment/Gateway.php               |  4 +-
+ Block/Checkout/Expresspay.php         | 40 ++++++++++++++------
+ Block/Payment/Form/Base.php           |  2 +-
+ Service/ExpressPay/QuoteConverter.php | 26 ++++++-------
+ Service/Order/Hydrate/ExtractData.php | 54 +++++++++++++++++++--------
+ controllers/IndexController.php       |  4 +-
+ 6 files changed, 85 insertions(+), 45 deletions(-)
+
+diff --git a/Api/Payment/Gateway.php b/Api/Payment/Gateway.php
+index 1a813de..92548f3 100644
+--- a/Api/Payment/Gateway.php
++++ b/Api/Payment/Gateway.php
+@@ -28,7 +28,7 @@ public static function capture(Varien_Object $payment, $amount)
+             return;
+         }
+         Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, true);
+-        if ((float)$order->getGrandTotal() === (float)$amount) {
++        if ((float)$order->getBaseGrandTotal() === (float)$amount) {
+             $payment->setTransactionId(self::captureFull($order))->setShouldCloseParentTransaction(true);
+             Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, false);
+             return;
+@@ -97,7 +97,7 @@ public static function refund(Varien_Object $payment, $amount)
+         /** @var Mage_Sales_Model_Order $order */
+         $order = $payment->getOrder();
+         Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, true);
+-        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
++        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getBaseGrandTotal());
+         $amount = Mage::app()->getStore()->roundPrice($amount);
+         if ($orderGrandTotal <= $amount) {
+             $transactionId = self::refundFull($order);
+diff --git a/Block/Checkout/Expresspay.php b/Block/Checkout/Expresspay.php
+index a95441e..5459b51 100644
+--- a/Block/Checkout/Expresspay.php
++++ b/Block/Checkout/Expresspay.php
+@@ -127,7 +127,7 @@ public function getCurrency()
+             return $storeCurrency;
+         }
+ 
+-        $currency = $quote->getQuoteCurrencyCode();
++        $currency = $quote->getBaseCurrencyCode();
+ 
+         return !empty($currency) ? $currency : $storeCurrency;
+     }
+@@ -143,15 +143,33 @@ public function getQuoteTotals()
+             return [];
+         }
+ 
+-        $totals = array_map(
+-            static function (Mage_Sales_Model_Quote_Address_Total $total) {
+-                return [
+-                    'code' => $total->getCode(),
+-                    'value' => number_format((float)$total->getValue(), 2, '.', '')
+-                ];
+-            },
+-            $quote->getTotals()
+-        );
++        $address = $quote->getShippingAddress();
++        $totals = [];
++
++        // Core totals
++        $totals[] = ['code' => 'subtotal', 'value' => number_format((float)$quote->getBaseSubtotal(), 2, '.', '')];
++        $totals[] = ['code' => 'shipping', 'value' => number_format((float)$address->getBaseShippingAmount(), 2, '.', '')];
++        $totals[] = ['code' => 'tax',      'value' => number_format((float)$address->getBaseTaxAmount(), 2, '.', '')];
++        $totals[] = ['code' => 'discount', 'value' => number_format(abs((float)$quote->getBaseDiscountAmount()), 2, '.', '')];
++        $totals[] = ['code' => 'grand_total', 'value' => number_format((float)$quote->getBaseGrandTotal(), 2, '.', '')];
++
++        // Catch any custom totals added by extensions (fees, surcharges, etc.)
++        foreach ($quote->getTotals() as $code => $total) {
++            if (in_array($code, ['subtotal','shipping','tax','discount','grand_total'], true)) {
++                continue;
++            }
++
++            $baseValue = (float)$total->getBaseValue();
++            if ($baseValue === 0.0 && method_exists($total, 'getValue')) {
++                // If base is missing but store value exists, skip (don’t guess)
++                continue;
++            }
++
++            $totals[] = [
++                'code'  => $code,
++                'value' => number_format($baseValue, 2, '.', '')
++            ];
++        }
+ 
+         return $totals;
+     }
+@@ -171,7 +189,7 @@ public function getQuoteItems()
+             static function (Mage_Sales_Model_Quote_Item $quoteItem) {
+                 return [
+                     'sku' => $quoteItem->getSku(),
+-                    'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
++                    'price' => number_format((float)$quoteItem->getBasePrice(), 2, '.', ''),
+                     'name' => $quoteItem->getName()
+                 ];
+             },
+diff --git a/Block/Payment/Form/Base.php b/Block/Payment/Form/Base.php
+index 5142daf..31a3ad9 100644
+--- a/Block/Payment/Form/Base.php
++++ b/Block/Payment/Form/Base.php
+@@ -127,7 +127,7 @@ public function getJwtToken()
+      */
+     public function getQuoteCurrencyCode()
+     {
+-        return $this->quote->getQuoteCurrencyCode();
++        return $this->quote->getBaseCurrencyCode();
+     }
+ 
+     /**
+diff --git a/Service/ExpressPay/QuoteConverter.php b/Service/ExpressPay/QuoteConverter.php
+index c72dd10..2e56450 100644
+--- a/Service/ExpressPay/QuoteConverter.php
++++ b/Service/ExpressPay/QuoteConverter.php
+@@ -111,7 +111,7 @@ public function convertShippingInformation(Mage_Sales_Model_Quote $quote)
+                 'shipping_options' => []
+             ]
+         ];
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+         $hasRequiredAddressData = $shippingAddress->getCity() !== null && $shippingAddress->getCountryId() !== null;
+ 
+         if ($hasRequiredAddressData) {
+@@ -126,7 +126,7 @@ public function convertShippingInformation(Mage_Sales_Model_Quote $quote)
+             ];
+         }
+ 
+-        $shippingAmount = $shippingAddress->getShippingAmount();
++        $shippingAmount = $shippingAddress->getBaseShippingAmount();
+ 
+         if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
+ 
+@@ -162,7 +162,7 @@ static function (Mage_Sales_Model_Quote_Address_Rate $rate) use (&$usedRateCodes
+             $convertedQuote['order_data']['shipping_options'] = array_map(
+                 static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode, $selectedMethod, $shippingAmount) {
+                     // Use actual shipping amount for selected method, rate price for others
+-                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getPrice();
++                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getBasePrice();
+ 
+                     return [
+                         'id' => $rate->getCode(),
+@@ -196,7 +196,7 @@ public function convertQuoteItems(Mage_Sales_Model_Quote $quote)
+             return [];
+         }
+ 
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+         $convertedQuote = [
+             'order_data' => [
+                 'items' => array_map(
+@@ -206,7 +206,7 @@ static function (Mage_Sales_Model_Quote_Item $quoteItem) use ($currencyCode) {
+                             'sku' => $quoteItem->getSku(),
+                             'unit_amount' => [
+                                 'currency_code' => $currencyCode,
+-                                'value' => number_format((float)$quoteItem->getPrice(), 2, '.', '')
++                                'value' => number_format((float)$quoteItem->getBasePrice(), 2, '.', '')
+                             ],
+                             'quantity' => (int)(ceil($quoteItem->getQty()) ?: $quoteItem->getQty()),
+                             'is_shipping_required' => !in_array(
+@@ -227,7 +227,7 @@ static function (Mage_Sales_Model_Quote_Item $quoteItem) use ($currencyCode) {
+                         array_sum(
+                             array_map(
+                                 static function (Mage_Sales_Model_Quote_Item $quoteItem) {
+-                                    return $quoteItem->getPrice() * $quoteItem->getQty();
++                                    return $quoteItem->getBasePrice() * $quoteItem->getQty();
+                                 },
+                                 $quoteItems
+                             )
+@@ -252,7 +252,7 @@ static function (Mage_Sales_Model_Quote_Item $quoteItem) {
+      */
+     public function convertTotal(Mage_Sales_Model_Quote $quote)
+     {
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+ 
+         if (!$this->areTotalsCollected) {
+             $quote->collectTotals();
+@@ -260,7 +260,7 @@ public function convertTotal(Mage_Sales_Model_Quote $quote)
+             $this->areTotalsCollected = true;
+         }
+ 
+-        $grandTotal = (float)$quote->getGrandTotal();
++        $grandTotal = (float)$quote->getBaseGrandTotal();
+ 
+         return [
+             'order_data' => [
+@@ -279,7 +279,7 @@ public function convertTotal(Mage_Sales_Model_Quote $quote)
+      */
+     public function convertTaxes(Mage_Sales_Model_Quote $quote)
+     {
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+         $convertedQuote = [
+             'order_data' => [
+                 'tax_total' => [
+@@ -296,7 +296,7 @@ public function convertTaxes(Mage_Sales_Model_Quote $quote)
+                 array_sum(
+                     array_map(
+                         static function (Mage_Sales_Model_Quote_Item $item) {
+-                            return $item->getTaxAmount() ?: 0.00;
++                            return $item->getBaseTaxAmount() ?: 0.00;
+                         },
+                         $quoteItems
+                     )
+@@ -308,7 +308,7 @@ static function (Mage_Sales_Model_Quote_Item $item) {
+         } else {
+             // Use the shipping address tax amount which should include all taxes
+             $shippingAddress = $quote->getShippingAddress();
+-            $totalTaxAmount = (float)($shippingAddress->getTaxAmount() ?: 0.00);
++            $totalTaxAmount = (float)($shippingAddress->getBaseTaxAmount() ?: 0.00);
+ 
+             $convertedQuote['order_data']['tax_total']['value'] = number_format(
+                 $totalTaxAmount,
+@@ -334,7 +334,7 @@ public function convertDiscount(Mage_Sales_Model_Quote $quote)
+             $this->areTotalsCollected = true;
+         }
+ 
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+         /** @var Mage_Sales_Model_Quote_Address_Total[] $quoteTotals */
+         $quoteTotals = $quote->getTotals();
+         $discount = array_key_exists('discount', $quoteTotals) ? abs($quoteTotals['discount']->getValue()) : 0;
+@@ -363,7 +363,7 @@ private function convertCustomTotals(Mage_Sales_Model_Quote $quote, array &$conv
+             $this->areTotalsCollected = true;
+         }
+ 
+-        $currencyCode = $quote->getQuoteCurrencyCode() ?: '';
++        $currencyCode = $quote->getBaseCurrencyCode() ?: '';
+         $excludedTotals = ['subtotal', 'discount', 'shipping', 'tax', 'grand_total'];
+         $customTotals = array_filter(
+             $quote->getTotals(),
+diff --git a/Service/Order/Hydrate/ExtractData.php b/Service/Order/Hydrate/ExtractData.php
+index 1f09c77..38ed192 100644
+--- a/Service/Order/Hydrate/ExtractData.php
++++ b/Service/Order/Hydrate/ExtractData.php
+@@ -167,7 +167,7 @@ private static function getShippingLine(Mage_Sales_Model_Quote $quote)
+ 
+         return [
+             'rate_name' => $quote->getShippingAddress()->getShippingDescription() ?: '',
+-            'cost' => self::convertToCents($quote->getShippingAddress()->getShippingAmount()),
++            'cost' => self::convertToCents($quote->getShippingAddress()->getBaseShippingAmount()),
+         ];
+     }
+ 
+@@ -219,24 +219,46 @@ private static function getDiscountsAndFees(Mage_Sales_Model_Quote $quote)
+     private static function getTotals(Mage_Sales_Model_Quote $quote)
+     {
+         $totals = $quote->getTotals();
+-        $subTotal = isset($totals['subtotal']['value_excl_tax'])
+-            ? $totals['subtotal']['value_excl_tax']
+-            : $totals['subtotal']['value'];
+-        $shippingTotal = isset($totals['shipping']['value_excl_tax'])
+-            ? $totals['shipping']['value_excl_tax']
+-            : $totals['shipping']['value'];
+-        $grandTotal = isset($totals['grand_total']['value_incl_tax'])
+-            ? $totals['grand_total']['value_incl_tax']
+-            : $totals['grand_total']['value'];
++
++        // Get base values directly from quote and address (no math)
++        $subTotal = $quote->getBaseSubtotal();
++        $shippingTotal = $quote->getShippingAddress()->getBaseShippingAmount();
++        $grandTotal = $quote->getBaseGrandTotal();
++        $taxTotal = $quote->getShippingAddress()->getBaseTaxAmount();
++        $discountTotal = abs((float)$quote->getBaseDiscountAmount());
++
++        // Fallback: check totals array if something is missing
++        if (!$subTotal && isset($totals['subtotal'])) {
++            $subTotal = (float)$totals['subtotal']->getBaseValue();
++        }
++        if (!$shippingTotal && isset($totals['shipping'])) {
++            $shippingTotal = (float)$totals['shipping']->getBaseValue();
++        }
++        if (!$grandTotal && isset($totals['grand_total'])) {
++            $grandTotal = (float)$totals['grand_total']->getBaseValue();
++        }
++        if (!$taxTotal && isset($totals['tax'])) {
++            $taxTotal = (float)$totals['tax']->getBaseValue();
++        }
++        if (!$discountTotal && isset($totals['discount'])) {
++            $discountTotal = abs((float)$totals['discount']->getBaseValue());
++        }
++
++        // Processed totals in cents
+         $processedTotals = [
+-            'sub_total' => self::convertToCents($subTotal),
+-            'tax_total' => isset($totals['tax']['value']) && $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
+-            'discount_total' => self::getDiscountTotal(),
++            'sub_total'      => self::convertToCents($subTotal),
++            'tax_total'      => self::convertToCents($taxTotal),
++            'discount_total' => self::convertToCents($discountTotal),
+             'shipping_total' => self::convertToCents($shippingTotal),
+-            'order_total' => self::convertToCents($grandTotal),
++            'order_total'    => self::convertToCents($grandTotal),
+         ];
+-        $calculatedGrandTotal = $processedTotals['sub_total'] + $processedTotals['tax_total']
+-            + $processedTotals['shipping_total'] - $processedTotals['discount_total'];
++
++        // Adjust mismatched grand totals (same logic as before)
++        $calculatedGrandTotal = $processedTotals['sub_total']
++            + $processedTotals['tax_total']
++            + $processedTotals['shipping_total']
++            - $processedTotals['discount_total'];
++
+         if ($calculatedGrandTotal > $processedTotals['order_total']
+             && $calculatedGrandTotal === $processedTotals['order_total'] + $processedTotals['tax_total']) {
+             $processedTotals['order_total'] = $calculatedGrandTotal;
+diff --git a/controllers/IndexController.php b/controllers/IndexController.php
+index c16f875..474c3c6 100644
+--- a/controllers/IndexController.php
++++ b/controllers/IndexController.php
+@@ -17,7 +17,7 @@ public function getCartDataAction()
+         }
+         $quote = Mage::getSingleton('checkout/session')->getQuote();
+         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
+-        $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
++        $cartData['quote_currency_code'] = $quote->getBaseCurrencyCode();
+         $cartData['shipping_options'] = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::getQuoteShippingOptions($quote);
+         $this->getResponse()->setBody(json_encode($cartData));
+     }
+@@ -57,7 +57,7 @@ public function getCartItemsAction()
+             static function (Mage_Sales_Model_Quote_Item $quoteItem) {
+                 return [
+                     'sku' => $quoteItem->getSku(),
+-                    'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
++                    'price' => number_format((float)$quoteItem->getBasePrice(), 2, '.', ''),
+                     'name' => $quoteItem->getName(),
+                 ];
+             },
+
+From bead7a21dd39985e21dc3cf34620dcc7b744040c Mon Sep 17 00:00:00 2001
+From: Carol Castro <carol.castro@boldcommerce.com>
+Date: Mon, 3 Nov 2025 10:52:58 -0300
+Subject: [PATCH 3/3] Using base currency
+
+---
+ Service/ExpressPay/QuoteConverter.php | 24 +++++-------------------
+ 1 file changed, 5 insertions(+), 19 deletions(-)
+
+diff --git a/Service/ExpressPay/QuoteConverter.php b/Service/ExpressPay/QuoteConverter.php
+index 2e56450..f45033e 100644
+--- a/Service/ExpressPay/QuoteConverter.php
++++ b/Service/ExpressPay/QuoteConverter.php
+@@ -126,17 +126,14 @@ public function convertShippingInformation(Mage_Sales_Model_Quote $quote)
+             ];
+         }
+ 
+-        $shippingAmount = $shippingAddress->getBaseShippingAmount();
+-
+         if ($hasRequiredAddressData && $shippingAddress->getShippingMethod() !== '') {
+-
+             $convertedQuote['order_data']['selected_shipping_option'] = [
+                 'id' => $shippingAddress->getShippingMethod(),
+                 'label' => $shippingAddress->getShippingDescription(),
+                 'type' => 'SHIPPING',
+                 'amount' => [
+                     'currency_code' => $currencyCode,
+-                    'value' => number_format((float)$shippingAmount, 2, '.', '')
++                    'value' => number_format((float)$shippingAddress->getBaseShippingAmount(), 2, '.', '')
+                 ],
+             ];
+         }
+@@ -157,20 +154,15 @@ static function (Mage_Sales_Model_Quote_Address_Rate $rate) use (&$usedRateCodes
+         );
+ 
+         if ($hasRequiredAddressData && count($shippingRates) > 0) {
+-            $selectedMethod = $shippingAddress->getShippingMethod();
+-
+             $convertedQuote['order_data']['shipping_options'] = array_map(
+-                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode, $selectedMethod, $shippingAmount) {
+-                    // Use actual shipping amount for selected method, rate price for others
+-                    $displayAmount = ($rate->getCode() === $selectedMethod) ? $shippingAmount : $rate->getBasePrice();
+-
++                static function (Mage_Sales_Model_Quote_Address_Rate $rate) use ($currencyCode) {
+                     return [
+                         'id' => $rate->getCode(),
+                         'label' => trim("{$rate->getCarrierTitle()} - {$rate->getMethodTitle()}", ' -'),
+                         'type' => 'SHIPPING',
+                         'amount' => [
+                             'currency_code' => $currencyCode,
+-                            'value' => number_format((float)$displayAmount, 2, '.', '')
++                            'value' => number_format((float)$rate->getPrice(), 2, '.', '')
+                         ]
+                     ];
+                 },
+@@ -260,13 +252,11 @@ public function convertTotal(Mage_Sales_Model_Quote $quote)
+             $this->areTotalsCollected = true;
+         }
+ 
+-        $grandTotal = (float)$quote->getBaseGrandTotal();
+-
+         return [
+             'order_data' => [
+                 'amount' => [
+                     'currency_code' => $currencyCode,
+-                    'value' => number_format($grandTotal, 2, '.', '')
++                    'value' => number_format((float)$quote->getBaseGrandTotal(), 2, '.', '')
+                 ]
+             ]
+         ];
+@@ -306,12 +296,8 @@ static function (Mage_Sales_Model_Quote_Item $item) {
+                 ''
+             );
+         } else {
+-            // Use the shipping address tax amount which should include all taxes
+-            $shippingAddress = $quote->getShippingAddress();
+-            $totalTaxAmount = (float)($shippingAddress->getBaseTaxAmount() ?: 0.00);
+-
+             $convertedQuote['order_data']['tax_total']['value'] = number_format(
+-                $totalTaxAmount,
++                (float)($quote->getShippingAddress()->getBaseTaxAmount() ?: 0.00),
+                 2,
+                 '.',
+                 ''
