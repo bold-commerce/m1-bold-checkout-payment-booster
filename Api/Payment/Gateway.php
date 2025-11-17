@@ -28,7 +28,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
             return;
         }
         Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, true);
-        if ((float)$order->getGrandTotal() === (float)$amount) {
+        if ((float)$order->getBaseGrandTotal() === (float)$amount) {
             $payment->setTransactionId(self::captureFull($order))->setShouldCloseParentTransaction(true);
             Bold_CheckoutPaymentBooster_Service_Order_Data::setIsCaptureInProgress($order, false);
             return;
@@ -97,7 +97,7 @@ class Bold_CheckoutPaymentBooster_Api_Payment_Gateway
         /** @var Mage_Sales_Model_Order $order */
         $order = $payment->getOrder();
         Bold_CheckoutPaymentBooster_Service_Order_Data::setIsRefundInProgress($order, true);
-        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getGrandTotal());
+        $orderGrandTotal = Mage::app()->getStore()->roundPrice($order->getBaseGrandTotal());
         $amount = Mage::app()->getStore()->roundPrice($amount);
         if ($orderGrandTotal <= $amount) {
             $transactionId = self::refundFull($order);

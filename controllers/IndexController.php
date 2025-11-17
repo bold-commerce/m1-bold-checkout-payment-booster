@@ -17,7 +17,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         }
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
-        $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
+        $cartData['quote_currency_code'] = $quote->getBaseCurrencyCode();
         $cartData['shipping_options'] = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::getQuoteShippingOptions($quote);
         $this->getResponse()->setBody(json_encode($cartData));
     }
@@ -57,7 +57,7 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
             static function (Mage_Sales_Model_Quote_Item $quoteItem) {
                 return [
                     'sku' => $quoteItem->getSku(),
-                    'price' => number_format((float)$quoteItem->getPrice(), 2, '.', ''),
+                    'price' => number_format((float)$quoteItem->getBasePrice(), 2, '.', ''),
                     'name' => $quoteItem->getName(),
                 ];
             },
