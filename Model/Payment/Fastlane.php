@@ -72,6 +72,10 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
      */
     public function isAvailable($quote = null)
     {
+        if (Mage::app()->getStore()->isAdmin()) {
+            return false;
+        }
+
         if (!$quote) {
             return false;
         }
@@ -99,14 +103,28 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
      */
     public function getTitle()
     {
+        if (Mage::app()->getStore()->isAdmin() || !$this->hasInfoInstance()) {
+            return $this->getConfigData('title');
+        }
+
         $infoInstance = $this->getInfoInstance();
-        if ($infoInstance && $infoInstance->getAdditionalInformation('card_details')) {
-            $cardDetails = unserialize($infoInstance->getAdditionalInformation('card_details'));
-            if (isset($cardDetails['brand']) && isset($cardDetails['last_four'])) {
-                return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
+        $cardDetails  = $infoInstance->getAdditionalInformation('card_details');
+
+        if ($cardDetails) {
+            $cardDetails = @unserialize($cardDetails);
+
+            if (is_array($cardDetails)) {
+                if (isset($cardDetails['brand'], $cardDetails['last_four'])) {
+                    return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
+                }
+
+                if (isset($cardDetails['account'], $cardDetails['email'])) {
+                    return 'PayPal: ' . $cardDetails['email'];
+                }
             }
         }
-        return parent::getTitle();
+
+        return $this->getConfigData('title');
     }
 
     /**
