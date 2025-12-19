@@ -72,7 +72,11 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function isAvailable($quote = null)
     {
-        return Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
+        if (Mage::app()->getStore()->isAdmin()) {
+            return false;
+        }
+
+        return (bool) Bold_CheckoutPaymentBooster_Service_Bold::getBoldCheckoutData();
     }
 
     /**
@@ -82,17 +86,28 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
      */
     public function getTitle()
     {
+        if (Mage::app()->getStore()->isAdmin() || !$this->hasInfoInstance()) {
+            return $this->getConfigData('title');
+        }
+
         $infoInstance = $this->getInfoInstance();
-        if ($infoInstance && $infoInstance->getAdditionalInformation('card_details')) {
-            $cardDetails = unserialize($infoInstance->getAdditionalInformation('card_details'));
-            if (isset($cardDetails['brand']) && isset($cardDetails['last_four'])) {
-                return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
-            }
-            if (isset($cardDetails['account']) && isset($cardDetails['email'])) {
-                return 'PayPal: ' . $cardDetails['email'];
+        $cardDetails  = $infoInstance->getAdditionalInformation('card_details');
+
+        if ($cardDetails) {
+            $cardDetails = @unserialize($cardDetails);
+
+            if (is_array($cardDetails)) {
+                if (isset($cardDetails['brand'], $cardDetails['last_four'])) {
+                    return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
+                }
+
+                if (isset($cardDetails['account'], $cardDetails['email'])) {
+                    return 'PayPal: ' . $cardDetails['email'];
+                }
             }
         }
-        return parent::getTitle();
+
+        return $this->getConfigData('title');
     }
 
     /**
