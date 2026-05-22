@@ -225,7 +225,7 @@
             <bold>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Bold</model>
                 <active>1</active>
-                <title></title>
+                <title>Bold Payments</title>
             </bold>
             <bold_fastlane>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Fastlane</model>
