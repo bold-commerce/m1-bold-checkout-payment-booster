@@ -84,6 +84,30 @@
                     </update_bold_order_status>
                 </observers>
             </checkout_submit_all_after>
+            <controller_action_predispatch_checkout_onepage_saveOrder>
+                <observers>
+                    <bold_checkout_seamless_duplicate_save_order>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>predispatchSeamlessSaveOrder</method>
+                    </bold_checkout_seamless_duplicate_save_order>
+                </observers>
+            </controller_action_predispatch_checkout_onepage_saveOrder>
+            <controller_action_predispatch_firecheckout_index_saveOrder>
+                <observers>
+                    <bold_checkout_seamless_duplicate_save_order_fc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>predispatchSeamlessSaveOrder</method>
+                    </bold_checkout_seamless_duplicate_save_order_fc>
+                </observers>
+            </controller_action_predispatch_firecheckout_index_saveOrder>
+            <controller_action_predispatch_firecheckout_onecolumn_saveOrder>
+                <observers>
+                    <bold_checkout_seamless_duplicate_save_order_fc_oc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>predispatchSeamlessSaveOrder</method>
+                    </bold_checkout_seamless_duplicate_save_order_fc_oc>
+                </observers>
+            </controller_action_predispatch_firecheckout_onecolumn_saveOrder>
             <checkout_type_onepage_save_order>
                 <observers>
                     <authorize_bold_payment>
@@ -92,54 +116,14 @@
                     </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
-            <controller_action_predispatch_checkout_onepage_saveOrder>
+            <sales_model_service_quote_submit_failure>
                 <observers>
-                    <bold_checkout_prevent_duplicate_save_order>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>predispatchSaveOrder</method>
-                    </bold_checkout_prevent_duplicate_save_order>
+                    <bold_checkout_clear_placement_on_failure>
+                        <class>Bold_CheckoutPaymentBooster_Observer_CheckoutObserver</class>
+                        <method>clearPlacementStateOnFailure</method>
+                    </bold_checkout_clear_placement_on_failure>
                 </observers>
-            </controller_action_predispatch_checkout_onepage_saveOrder>
-            <controller_action_postdispatch_checkout_onepage_saveOrder>
-                <observers>
-                    <bold_checkout_clear_placement_state>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>cleanupAfterSaveOrder</method>
-                    </bold_checkout_clear_placement_state>
-                </observers>
-            </controller_action_postdispatch_checkout_onepage_saveOrder>
-            <controller_action_predispatch_firecheckout_index_saveOrder>
-                <observers>
-                    <bold_checkout_prevent_duplicate_save_order_fc>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>predispatchSaveOrder</method>
-                    </bold_checkout_prevent_duplicate_save_order_fc>
-                </observers>
-            </controller_action_predispatch_firecheckout_index_saveOrder>
-            <controller_action_postdispatch_firecheckout_index_saveOrder>
-                <observers>
-                    <bold_checkout_clear_placement_state_fc>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>cleanupAfterSaveOrder</method>
-                    </bold_checkout_clear_placement_state_fc>
-                </observers>
-            </controller_action_postdispatch_firecheckout_index_saveOrder>
-            <controller_action_predispatch_firecheckout_onecolumn_saveOrder>
-                <observers>
-                    <bold_checkout_prevent_duplicate_save_order_fc_oc>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>predispatchSaveOrder</method>
-                    </bold_checkout_prevent_duplicate_save_order_fc_oc>
-                </observers>
-            </controller_action_predispatch_firecheckout_onecolumn_saveOrder>
-            <controller_action_postdispatch_firecheckout_onecolumn_saveOrder>
-                <observers>
-                    <bold_checkout_clear_placement_state_fc_oc>
-                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
-                        <method>cleanupAfterSaveOrder</method>
-                    </bold_checkout_clear_placement_state_fc_oc>
-                </observers>
-            </controller_action_postdispatch_firecheckout_onecolumn_saveOrder>
+            </sales_model_service_quote_submit_failure>
         </events>
         <routers>
             <checkoutpaymentbooster>
@@ -225,7 +209,7 @@
             <bold>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Bold</model>
                 <active>1</active>
-                <title>Bold Payments</title>
+                <title>Credit Card</title>
             </bold>
             <bold_fastlane>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Fastlane</model>

@@ -92,7 +92,9 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
                 return 'PayPal: ' . $cardDetails['email'];
             }
         }
-        return parent::getTitle();
+        $title = parent::getTitle();
+
+        return $title !== '' ? $title : Mage::helper('payment')->__('Credit Card');
     }
 
     /**
