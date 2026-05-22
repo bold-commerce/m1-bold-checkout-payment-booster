@@ -24,7 +24,9 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         if (!in_array($paymentMethod, $methodsToProcess)) {
             return;
         }
+
         $quote = $order->getQuote();
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertQuoteCanSubmit($quote);
         $websiteId = $quote->getStore()->getWebsiteId();
         try {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
@@ -61,8 +63,20 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
             $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
             $extOrderData->setOrderId($order->getEntityId());
-            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
-            $extOrderData->save();
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+            $extOrderData->setPublicId($publicOrderId);
+            try {
+                $extOrderData->save();
+            } catch (Exception $e) {
+                if ($publicOrderId && self::isDuplicatePublicIdException($e)) {
+                    Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logDuplicateOrderAttempt(
+                        $publicOrderId,
+                        'after_save_order mapping race magento_order=' . $order->getIncrementId()
+                    );
+                } else {
+                    throw $e;
+                }
+            }
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
         } catch (Exception $e) {
@@ -95,5 +109,17 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         if ($cardDetails) {
             $order->getPayment()->setAdditionalInformation('card_details', serialize((array)$cardDetails));
         }
+    }
+
+    /**
+     * @param Exception $exception
+     * @return bool
+     */
+    private static function isDuplicatePublicIdException(Exception $exception)
+    {
+        $message = $exception->getMessage();
+
+        return stripos($message, 'Duplicate entry') !== false
+            && stripos($message, 'UNQ_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_PUBLIC_ID') !== false;
     }
 }
