@@ -450,6 +450,15 @@
             return this.boldPaymentsInstance;
         },
         /**
+         * Reset cached Payments SDK so SPI can render again after DOM teardown.
+         *
+         * @return {void}
+         */
+        resetPaymentsInstance: function () {
+            this.boldPaymentsInstance = null;
+            this.buildPaymentsInstanceInProgress = false;
+        },
+        /**
          * Load specified script with attributes.
          *
          * @param {string} src
@@ -582,11 +591,10 @@
     });
 
     /**
-     * Bold payment method (SPI) — lives in base.phtml so Firecheckout AJAX does not re-run this script.
+     * Bold payment method — single instance in base.phtml (Firecheckout AJAX reloads bold_method markup only).
      */
     const BoldPaymentMethod = Class.create({
         paymentMethodElement: null,
-        paymentContainer: null,
         paymentCheckbox: null,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         isFastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
@@ -594,6 +602,8 @@
         paymentRuntimeVersion: 0,
         isTokenizing: false,
         isCompletingPayment: false,
+        tokenizeCooldownUntil: 0,
+        lastTerminalFailureAt: 0,
         spiEventsSubscribed: false,
         checkoutSaveWrapped: false,
         paymentSaveWrapped: false,
@@ -605,8 +615,9 @@
                 return;
             }
             await this.waitForPaymentFormDom();
+            this.dedupePaymentFormBoldElements();
             this.refreshDomReferences();
-            if (!document.getElementById('payment_form_bold')) {
+            if (!this.getPaymentFormBold()) {
                 return;
             }
             await this.waitForBaseInstance();
@@ -617,28 +628,6 @@
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
             this.scheduleRenderPaymentForm(true);
-        },
-        isBoldPaymentSelected: function () {
-            const checkbox = document.getElementById('p_method_bold');
-            return !!(checkbox && checkbox.checked);
-        },
-        waitForPaymentFormDom: function () {
-            return new Promise((resolve) => {
-                if (document.getElementById('payment_form_bold')) {
-                    resolve();
-                    return;
-                }
-                const intervalId = setInterval(() => {
-                    if (document.getElementById('payment_form_bold')) {
-                        clearInterval(intervalId);
-                        resolve();
-                    }
-                }, 100);
-                setTimeout(() => {
-                    clearInterval(intervalId);
-                    resolve();
-                }, 10000);
-            });
         },
         syncPaymentRuntimeVersion: function () {
             if (typeof window.bold.paymentRuntimeVersion !== 'number') {
@@ -663,215 +652,86 @@
             this.isTokenizing = false;
             this.isCompletingPayment = false;
         },
+        canAttemptTokenize: function () {
+            if (this.isTokenizing || this.isCompletingPayment) {
+                return false;
+            }
+            if (this.tokenizeCooldownUntil && Date.now() < this.tokenizeCooldownUntil) {
+                return false;
+            }
+            return true;
+        },
         delay: function (ms) {
             return new Promise((resolve) => {
                 setTimeout(resolve, ms);
             });
         },
-        awaitPendingPaymentRender: function () {
-            if (window.bold.paymentRenderPromise) {
-                return window.bold.paymentRenderPromise.catch(function () {});
-            }
-            return Promise.resolve();
+        getPaymentMethodLoadRoot: function () {
+            return document.getElementById('checkout-payment-method-load')
+                || document.getElementById('payment-method');
         },
-        ensurePpcpButtonsContainer: function () {
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (!boldPaymentsForm) {
-                return;
-            }
-            let ppcpContainer = document.getElementById('smart-ppcp-buttons');
-            if (!ppcpContainer) {
-                ppcpContainer = document.createElement('div');
-                ppcpContainer.id = 'smart-ppcp-buttons';
-                boldPaymentsForm.appendChild(ppcpContainer);
-                return;
-            }
-            if (ppcpContainer.parentNode !== boldPaymentsForm) {
-                boldPaymentsForm.appendChild(ppcpContainer);
-            }
-            ppcpContainer.classList.add('bold-ppcp-buttons-host');
-            if (!ppcpContainer.style.display || ppcpContainer.style.display === 'none') {
-                ppcpContainer.style.display = 'block';
-            }
+        getAllPaymentFormBoldElements: function () {
+            return Array.from(document.querySelectorAll('[id="payment_form_bold"]'));
         },
-        clearSpiContainer: function () {
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (!boldPaymentsForm) {
+        dedupePaymentFormBoldElements: function () {
+            const forms = this.getAllPaymentFormBoldElements();
+            if (forms.length <= 1) {
                 return;
             }
-            Array.from(boldPaymentsForm.children).forEach((child) => {
-                if (child.id !== 'smart-ppcp-buttons') {
-                    child.remove();
+            const root = this.getPaymentMethodLoadRoot();
+            let keepForm = forms[forms.length - 1];
+            if (root) {
+                const inRoot = forms.filter((form) => root.contains(form));
+                if (inRoot.length) {
+                    keepForm = inRoot[inRoot.length - 1];
+                }
+            }
+            forms.forEach((form) => {
+                if (form !== keepForm) {
+                    form.remove();
                 }
             });
-            this.ensurePpcpButtonsContainer();
-        },
-        getActiveSpiFrame: function () {
-            const iframeById = document.getElementById('spi_frame_payment_form_bold');
-            if (iframeById) {
-                return iframeById;
-            }
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (!boldPaymentsForm) {
-                return null;
-            }
-            return boldPaymentsForm.querySelector('#spi_frame_payment_form_bold');
-        },
-        ensurePaymentFormVisible: function () {
-            if (!this.isBoldPaymentSelected()) {
-                return;
-            }
-            const form = document.getElementById('payment_form_bold');
-            if (!form) {
-                return;
-            }
-            if (form.style.display === 'none') {
-                form.style.display = '';
-            }
-            if (typeof payment !== 'undefined' && payment.changeVisible) {
-                payment.changeVisible('bold', false);
-            }
-        },
-        hidePaymentFormWhenNotSelected: function () {
-            const form = document.getElementById('payment_form_bold');
-            if (!form) {
-                return;
-            }
-            if (typeof payment !== 'undefined' && payment.changeVisible) {
-                payment.changeVisible('bold', true);
-                return;
-            }
-            form.style.display = 'none';
-        },
-        hasRenderedPpcpButtons: function () {
-            const ppcpContainer = document.getElementById('smart-ppcp-buttons');
-
-            return !!(ppcpContainer && ppcpContainer.children.length > 0);
-        },
-        updatePpcpButtonsVisibility: function () {
-            const ppcpContainer = document.getElementById('smart-ppcp-buttons');
-            if (!ppcpContainer) {
-                return;
-            }
-            if (window.bold.spiRenderInProgress) {
-                ppcpContainer.style.display = 'block';
-                ppcpContainer.style.minHeight = '48px';
-                return;
-            }
-            const hasContent = ppcpContainer.children.length > 0;
-            ppcpContainer.style.display = hasContent ? 'block' : 'none';
-            ppcpContainer.style.minHeight = hasContent ? '' : '';
-        },
-        waitForSpiRenderComplete: function () {
-            return new Promise((resolve) => {
-                if (!window.bold.spiRenderInProgress) {
-                    resolve();
-                    return;
+            document.querySelectorAll('[id="spi_frame_payment_form_bold"]').forEach((frame) => {
+                if (!keepForm.contains(frame)) {
+                    frame.remove();
                 }
-                const intervalId = setInterval(() => {
-                    if (!window.bold.spiRenderInProgress) {
-                        clearInterval(intervalId);
-                        resolve();
-                    }
-                }, 50);
-                setTimeout(() => {
-                    clearInterval(intervalId);
-                    resolve();
-                }, 20000);
             });
         },
-        waitForSpiFrame: function (timeoutMs) {
-            const deadline = Date.now() + timeoutMs;
-            return new Promise((resolve) => {
-                const tick = () => {
-                    const iframe = this.getActiveSpiFrame();
-                    if (iframe && iframe.contentWindow) {
-                        resolve(true);
-                        return;
-                    }
-                    if (Date.now() >= deadline) {
-                        resolve(false);
-                        return;
-                    }
-                    setTimeout(tick, 100);
-                };
-                tick();
-            });
-        },
-        ensureSpiFrameReady: async function () {
-            const existing = this.getActiveSpiFrame();
-            if (existing && existing.contentWindow) {
-                return true;
+        getPaymentFormBold: function () {
+            this.dedupePaymentFormBoldElements();
+            const root = this.getPaymentMethodLoadRoot();
+            if (root) {
+                const inRoot = root.querySelector('[id="payment_form_bold"]');
+                if (inRoot) {
+                    return inRoot;
+                }
             }
-            this.ensurePaymentFormVisible();
-            if (window.bold.spiRenderInProgress) {
-                await this.waitForSpiRenderComplete();
-            } else {
-                await this.renderPaymentForm();
-            }
-            if (!this.getActiveSpiFrame()) {
-                this.scheduleRenderPaymentForm(true);
-                await this.waitForSpiRenderComplete();
-            }
-            return this.waitForSpiFrame(20000);
-        },
-        isMessageFromActiveSpi: function (event) {
-            const iframe = this.getActiveSpiFrame();
-            return !!(iframe && iframe.contentWindow && event.source === iframe.contentWindow);
+            const forms = this.getAllPaymentFormBoldElements();
+            return forms.length ? forms[forms.length - 1] : null;
         },
         refreshDomReferences: function () {
             this.paymentCheckbox = document.getElementById('p_method_bold');
             this.paymentMethodElement = this.paymentCheckbox
                 ? this.paymentCheckbox.parentNode
                 : null;
-            this.paymentContainer = document.getElementById('bold-payments-container');
         },
-        onPaymentSectionReloaded: async function (options) {
-            options = options || {};
-            await this.waitForPaymentFormDom();
-            this.refreshDomReferences();
-            if (!document.getElementById('payment_form_bold')) {
-                return;
-            }
-            if (!this.isAvailable) {
-                this.hidePaymentMethod();
-                return;
-            }
-            if (options.hardReload) {
-                this.bumpPaymentRuntimeVersion();
-                this.resetPaymentFlowState();
-                await this.awaitPendingPaymentRender();
-                this.clearSpiContainer();
-                if (typeof checkout !== 'undefined') {
-                    checkout.setLoadWaiting(false);
+        waitForPaymentFormDom: function () {
+            return new Promise((resolve) => {
+                if (this.getPaymentFormBold()) {
+                    resolve();
+                    return;
                 }
-            }
-            await this.waitForBaseInstance();
-            if (!this.hasValidBaseInstance()) {
-                return;
-            }
-            this.scheduleRenderPaymentForm(true);
-            if (this.isBoldPaymentSelected()) {
-                this.ensurePaymentFormVisible();
-            } else {
-                this.hidePaymentFormWhenNotSelected();
-            }
-            this.waitForPaymentInitialization();
-            this.waitForCheckoutInitialization();
-        },
-        onBoldPaymentMethodSelected: function () {
-            if (!this.isBoldPaymentSelected()) {
-                return;
-            }
-            this.refreshDomReferences();
-            if (!document.getElementById('payment_form_bold')) {
-                return;
-            }
-            this.ensurePaymentFormVisible();
-            if (!this.hasRenderedPpcpButtons()
-                || (!this.isFastlaneAvailable && !this.getActiveSpiFrame())) {
-                this.scheduleRenderPaymentForm(true);
-            }
+                const intervalId = setInterval(() => {
+                    if (this.getPaymentFormBold()) {
+                        clearInterval(intervalId);
+                        resolve();
+                    }
+                }, 100);
+                setTimeout(() => {
+                    clearInterval(intervalId);
+                    resolve();
+                }, 10000);
+            });
         },
         hasValidBaseInstance: function () {
             return window.bold
@@ -896,7 +756,162 @@
                 }, 10000);
             });
         },
-        scheduleRenderPaymentForm: function (immediate) {
+        getActiveSpiFrame: function () {
+            const form = this.getPaymentFormBold();
+            return form ? form.querySelector('[id="spi_frame_payment_form_bold"]') : null;
+        },
+        getPpcpButtonsContainer: function () {
+            const form = this.getPaymentFormBold();
+            return form ? form.querySelector('[id="smart-ppcp-buttons"]') : document.getElementById('smart-ppcp-buttons');
+        },
+        ensurePpcpButtonsContainer: function () {
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return null;
+            }
+            let host = this.getPpcpButtonsContainer();
+            if (!host) {
+                host = document.createElement('div');
+                host.id = 'smart-ppcp-buttons';
+                host.className = 'bold-ppcp-wallet-host';
+                const inner = document.createElement('div');
+                inner.id = 'paypal-button-container';
+                host.appendChild(inner);
+            } else if (!host.querySelector('[id="paypal-button-container"]')) {
+                const inner = document.createElement('div');
+                inner.id = 'paypal-button-container';
+                host.appendChild(inner);
+            }
+            if (host.parentNode !== form) {
+                form.appendChild(host);
+            }
+            const spiFrame = this.getActiveSpiFrame();
+            if (spiFrame && host.nextSibling !== spiFrame) {
+                form.insertBefore(host, spiFrame);
+            } else if (!spiFrame && form.firstChild !== host) {
+                form.insertBefore(host, form.firstChild);
+            }
+            host.style.display = '';
+            return host;
+        },
+        clearPpcpButtonsContent: function () {
+            const host = this.getPpcpButtonsContainer();
+            if (!host) {
+                return;
+            }
+            const inner = host.querySelector('[id="paypal-button-container"]') || host;
+            while (inner.firstChild) {
+                inner.removeChild(inner.firstChild);
+            }
+        },
+        hasRenderedPpcpButtons: function () {
+            const host = this.getPpcpButtonsContainer();
+            if (!host) {
+                return false;
+            }
+            const inner = host.querySelector('[id="paypal-button-container"]') || host;
+            if (inner.children.length > 0) {
+                return true;
+            }
+            return !!host.querySelector('iframe, [data-funding-source], .paypal-buttons, button, [role="button"]');
+        },
+        needsPpcpButtonsRender: function () {
+            return !!this.getPaymentFormBold() && !this.hasRenderedPpcpButtons();
+        },
+        dedupeSpiFrames: function () {
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return;
+            }
+            const frames = Array.from(form.querySelectorAll('[id="spi_frame_payment_form_bold"]'));
+            frames.slice(0, -1).forEach((frame) => frame.remove());
+        },
+        clearSpiFromDom: function () {
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return;
+            }
+            const hadSpi = !!this.getActiveSpiFrame();
+            Array.from(form.children).forEach((child) => {
+                if (child.id === 'smart-ppcp-buttons') {
+                    this.clearPpcpButtonsContent();
+                    return;
+                }
+                child.remove();
+            });
+            this.dedupeSpiFrames();
+            if (hadSpi && window.bold.baseInstance) {
+                window.bold.baseInstance.resetPaymentsInstance();
+            }
+        },
+        isSpiAlreadyRenderedError: function (error) {
+            const message = error && error.message ? error.message : String(error);
+            return message.indexOf('SPI frame is already rendered') !== -1;
+        },
+        isPaymentRenderReady: function () {
+            return !!this.getActiveSpiFrame();
+        },
+        canSkipPaymentRender: function (forceReset) {
+            if (forceReset || !this.isCurrentRuntime()) {
+                return false;
+            }
+            if (!this.isPaymentRenderReady()) {
+                return false;
+            }
+            if (this.needsPpcpButtonsRender()) {
+                return false;
+            }
+            return true;
+        },
+        awaitPendingPaymentRender: function () {
+            if (window.bold.paymentRenderPromise) {
+                return window.bold.paymentRenderPromise.catch(function () {});
+            }
+            return Promise.resolve();
+        },
+        renderPpcpWalletButtons: async function (paymentInstance, force) {
+            if (!paymentInstance || typeof paymentInstance.renderWalletPayments !== 'function') {
+                return false;
+            }
+            if (force) {
+                this.clearPpcpButtonsContent();
+            } else if (!this.needsPpcpButtonsRender()) {
+                return this.hasRenderedPpcpButtons();
+            }
+            this.ensurePpcpButtonsContainer();
+            const shopName = window.bold.baseInstance && window.bold.baseInstance.groupLabel
+                ? window.bold.baseInstance.groupLabel
+                : '';
+            try {
+                await paymentInstance.renderWalletPayments('smart-ppcp-buttons', {
+                    allowedCountries: ['US', 'CA'],
+                    fastlane: !!this.isFastlaneAvailable,
+                    isPhoneRequired: true,
+                    pageSource: 'checkout',
+                    shopName: shopName
+                });
+                return this.hasRenderedPpcpButtons();
+            } catch (e) {
+                console.warn('[Bold] renderWalletPayments failed', e);
+                return false;
+            }
+        },
+        renderPpcpWalletButtonsWithRetry: async function (paymentInstance, force) {
+            const maxAttempts = force ? 3 : 1;
+            for (let attempt = 0; attempt < maxAttempts; attempt++) {
+                if (!this.isCurrentRuntime()) {
+                    return;
+                }
+                const rendered = await this.renderPpcpWalletButtons(paymentInstance, !!force);
+                if (rendered) {
+                    return;
+                }
+                if (attempt < maxAttempts - 1) {
+                    await this.delay(300);
+                }
+            }
+        },
+        scheduleRenderPaymentForm: function (immediate, forceReset) {
             if (typeof window.bold.spiRenderGeneration !== 'number') {
                 window.bold.spiRenderGeneration = 0;
             }
@@ -906,83 +921,88 @@
                 clearTimeout(this.renderPaymentFormTimer);
                 this.renderPaymentFormTimer = null;
             }
-            const runRender = () => {
+            const run = () => {
                 if (generation !== window.bold.spiRenderGeneration) {
                     return;
                 }
-                this.renderPaymentForm();
+                this.renderPaymentForm(!!forceReset);
             };
             if (immediate) {
-                runRender();
-                return;
+                run();
+            } else {
+                this.renderPaymentFormTimer = setTimeout(run, 500);
             }
-            this.renderPaymentFormTimer = setTimeout(() => {
-                this.renderPaymentFormTimer = null;
-                runRender();
-            }, 500);
         },
-        renderPaymentForm: async function (forceResetSdk) {
-            if (!this.isCurrentRuntime()) {
+        renderPaymentForm: async function (forceReset) {
+            if (!this.isCurrentRuntime() || !this.hasValidBaseInstance()) {
                 return;
             }
-            if (!this.hasValidBaseInstance()) {
+            const form = this.getPaymentFormBold();
+            if (!form) {
                 return;
             }
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (!boldPaymentsForm) {
-                return;
-            }
-            if (this.isBoldPaymentSelected()) {
-                this.ensurePaymentFormVisible();
-            }
-            this.ensurePpcpButtonsContainer();
-            this.updatePpcpButtonsVisibility();
-            if (!this.isFastlaneAvailable && this.getActiveSpiFrame() && !forceResetSdk) {
-                return;
-            }
-            if (this.isFastlaneAvailable && this.hasRenderedPpcpButtons() && !forceResetSdk) {
+            if (this.canSkipPaymentRender(forceReset)) {
                 return;
             }
             await this.awaitPendingPaymentRender();
-            if (!this.isCurrentRuntime()) {
-                return;
-            }
-            if (!this.isFastlaneAvailable && this.getActiveSpiFrame() && !forceResetSdk) {
+            if (!this.isCurrentRuntime() || this.canSkipPaymentRender(forceReset)) {
                 return;
             }
             const renderVersion = this.paymentRuntimeVersion;
             const renderTask = (async () => {
                 window.bold.spiRenderInProgress = true;
                 try {
-                    if (forceResetSdk && window.bold.baseInstance) {
-                        window.bold.baseInstance.resetPaymentsInstance();
-                        await this.delay(200);
+                    if (forceReset) {
+                        this.clearSpiFromDom();
+                        if (window.bold.baseInstance) {
+                            window.bold.baseInstance.resetPaymentsInstance();
+                            await this.delay(200);
+                        }
                     }
                     if (!this.isCurrentRuntime() || renderVersion !== this.paymentRuntimeVersion) {
                         return;
                     }
-                    this.ensurePpcpButtonsContainer();
                     const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
                     if (!this.isCurrentRuntime() || renderVersion !== this.paymentRuntimeVersion) {
                         return;
                     }
-                    if (!this.isFastlaneAvailable && this.getActiveSpiFrame() && !forceResetSdk) {
-                        return;
-                    }
-                    await paymentInstance.renderPayments(
-                        'payment_form_bold',
-                        {
-                            fastlane: !!this.isFastlaneAvailable,
-                            shouldRenderSpiFrame: !this.isFastlaneAvailable
+                    this.ensurePpcpButtonsContainer();
+                    const shouldRenderSpi = forceReset || !this.getActiveSpiFrame();
+                    if (!this.isFastlaneAvailable && shouldRenderSpi) {
+                        try {
+                            await paymentInstance.renderPayments('payment_form_bold', {
+                                fastlane: false,
+                                shouldRenderSpiFrame: true
+                            });
+                        } catch (e) {
+                            if (this.isSpiAlreadyRenderedError(e)) {
+                                if (!this.getActiveSpiFrame() && window.bold.baseInstance) {
+                                    window.bold.baseInstance.resetPaymentsInstance();
+                                    await this.delay(200);
+                                    const retryInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+                                    await retryInstance.renderPayments('payment_form_bold', {
+                                        fastlane: false,
+                                        shouldRenderSpiFrame: true
+                                    });
+                                } else {
+                                    console.warn('[Bold] SPI frame already rendered, reusing existing frame');
+                                    this.dedupeSpiFrames();
+                                }
+                            } else {
+                                throw e;
+                            }
                         }
-                    );
+                    } else if (this.isFastlaneAvailable && shouldRenderSpi) {
+                        await paymentInstance.renderPayments('payment_form_bold', {
+                            fastlane: true,
+                            shouldRenderSpiFrame: false
+                        });
+                    }
                     if (!this.isCurrentRuntime() || renderVersion !== this.paymentRuntimeVersion) {
                         return;
                     }
-                    if (!this.isFastlaneAvailable) {
-                        await this.waitForSpiFrame(15000);
-                    }
-                    this.updatePpcpButtonsVisibility();
+                    this.dedupeSpiFrames();
+                    await this.renderPpcpWalletButtonsWithRetry(paymentInstance, forceReset);
                 } finally {
                     window.bold.spiRenderInProgress = false;
                 }
@@ -991,14 +1011,116 @@
             try {
                 await renderTask;
             } catch (e) {
-                console.error('[Bold] renderPayments failed', e);
-                if (!forceResetSdk && this.isCurrentRuntime()) {
-                    await this.renderPaymentForm(true);
-                }
+                console.error('[Bold] renderPaymentForm failed', e);
             } finally {
                 if (window.bold.paymentRenderPromise === renderTask) {
                     window.bold.paymentRenderPromise = null;
                 }
+            }
+        },
+        isBoldPaymentSelected: function () {
+            const checkbox = document.getElementById('p_method_bold');
+            return !!(checkbox && checkbox.checked);
+        },
+        ensurePaymentFormVisible: function () {
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return;
+            }
+            form.style.display = '';
+            if (typeof payment !== 'undefined' && payment.changeVisible) {
+                payment.changeVisible('bold', false);
+            }
+        },
+        hidePaymentFormWhenNotSelected: function () {
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return;
+            }
+            if (typeof payment !== 'undefined' && payment.changeVisible) {
+                payment.changeVisible('bold', true);
+                return;
+            }
+            form.style.display = 'none';
+        },
+        onPaymentSectionReloaded: async function (options) {
+            options = options || {};
+            await this.waitForPaymentFormDom();
+            this.dedupePaymentFormBoldElements();
+            this.refreshDomReferences();
+            if (!this.getPaymentFormBold()) {
+                return;
+            }
+            if (!this.isAvailable) {
+                this.hidePaymentMethod();
+                return;
+            }
+            if (options.hardReload) {
+                this.bumpPaymentRuntimeVersion();
+                this.resetPaymentFlowState();
+                await this.awaitPendingPaymentRender();
+                this.clearSpiFromDom();
+                if (typeof checkout !== 'undefined') {
+                    checkout.setLoadWaiting(false);
+                }
+            }
+            await this.waitForBaseInstance();
+            this.scheduleRenderPaymentForm(true, !!options.hardReload);
+            if (this.isBoldPaymentSelected()) {
+                this.ensurePaymentFormVisible();
+            } else {
+                this.hidePaymentFormWhenNotSelected();
+            }
+            this.waitForPaymentInitialization();
+            this.waitForCheckoutInitialization();
+        },
+        refreshPaymentFormAfterTotalsChange: async function () {
+            if (!this.isCurrentRuntime() || !this.isBoldPaymentSelected()) {
+                return;
+            }
+            if (typeof window.bold.spiTotalsRefreshInProgress !== 'undefined' && window.bold.spiTotalsRefreshInProgress) {
+                return;
+            }
+            window.bold.spiTotalsRefreshInProgress = true;
+            try {
+                await this.waitForPaymentFormDom();
+                this.dedupePaymentFormBoldElements();
+                this.refreshDomReferences();
+                if (!this.getPaymentFormBold()) {
+                    return;
+                }
+                this.ensurePaymentFormVisible();
+                this.ensurePpcpButtonsContainer();
+                this.resetPaymentFlowState();
+                await this.awaitPendingPaymentRender();
+                if (window.bold.baseInstance && typeof window.bold.baseInstance.getCartData === 'function') {
+                    try {
+                        await window.bold.baseInstance.getCartData();
+                    } catch (e) {
+                        console.warn('[Bold] Could not refresh cart data before payment re-render', e);
+                    }
+                }
+                await this.renderPaymentForm(true);
+            } finally {
+                window.bold.spiTotalsRefreshInProgress = false;
+            }
+        },
+        onBoldPaymentMethodSelected: function () {
+            if (!this.isBoldPaymentSelected()) {
+                return;
+            }
+            this.refreshDomReferences();
+            if (!this.getPaymentFormBold()) {
+                return;
+            }
+            this.ensurePaymentFormVisible();
+            if (!this.getActiveSpiFrame()) {
+                this.scheduleRenderPaymentForm(true, false);
+            }
+        },
+        hidePaymentMethod: function () {
+            if (this.paymentMethodElement) {
+                this.paymentMethodElement.style.display = 'none';
             }
         },
         waitForCheckoutInitialization: function () {
@@ -1008,9 +1130,7 @@
                     clearInterval(intervalId);
                 }
             }, 100);
-            setTimeout(() => {
-                clearInterval(intervalId);
-            }, 10000);
+            setTimeout(() => clearInterval(intervalId), 10000);
         },
         waitForPaymentInitialization: function () {
             const intervalId = setInterval(() => {
@@ -1019,102 +1139,68 @@
                     clearInterval(intervalId);
                 }
             }, 100);
-            setTimeout(() => {
-                clearInterval(intervalId);
-            }, 10000);
+            setTimeout(() => clearInterval(intervalId), 10000);
         },
         wrapCheckoutSave: function () {
             if (this.checkoutSaveWrapped) {
                 return;
             }
             this.checkoutSaveWrapped = true;
-            checkout.save = checkout.save.wrap(
-                function (checkoutSaveMethod) {
-                    if (!this.isCurrentRuntime()) {
-                        return checkoutSaveMethod();
-                    }
-                    if (!this.paymentCheckbox) {
-                        return checkoutSaveMethod();
-                    }
-                    if (!this.paymentCheckbox.checked) {
-                        return checkoutSaveMethod();
-                    }
-                    checkout.validate();
-                    if (!this.paymentId) {
-                        if (this.isTokenizing) {
-                            return;
-                        }
-                        checkout.setLoadWaiting('payment', true);
-                        this.tokenize();
+            checkout.save = checkout.save.wrap(function (original) {
+                if (!this.isCurrentRuntime() || !this.paymentCheckbox || !this.paymentCheckbox.checked) {
+                    return original();
+                }
+                checkout.validate();
+                if (!this.paymentId) {
+                    if (!this.canAttemptTokenize()) {
                         return;
                     }
-                    this.isCompletingPayment = false;
-                    this.isTokenizing = false;
-                    checkout.setLoadWaiting(false);
-                    checkoutSaveMethod();
-                }.bind(this)
-            );
+                    checkout.setLoadWaiting('payment', true);
+                    this.tokenize();
+                    return;
+                }
+                this.isCompletingPayment = false;
+                this.isTokenizing = false;
+                checkout.setLoadWaiting(false);
+                return original();
+            }.bind(this));
         },
         wrapPaymentSave: function () {
             if (this.paymentSaveWrapped) {
                 return;
             }
             this.paymentSaveWrapped = true;
-            payment.save = payment.save.wrap(
-                function (paymentSaveMethod) {
-                    if (!this.isCurrentRuntime()) {
-                        return paymentSaveMethod();
-                    }
-                    if (!this.paymentCheckbox) {
-                        return paymentSaveMethod();
-                    }
-                    if (!this.paymentCheckbox.checked) {
-                        return paymentSaveMethod();
-                    }
-                    if (!this.paymentId) {
-                        if (this.isTokenizing) {
-                            return;
-                        }
-                        checkout.setLoadWaiting('payment', true);
-                        this.tokenize();
+            payment.save = payment.save.wrap(function (original) {
+                if (!this.isCurrentRuntime() || !this.paymentCheckbox || !this.paymentCheckbox.checked) {
+                    return original();
+                }
+                if (!this.paymentId) {
+                    if (typeof checkout !== 'undefined' && checkout.save) {
                         return;
                     }
-                    this.isCompletingPayment = false;
-                    this.isTokenizing = false;
-                    checkout.setLoadWaiting(false);
-                    paymentSaveMethod();
-                }.bind(this)
-            );
-        },
-        hidePaymentMethod: function () {
-            if (this.paymentMethodElement) {
-                this.paymentMethodElement.style.display = 'none';
-            }
-        },
-        showPaymentMethod: function () {
-            if (this.paymentMethodElement) {
-                this.paymentMethodElement.style.display = 'block';
-            }
-        },
-        tokenize: async function () {
-            if (!this.isCurrentRuntime()) {
-                return;
-            }
-            if (this.isTokenizing) {
-                return;
-            }
-            this.isTokenizing = true;
-            try {
-                const ready = await this.ensureSpiFrameReady();
-                if (!ready || !this.isCurrentRuntime()) {
-                    console.error('Bold payment iframe is not available');
-                    this.isTokenizing = false;
-                    checkout.setLoadWaiting(false);
+                    if (!this.canAttemptTokenize()) {
+                        return;
+                    }
+                    checkout.setLoadWaiting('payment', true);
+                    this.tokenize();
                     return;
                 }
+                this.isCompletingPayment = false;
+                this.isTokenizing = false;
+                checkout.setLoadWaiting(false);
+                return original();
+            }.bind(this));
+        },
+        tokenize: async function () {
+            if (!this.isCurrentRuntime() || !this.canAttemptTokenize()) {
+                return;
+            }
+            this.dedupeSpiFrames();
+            this.isTokenizing = true;
+            try {
                 const iframe = this.getActiveSpiFrame();
                 if (!iframe || !iframe.contentWindow) {
-                    console.error('Bold payment iframe is not available');
+                    console.error('[Bold] SPI iframe is not available');
                     this.isTokenizing = false;
                     checkout.setLoadWaiting(false);
                     return;
@@ -1124,22 +1210,39 @@
                     this.isTokenizing = false;
                     return;
                 }
-                const payload = {
-                    customer: cartData.customer,
-                    billing_address: cartData.billing_address,
-                    shipping_address: cartData.shipping_address || cartData.billing_address,
-                    totals: cartData.totals,
-                };
-                iframe.contentWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
+                iframe.contentWindow.postMessage({
+                    actionType: 'ACTION_SPI_TOKENIZE',
+                    payload: {
+                        customer: cartData.customer,
+                        billing_address: cartData.billing_address,
+                        shipping_address: cartData.shipping_address || cartData.billing_address,
+                        totals: cartData.totals,
+                    }
+                }, '*');
             } catch (e) {
                 this.isTokenizing = false;
                 checkout.setLoadWaiting(false);
-                console.error('Bold tokenize failed', e);
+                console.error('[Bold] tokenize failed', e);
             }
         },
-        handleSpiTerminalFailure: function (instance) {
-            instance.resetPaymentFlowState();
-            checkout.setLoadWaiting(false);
+        isMessageFromActiveSpi: function (event) {
+            const iframe = this.getActiveSpiFrame();
+            return !!(iframe && iframe.contentWindow && event.source === iframe.contentWindow);
+        },
+        handleSpiTerminalFailure: function (reason) {
+            if (!this.isCurrentRuntime()) {
+                return;
+            }
+            if (this.lastTerminalFailureAt && (Date.now() - this.lastTerminalFailureAt) < 1000) {
+                return;
+            }
+            this.lastTerminalFailureAt = Date.now();
+            this.tokenizeCooldownUntil = Date.now() + 5000;
+            this.resetPaymentFlowState();
+            if (typeof checkout !== 'undefined') {
+                checkout.setLoadWaiting(false);
+            }
+            console.warn('[Bold] Payment tokenization failed', reason || '');
         },
         subscribeToSpiEvents: function () {
             if (this.spiEventsSubscribed) {
@@ -1152,17 +1255,13 @@
                     return;
                 }
                 const instance = window.bold.boldPaymentMethod;
-                if (!instance || !instance.isCurrentRuntime()) {
-                    return;
-                }
-                if (!instance.isMessageFromActiveSpi(event)) {
+                if (!instance || !instance.isCurrentRuntime() || !instance.isMessageFromActiveSpi(event)) {
                     return;
                 }
                 switch (data.eventType) {
                     case 'EVENT_SPI_TOKENIZED':
                         if (!data.payload || !data.payload.success) {
-                            console.error('Failed to tokenize');
-                            instance.handleSpiTerminalFailure(instance);
+                            instance.handleSpiTerminalFailure('tokenize_unsuccessful');
                             return;
                         }
                         if (instance.isCompletingPayment) {
@@ -1173,13 +1272,12 @@
                         instance.isCompletingPayment = true;
                         if (checkout.save) {
                             checkout.save();
-                            return;
+                        } else {
+                            payment.save();
                         }
-                        payment.save();
                         break;
                     case 'EVENT_SPI_TOKENIZE_FAILED':
-                        console.error('Failed to tokenize');
-                        instance.handleSpiTerminalFailure(instance);
+                        instance.handleSpiTerminalFailure('tokenize_failed');
                         break;
                     case 'EVENT_SPI_PAYMENT_ORDER_SCA':
                         instance.isTokenizing = false;
@@ -1189,8 +1287,17 @@
                         checkout.setLoadWaiting(false);
                         break;
                     case 'EVENT_SPI_DISABLE_FULLSCREEN':
+                        if (instance.tokenizeCooldownUntil && Date.now() < instance.tokenizeCooldownUntil) {
+                            checkout.setLoadWaiting(false);
+                            break;
+                        }
                         if (instance.isTokenizing || instance.isCompletingPayment) {
                             checkout.setLoadWaiting('payment', true);
+                        }
+                        break;
+                    default:
+                        if (data.eventType && data.eventType.indexOf('FAIL') !== -1) {
+                            instance.handleSpiTerminalFailure(data.eventType);
                         }
                         break;
                 }
@@ -1211,20 +1318,6 @@
         }
     };
 
-    window.bold.refreshFastlanePaymentForm = async function () {
-        if (!window.bold.fastlanePaymentMethod || !window.bold.fastlanePaymentMethod.isAvailable) {
-            return;
-        }
-        if (!document.getElementById('payment_form_bold_fastlane')) {
-            return;
-        }
-        if (!window.bold.baseInstance) {
-            window.bold.baseInstance = new BoldBase();
-        }
-        await window.bold.fastlanePaymentMethod.waitForBaseInstance();
-        await window.bold.fastlanePaymentMethod.renderFastlanePaymentComponent();
-    };
-
     window.bold.onBoldPaymentFormInjected = function () {
         if (!<?php echo $this->isAvailable(); ?>) {
             return;
@@ -1240,7 +1333,6 @@
             return;
         }
         window.bold.boldPaymentMethod.onPaymentSectionReloaded({hardReload: false});
-        window.bold.refreshFastlanePaymentForm();
     };
 
     window.bold.handleFirecheckoutPaymentSectionReload = async function () {
@@ -1255,7 +1347,6 @@
             return;
         }
         await window.bold.boldPaymentMethod.onPaymentSectionReloaded({hardReload: true});
-        await window.bold.refreshFastlanePaymentForm();
         if (typeof payment !== 'undefined' && payment.currentMethod === 'bold') {
             window.bold.handleBoldPaymentMethodSelected();
         }
@@ -1272,34 +1363,48 @@
         window.bold.boldPaymentMethod.onBoldPaymentMethodSelected();
     };
 
+    window.bold.handleBoldPaymentTotalsChange = function () {
+        if (!<?php echo $this->isAvailable(); ?>) {
+            return;
+        }
+        if (typeof payment === 'undefined' || payment.currentMethod !== 'bold') {
+            return;
+        }
+        if (!window.bold.baseInstance) {
+            window.bold.baseInstance = new BoldBase();
+        }
+        if (!window.bold.boldPaymentMethod) {
+            window.bold.initBoldPaymentMethod();
+            return;
+        }
+        if (window.bold.firecheckoutTotalsChangeTimer) {
+            clearTimeout(window.bold.firecheckoutTotalsChangeTimer);
+        }
+        window.bold.firecheckoutTotalsChangeTimer = setTimeout(function () {
+            window.bold.firecheckoutTotalsChangeTimer = null;
+            window.bold.boldPaymentMethod.refreshPaymentFormAfterTotalsChange();
+        }, 500);
+    };
+
     if (!window.bold.firecheckoutPaymentReloadRegistered) {
         window.bold.firecheckoutPaymentReloadRegistered = true;
         document.observe('firecheckout:setResponseAfter', function (e) {
             const sections = e.memo.response && e.memo.response.update_section;
-            if (!sections || !sections['payment-method']) {
+            if (!sections) {
                 return;
             }
-            if (window.bold.firecheckoutPaymentReloadTimer) {
-                clearTimeout(window.bold.firecheckoutPaymentReloadTimer);
-            }
-            window.bold.firecheckoutPaymentReloadTimer = setTimeout(function () {
-                window.bold.firecheckoutPaymentReloadTimer = null;
-                window.bold.handleFirecheckoutPaymentSectionReload();
-            }, 500);
-        });
-        document.observe('firecheckout:setResponseAfter', function (e) {
-            const sections = e.memo.response && e.memo.response.update_section;
-            if (!sections || sections['payment-method']) {
+            if (sections['payment-method']) {
+                if (window.bold.firecheckoutPaymentReloadTimer) {
+                    clearTimeout(window.bold.firecheckoutPaymentReloadTimer);
+                }
+                window.bold.firecheckoutPaymentReloadTimer = setTimeout(function () {
+                    window.bold.firecheckoutPaymentReloadTimer = null;
+                    window.bold.handleFirecheckoutPaymentSectionReload();
+                }, 500);
                 return;
             }
-            if (!sections['shipping-method'] || typeof payment === 'undefined' || payment.currentMethod !== 'bold') {
-                return;
-            }
-            if (!document.getElementById('payment_form_bold')) {
-                return;
-            }
-            if (!window.bold.boldPaymentMethod || !window.bold.boldPaymentMethod.getActiveSpiFrame()) {
-                window.bold.handleBoldPaymentMethodSelected();
+            if (sections['shipping-method'] || sections['cart'] || sections['total']) {
+                window.bold.handleBoldPaymentTotalsChange();
             }
         });
         document.observe('payment-method:switched', function (e) {
@@ -1320,9 +1425,6 @@
     }
 
     function boldBoosterBootstrap() {
-        if (typeof window.bold === 'undefined') {
-            window.bold = {};
-        }
         if (!window.bold.baseInstance) {
             window.bold.baseInstance = new BoldBase();
         }

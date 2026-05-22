@@ -1,31 +1,18 @@
 <?php
 
 /**
- * Prevents duplicate Magento orders for the same Bold public_order_id.
+ * Prevents duplicate Magento orders for the same Bold checkout session or Express Pay order.
  */
 class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 {
     const SESSION_PLACEMENT_FLAG = 'bold_order_placement_in_progress';
 
-    const SESSION_PAYMENT_AUTH_KEY = 'bold_payment_auth_public_order_id';
-
-    const LOCK_TIMEOUT_SECONDS = 0;
-
-    const LOCK_BLOCKING_TIMEOUT_SECONDS = 60;
-
-    const WAIT_FOR_ORDER_MAX_ATTEMPTS = 100;
-
-    const WAIT_FOR_ORDER_SLEEP_MICROSECONDS = 100000;
+    const DUPLICATE_ORDER_LOG_FILE = 'bold_checkout_payment_booster_duplicate_order.log';
 
     /**
      * @var string|null
      */
     private static $heldLockPublicId = null;
-
-    /**
-     * @var array<string, Mage_Sales_Model_Order|null>
-     */
-    private static $orderByPublicIdCache = array();
 
     /**
      * @return string[]
@@ -48,26 +35,43 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
-     * @param string $publicOrderId
-     * @return bool
+     * @return string|null
      */
-    public static function hasPaymentAuthForPublicOrderId($publicOrderId)
+    public static function getPaymentMethodFromRequest()
     {
-        /** @var Mage_Checkout_Model_Session $session */
-        $session = Mage::getSingleton('checkout/session');
+        $payment = Mage::app()->getRequest()->getParam('payment');
+        if (is_array($payment) && !empty($payment['method'])) {
+            return $payment['method'];
+        }
 
-        return $session->getData(self::SESSION_PAYMENT_AUTH_KEY) === $publicOrderId;
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        if ($quote && $quote->getId() && $quote->getPayment()) {
+            return $quote->getPayment()->getMethod();
+        }
+
+        return null;
     }
 
     /**
-     * @param string $publicOrderId
-     * @return void
+     * @return string|null
      */
-    public static function markPaymentAuthForPublicOrderId($publicOrderId)
+    public static function getEpsOrderIdFromRequest()
     {
-        /** @var Mage_Checkout_Model_Session $session */
-        $session = Mage::getSingleton('checkout/session');
-        $session->setData(self::SESSION_PAYMENT_AUTH_KEY, $publicOrderId);
+        $payment = Mage::app()->getRequest()->getParam('payment');
+        if (!is_array($payment) || empty($payment['additional_data'])) {
+            return null;
+        }
+
+        $additionalData = $payment['additional_data'];
+        if (is_string($additionalData)) {
+            parse_str($additionalData, $additionalData);
+        }
+
+        if (!is_array($additionalData) || empty($additionalData['order_id'])) {
+            return null;
+        }
+
+        return (string) $additionalData['order_id'];
     }
 
     /**
@@ -76,54 +80,39 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      */
     public static function findOrderByPublicId($publicOrderId)
     {
-        if (array_key_exists($publicOrderId, self::$orderByPublicIdCache)) {
-            return self::$orderByPublicIdCache[$publicOrderId];
-        }
+        /** @var Bold_CheckoutPaymentBooster_Model_Resource_Order_Collection $collection */
+        $collection = Mage::getModel('bold_checkout_payment_booster/order')->getCollection();
+        $collection->addFieldToFilter('public_id', $publicOrderId);
+        $collection->addFieldToFilter('order_id', array('notnull' => true));
+        $collection->setPageSize(1);
 
-        $connection = Mage::getSingleton('core/resource')->getConnection('core_read');
-        $tableName = Mage::getSingleton('core/resource')->getTableName(
-            Bold_CheckoutPaymentBooster_Model_Order::RESOURCE
-        );
-        $orderId = $connection->fetchOne(
-            $connection->select()
-                ->from($tableName, array('order_id'))
-                ->where('public_id = ?', $publicOrderId)
-                ->where('order_id IS NOT NULL')
-                ->limit(1)
-        );
-
-        if (!$orderId) {
-            self::$orderByPublicIdCache[$publicOrderId] = null;
-
+        $mapping = $collection->getFirstItem();
+        if (!$mapping->getId() || !$mapping->getOrderId()) {
             return null;
         }
 
-        $order = Mage::getModel('sales/order')->load($orderId);
-        $result = $order->getId() ? $order : null;
-        self::$orderByPublicIdCache[$publicOrderId] = $result;
+        $order = Mage::getModel('sales/order')->load($mapping->getOrderId());
 
-        return $result;
+        return $order->getId() ? $order : null;
     }
 
     /**
      * @param string $publicOrderId
-     * @param int $timeoutSeconds
-     * @return bool
+     * @param string $context
+     * @return void
      */
-    public static function acquireLock($publicOrderId, $timeoutSeconds = null)
+    public static function logDuplicateOrderAttempt($publicOrderId, $context = '')
     {
-        if ($timeoutSeconds === null) {
-            $timeoutSeconds = self::LOCK_TIMEOUT_SECONDS;
+        if (!$publicOrderId) {
+            return;
         }
 
-        $connection = Mage::getSingleton('core/resource')->getConnection('core_write');
-        $lockName = 'bold_checkout_place_' . md5($publicOrderId);
-        $result = $connection->fetchOne(
-            'SELECT GET_LOCK(?, ?)',
-            array($lockName, (int) $timeoutSeconds)
-        );
+        $message = sprintf('order %s was attempt to duplicate', $publicOrderId);
+        if ($context !== '') {
+            $message .= ' [' . $context . ']';
+        }
 
-        return (int) $result === 1;
+        Mage::log($message, Zend_Log::WARN, self::DUPLICATE_ORDER_LOG_FILE);
     }
 
     /**
@@ -132,35 +121,47 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      */
     public static function findOrderByQuoteId($quoteId)
     {
-        if (!$quoteId) {
-            return null;
-        }
-
         $order = Mage::getModel('sales/order')->loadByAttribute('quote_id', $quoteId);
 
         return $order->getId() ? $order : null;
     }
 
     /**
-     * @param Mage_Core_Controller_Varien_Action|null $controller
+     * @param string $epsOrderId
      * @return Mage_Sales_Model_Order|null
      */
-    public static function findExistingOrderForCheckout($controller = null)
+    public static function findOrderByEpsOrderId($epsOrderId)
     {
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
-        if ($quote && $quote->getId()) {
-            $order = self::findOrderByQuoteId($quote->getId());
-            if ($order) {
-                return $order;
-            }
+        /** @var Mage_Sales_Model_Resource_Order_Payment_Collection $collection */
+        $collection = Mage::getModel('sales/order_payment')->getCollection();
+        $collection->addFieldToFilter('method', array('in' => self::getBoldPaymentMethodCodes()));
+        $collection->addFieldToFilter('additional_information', array('like' => '%' . $epsOrderId . '%'));
+        $collection->setPageSize(1);
+
+        $payment = $collection->getFirstItem();
+        if (!$payment->getId() || !$payment->getParentId()) {
+            return null;
         }
 
-        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        if ($publicOrderId) {
-            return self::findOrderByPublicId($publicOrderId);
-        }
+        $order = Mage::getModel('sales/order')->load($payment->getParentId());
 
-        return null;
+        return $order->getId() ? $order : null;
+    }
+
+    /**
+     * @param string $publicOrderId
+     * @return bool
+     */
+    public static function acquireLock($publicOrderId)
+    {
+        $connection = Mage::getSingleton('core/resource')->getConnection('core_write');
+        $lockName = 'bold_checkout_place_' . md5($publicOrderId);
+        $result = $connection->fetchOne(
+            'SELECT GET_LOCK(?, 10)',
+            array($lockName)
+        );
+
+        return (int) $result === 1;
     }
 
     /**
@@ -184,188 +185,107 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
-     * Predispatch: seamless success when order already exists or finishes while waiting.
-     *
-     * @param Mage_Core_Controller_Varien_Action $controller
-     * @return void
+     * @return array{action:string,order?:Mage_Sales_Model_Order,message?:string}
      */
-    public static function handleSaveOrderPredispatch(Mage_Core_Controller_Varien_Action $controller)
+    public static function evaluatePlacementRequest()
     {
-        $existingOrder = self::findExistingOrderForCheckout($controller);
-        if ($existingOrder) {
-            self::completeWithExistingOrder($controller, $existingOrder, 'DUPLICATE_ORDER_SEAMLESS_PREDISPATCH');
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $quote = $session->getQuote();
+
+        if (!$quote || !$quote->getId()) {
+            return array(
+                'action' => 'block',
+                'message' => Mage::helper('checkout')->__('Your shopping cart could not be found.'),
+            );
         }
-    }
 
-    /**
-     * Runs once per order submission (checkout_type_onepage_save_order).
-     *
-     * @return void
-     */
-    public static function assertCanPlaceOrder()
-    {
-        self::resolveDuplicatePlacement(null);
-    }
+        if (!$quote->getIsActive()) {
+            $existingOrder = self::findOrderByQuoteId($quote->getId());
+            if ($existingOrder) {
+                return array(
+                    'action' => 'success_existing',
+                    'order' => $existingOrder,
+                );
+            }
 
-    /**
-     * Block duplicate placement; redirect seamlessly when an order already exists.
-     *
-     * @param Mage_Core_Controller_Varien_Action|null $controller
-     * @return void
-     */
-    public static function resolveDuplicatePlacement($controller = null)
-    {
+            return array(
+                'action' => 'block',
+                'message' => Mage::helper('checkout')->__('Your shopping cart is no longer active.'),
+            );
+        }
+
+        if ($session->getData(self::SESSION_PLACEMENT_FLAG)) {
+            return array(
+                'action' => 'block_in_progress',
+                'message' => Mage::helper('checkout')->__('Your order is already being placed. Please wait.'),
+            );
+        }
+
         $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
-        $quoteId = $quote && $quote->getId() ? (int) $quote->getId() : null;
+        $epsOrderId = self::getEpsOrderIdFromRequest();
 
-        $existingOrder = self::findExistingOrderForCheckout($controller);
-        if ($existingOrder) {
-            self::completeWithExistingOrder($controller, $existingOrder, 'DUPLICATE_ORDER_SEAMLESS_EXISTING');
-
-            return;
-        }
-
-        if (!$publicOrderId) {
-            return;
-        }
-
-        if (self::waitAndAcquirePlacementLock($publicOrderId, $quoteId)) {
-            /** @var Mage_Checkout_Model_Session $session */
-            $session = Mage::getSingleton('checkout/session');
-            $session->setData(self::SESSION_PLACEMENT_FLAG, 1);
-
-            $existingOrder = self::findExistingOrderForCheckout($controller);
-            if ($existingOrder) {
-                self::releaseLock($publicOrderId);
-                self::completeWithExistingOrder($controller, $existingOrder, 'DUPLICATE_ORDER_SEAMLESS_AFTER_LOCK');
-
-                return;
-            }
-
-            return;
-        }
-
-        $existingOrder = self::findExistingOrderForCheckout($controller);
-        if ($existingOrder) {
-            self::completeWithExistingOrder($controller, $existingOrder, 'DUPLICATE_ORDER_SEAMLESS_AFTER_WAIT');
-
-            return;
-        }
-
-        self::logDuplicateOrderAttempt('DUPLICATE_ORDER_WAITING_BLOCKING_LOCK', array(
-            'quote_id' => $quoteId,
-        ));
-
-        if (self::acquireLock($publicOrderId, self::LOCK_BLOCKING_TIMEOUT_SECONDS)) {
-            self::$heldLockPublicId = $publicOrderId;
-            Mage::getSingleton('checkout/session')->setData(self::SESSION_PLACEMENT_FLAG, 1);
-
-            $existingOrder = self::findExistingOrderForCheckout($controller);
-            if ($existingOrder) {
-                self::releaseLock($publicOrderId);
-                self::completeWithExistingOrder($controller, $existingOrder, 'DUPLICATE_ORDER_SEAMLESS_AFTER_LOCK');
-            }
-        }
-    }
-
-    /**
-     * @param string $publicOrderId
-     * @param int|null $quoteId
-     * @return bool
-     */
-    public static function waitAndAcquirePlacementLock($publicOrderId, $quoteId = null)
-    {
-        for ($attempt = 0; $attempt < self::WAIT_FOR_ORDER_MAX_ATTEMPTS; $attempt++) {
-            if (self::acquireLock($publicOrderId)) {
-                self::$heldLockPublicId = $publicOrderId;
-
-                return true;
-            }
-
-            $existingOrder = self::findExistingOrderForCheckout();
-            if ($existingOrder) {
-                return false;
-            }
-
-            if ($quoteId) {
-                $order = self::findOrderByQuoteId($quoteId);
-                if ($order) {
-                    return false;
-                }
-            }
-
-            usleep(self::WAIT_FOR_ORDER_SLEEP_MICROSECONDS);
-        }
-
-        if (self::acquireLock($publicOrderId, self::LOCK_BLOCKING_TIMEOUT_SECONDS)) {
-            self::$heldLockPublicId = $publicOrderId;
-
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param string $publicOrderId
-     * @return Mage_Sales_Model_Order|null
-     */
-    public static function waitForOrderByPublicId($publicOrderId)
-    {
-        for ($attempt = 0; $attempt < self::WAIT_FOR_ORDER_MAX_ATTEMPTS; $attempt++) {
-            unset(self::$orderByPublicIdCache[$publicOrderId]);
+        if ($publicOrderId) {
             $existingOrder = self::findOrderByPublicId($publicOrderId);
             if ($existingOrder) {
-                return $existingOrder;
+                self::logDuplicateOrderAttempt($publicOrderId, 'predispatch');
+
+                return array(
+                    'action' => 'success_existing',
+                    'order' => $existingOrder,
+                );
             }
 
-            $quote = Mage::getSingleton('checkout/session')->getQuote();
-            if ($quote && $quote->getId()) {
-                $order = self::findOrderByQuoteId($quote->getId());
-                if ($order) {
-                    return $order;
-                }
+            if (!self::acquireLock($publicOrderId)) {
+                return array(
+                    'action' => 'block_in_progress',
+                    'message' => Mage::helper('checkout')->__('Your order is already being placed. Please wait.'),
+                );
             }
 
-            usleep(self::WAIT_FOR_ORDER_SLEEP_MICROSECONDS);
+            self::$heldLockPublicId = $publicOrderId;
+
+            $existingOrder = self::findOrderByPublicId($publicOrderId);
+            if ($existingOrder) {
+                self::releaseLock();
+
+                return array(
+                    'action' => 'success_existing',
+                    'order' => $existingOrder,
+                );
+            }
         }
 
-        return null;
+        if ($epsOrderId) {
+            $existingOrder = self::findOrderByEpsOrderId($epsOrderId);
+            if ($existingOrder) {
+                self::releaseLock();
+
+                return array(
+                    'action' => 'success_existing',
+                    'order' => $existingOrder,
+                );
+            }
+        }
+
+        $session->setData(self::SESSION_PLACEMENT_FLAG, 1);
+
+        return array('action' => 'allow');
     }
 
     /**
-     * @param Mage_Core_Controller_Varien_Action|null $controller
      * @param Mage_Sales_Model_Order $order
-     * @param string $event
      * @return void
      */
-    public static function completeWithExistingOrder($controller, Mage_Sales_Model_Order $order, $event)
+    public static function prepareCheckoutSessionForExistingOrder(Mage_Sales_Model_Order $order)
     {
-        self::logDuplicateOrderAttempt($event, array(
-            'existing_magento_order_id' => $order->getId(),
-            'existing_magento_increment_id' => $order->getIncrementId(),
-        ));
-        self::prepareCheckoutSessionForExistingOrder($order);
-        self::clearPlacementState();
-
-        if ($controller === null) {
-            $controller = Mage::app()->getFrontController()->getAction();
-        }
-
-        if ($controller && self::isSaveOrderControllerAction($controller)) {
-            self::respondWithExistingOrderSuccess($controller, $order);
-            exit;
-        }
-    }
-
-    /**
-     * @param Mage_Core_Controller_Varien_Action $controller
-     * @return bool
-     */
-    public static function isSaveOrderControllerAction(Mage_Core_Controller_Varien_Action $controller)
-    {
-        return $controller->getRequest()->getActionName() === 'saveOrder';
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $session->setLastQuoteId($order->getQuoteId());
+        $session->setLastSuccessQuoteId($order->getQuoteId());
+        $session->setLastOrderId($order->getId());
+        $session->setLastRealOrderId($order->getIncrementId());
+        $session->setRedirectUrl(null);
     }
 
     /**
@@ -375,6 +295,9 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      */
     public static function respondWithExistingOrderSuccess($controller, Mage_Sales_Model_Order $order)
     {
+        self::prepareCheckoutSessionForExistingOrder($order);
+        self::clearPlacementState();
+
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $redirectUrl = $checkoutSession->getRedirectUrl();
@@ -401,21 +324,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
-     * @param Mage_Sales_Model_Order $order
-     * @return void
-     */
-    public static function prepareCheckoutSessionForExistingOrder(Mage_Sales_Model_Order $order)
-    {
-        /** @var Mage_Checkout_Model_Session $session */
-        $session = Mage::getSingleton('checkout/session');
-        $session->setLastQuoteId($order->getQuoteId());
-        $session->setLastSuccessQuoteId($order->getQuoteId());
-        $session->setLastOrderId($order->getId());
-        $session->setLastRealOrderId($order->getIncrementId());
-        $session->setRedirectUrl(null);
-    }
-
-    /**
      * @return void
      */
     public static function clearPlacementState()
@@ -423,68 +331,55 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
         /** @var Mage_Checkout_Model_Session $session */
         $session = Mage::getSingleton('checkout/session');
         $session->unsetData(self::SESSION_PLACEMENT_FLAG);
-        $session->unsetData(self::SESSION_PAYMENT_AUTH_KEY);
         self::releaseLock();
     }
 
     /**
-     * @return string|null
+     * @param string $message
+     * @throws Mage_Core_Exception
+     * @return void
      */
-    public static function getPaymentMethodFromRequest()
+    public static function blockPlacement($message)
     {
-        $payment = Mage::app()->getRequest()->getParam('payment');
-        if (is_array($payment) && !empty($payment['method'])) {
-            return $payment['method'];
-        }
-
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
-        if ($quote && $quote->getId() && $quote->getPayment()) {
-            return $quote->getPayment()->getMethod();
-        }
-
-        return null;
+        Mage::throwException($message);
     }
 
     /**
-     * @param string $event
-     * @param array $context
+     * Second line of defense during order submission.
+     *
+     * @param Mage_Sales_Model_Quote $quote
      * @return void
+     * @throws Mage_Core_Exception
      */
-    public static function logDuplicateOrderAttempt($event, array $context = array())
+    public static function assertQuoteCanSubmit(Mage_Sales_Model_Quote $quote)
     {
-        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
-        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $websiteId = Mage::app()->getStore()->getWebsiteId();
-        if (!$config->isLogEnabled($websiteId)) {
-            return;
-        }
-
         $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
-        $quote = Mage::getSingleton('checkout/session')->getQuote();
-        $request = Mage::app()->getRequest();
-        $paymentMethod = null;
-        if ($quote && $quote->getId() && $quote->getPayment()) {
-            $paymentMethod = $quote->getPayment()->getMethod();
+        if ($publicOrderId) {
+            $existingOrder = self::findOrderByPublicId($publicOrderId);
+            if ($existingOrder) {
+                self::blockPlacement(
+                    Mage::helper('checkout')->__('This Bold payment has already been used to place an order.')
+                );
+            }
         }
 
-        $parts = array(
-            'event=' . $event,
-            'public_order_id=' . ($publicOrderId ?: ''),
-            'quote_id=' . ($quote && $quote->getId() ? $quote->getId() : ''),
-            'payment_method=' . ($paymentMethod ?: ''),
-            'route=' . $request->getModuleName()
-                . '/' . $request->getControllerName()
-                . '/' . $request->getActionName(),
-        );
-
-        foreach ($context as $key => $value) {
-            $parts[] = $key . '=' . $value;
+        $epsOrderId = self::getEpsOrderIdFromRequest();
+        if ($epsOrderId) {
+            $existingOrder = self::findOrderByEpsOrderId($epsOrderId);
+            if ($existingOrder) {
+                self::blockPlacement(
+                    Mage::helper('checkout')->__('This Bold payment has already been used to place an order.')
+                );
+            }
         }
 
-        Mage::log(
-            'DUPLICATE_ORDER_GUARD ' . implode(' ', $parts),
-            Zend_Log::WARN,
-            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
-        );
+        if (!$quote->getIsActive()) {
+            $existingOrder = self::findOrderByQuoteId($quote->getId());
+            if ($existingOrder) {
+                self::blockPlacement(
+                    Mage::helper('checkout')->__('This order has already been placed.')
+                );
+            }
+        }
     }
 }

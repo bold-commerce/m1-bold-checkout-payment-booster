@@ -18,4 +18,12 @@ class Bold_CheckoutPaymentBooster_Model_Resource_Order extends Mage_Core_Model_M
     {
         $this->_init(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE, self::ENTITY_ID);
     }
+
+    /**
+     * @return Bold_CheckoutPaymentBooster_Model_Resource_Order_Collection
+     */
+    public function getCollection()
+    {
+        return new Bold_CheckoutPaymentBooster_Model_Resource_Order_Collection();
+    }
 }
