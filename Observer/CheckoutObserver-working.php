@@ -6,6 +6,24 @@
 class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
 {
     /**
+     * Seamless duplicate handling before saveOrder runs (only when placement already started).
+     *
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function predispatchSeamlessSaveOrder(Varien_Event_Observer $event)
+    {
+        $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
+        if (!Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod)) {
+            return;
+        }
+
+        /** @var Mage_Core_Controller_Varien_Action $controller */
+        $controller = $event->getEvent()->getControllerAction();
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::handleSaveOrderPredispatch($controller);
+    }
+
+    /**
      * Authorize payment before Magento order is placed.
      *
      * @param Varien_Event_Observer $event
@@ -25,19 +43,32 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             return;
         }
 
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertCanPlaceOrder();
+
         $quote = $order->getQuote();
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertQuoteCanSubmit($quote);
         $websiteId = $quote->getStore()->getWebsiteId();
+        $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+
         try {
-            if (Bold_CheckoutPaymentBooster_Service_Bold::shouldRotatePublicOrder($quote)) {
-                Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
-                Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+            if ($publicOrderId
+                && Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::hasPaymentAuthForPublicOrderId(
+                    $publicOrderId
+                )
+            ) {
+                return;
             }
+
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
-            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
             $this->saveTransaction($order, $transactionData);
+
+            if ($publicOrderId) {
+                Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::markPaymentAuthForPublicOrderId(
+                    $publicOrderId
+                );
+            }
         } catch (Mage_Core_Exception $e) {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::clearPlacementState();
             Mage::log($e->getMessage(), Zend_Log::CRIT);
             Mage::throwException(Mage::helper('core')->__('Payment Authorization Failure.'));
         }
@@ -74,8 +105,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             } catch (Exception $e) {
                 if ($publicOrderId && self::isDuplicatePublicIdException($e)) {
                     Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logDuplicateOrderAttempt(
-                        $publicOrderId,
-                        'after_save_order mapping race magento_order=' . $order->getIncrementId()
+                        'DUPLICATE_ORDER_BLOCKED_MAPPING_SAVE',
+                        array(
+                            'attempted_magento_order_id' => $order->getId(),
+                            'attempted_magento_increment_id' => $order->getIncrementId(),
+                        )
                     );
                 } else {
                     throw $e;
@@ -85,7 +119,27 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
         } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
+        } finally {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::clearPlacementState();
         }
+    }
+
+    /**
+     * @param Varien_Event_Observer $event
+     * @return void
+     */
+    public function clearPlacementStateOnFailure(Varien_Event_Observer $event)
+    {
+        $order = $event->getEvent()->getOrder();
+        if ($order && $order->getPayment()
+            && !Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod(
+                $order->getPayment()->getMethod()
+            )
+        ) {
+            return;
+        }
+
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::clearPlacementState();
     }
 
     /**

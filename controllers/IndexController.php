@@ -19,7 +19,34 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
         $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
         $cartData['shipping_options'] = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::getQuoteShippingOptions($quote);
-        $this->getResponse()->setBody(json_encode($cartData));
+        $cartData['bold_checkout'] = Bold_CheckoutPaymentBooster_Service_Bold::exportCheckoutSessionForFrontend();
+        $this->getResponse()
+            ->setHeader('Content-type', 'application/json')
+            ->setBody(json_encode($cartData));
+    }
+
+    /**
+     * Return current Bold checkout session and ensure it matches the active quote.
+     *
+     * @return void
+     */
+    public function getCheckoutSessionAction()
+    {
+        if (!$this->_validateFormKey()) {
+            return;
+        }
+
+        /** @var Mage_Sales_Model_Quote $quote */
+        $quote = Mage::getSingleton('checkout/session')->getQuote();
+        if ($quote && $quote->getId()) {
+            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
+        }
+
+        $this->getResponse()
+            ->setHeader('Content-type', 'application/json')
+            ->setBody(json_encode(
+                Bold_CheckoutPaymentBooster_Service_Bold::exportCheckoutSessionForFrontend()
+            ));
     }
 
     public function getCartTotalsAction()

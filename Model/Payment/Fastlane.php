@@ -99,8 +99,12 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
      */
     public function getTitle()
     {
-        $infoInstance = $this->getInfoInstance();
-        if ($infoInstance && $infoInstance->getAdditionalInformation('card_details')) {
+        if (!$this->_infoInstance) {
+            return parent::getTitle();
+        }
+
+        $infoInstance = $this->_infoInstance;
+        if ($infoInstance->getAdditionalInformation('card_details')) {
             $cardDetails = unserialize($infoInstance->getAdditionalInformation('card_details'));
             if (isset($cardDetails['brand']) && isset($cardDetails['last_four'])) {
                 return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];

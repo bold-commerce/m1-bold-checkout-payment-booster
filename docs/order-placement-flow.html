@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bold Checkout — Order placement flow (with vs without PlacementGuard)</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --frontend: #8b5cf6;
+      --magento: #f59e0b;
+      --bold-api: #10b981;
+      --danger: #ef4444;
+      --guard: #06b6d4;
+      --success: #22c55e;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.45;
+    }
+    header {
+      padding: 2rem 2rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, #152033 0%, var(--bg) 100%);
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 1.75rem; font-weight: 600; }
+    header p { margin: 0; color: var(--muted); max-width: 72rem; }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin-top: 1.25rem;
+      font-size: 0.85rem;
+    }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    main {
+      padding: 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .columns {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .columns { grid-template-columns: 1fr; }
+    }
+    .column h2 {
+      margin: 0 0 0.25rem;
+      font-size: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .column .subtitle {
+      color: var(--muted);
+      font-size: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .badge-danger { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+    .badge-guard { background: rgba(6, 182, 212, 0.2); color: #67e8f9; }
+    .flow {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      position: relative;
+    }
+    .lane-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      padding-left: 0.25rem;
+    }
+    .step {
+      position: relative;
+      padding: 0.65rem 0.85rem;
+      margin: 0 0 0.5rem 0;
+      border-radius: 8px;
+      border-left: 4px solid var(--border);
+      font-size: 0.88rem;
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .step:last-child { margin-bottom: 0; }
+    .step strong { display: block; margin-bottom: 0.15rem; font-size: 0.92rem; }
+    .step small { color: var(--muted); font-size: 0.8rem; }
+    .step.frontend { border-left-color: var(--frontend); }
+    .step.magento { border-left-color: var(--magento); }
+    .step.bold { border-left-color: var(--bold-api); }
+    .step.guard { border-left-color: var(--guard); background: rgba(6, 182, 212, 0.08); }
+    .step.danger {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.12);
+    }
+    .step.success {
+      border-left-color: var(--success);
+      background: rgba(34, 197, 94, 0.1);
+    }
+    .step.warn {
+      border-left-color: var(--warn);
+      background: rgba(251, 191, 36, 0.08);
+    }
+    .arrow {
+      text-align: center;
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin: 0.15rem 0;
+      line-height: 1;
+    }
+    .fork {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+    }
+    .fork .step { margin: 0; font-size: 0.82rem; }
+    .outcome-box {
+      margin-top: 1.25rem;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px dashed var(--border);
+      font-size: 0.85rem;
+    }
+    .outcome-box h3 { margin: 0 0 0.5rem; font-size: 0.95rem; }
+    .outcome-box ul { margin: 0; padding-left: 1.2rem; }
+    .outcome-box li { margin-bottom: 0.35rem; }
+    .diagram-section {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+    }
+    .diagram-section h2 { font-size: 1.2rem; margin-bottom: 1rem; }
+    .mermaid-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    .guard-decision {
+      margin: 1.5rem 0;
+      padding: 1.25rem;
+      background: var(--panel);
+      border: 1px solid var(--guard);
+      border-radius: 12px;
+    }
+    .guard-decision h3 { margin: 0 0 1rem; color: #67e8f9; font-size: 1rem; }
+    .decision-tree {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .decision-node {
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      font-size: 0.85rem;
+    }
+    .decision-node.result-allow { border-left: 3px solid var(--success); }
+    .decision-node.result-block { border-left: 3px solid var(--danger); }
+    .decision-node.result-redirect { border-left: 3px solid var(--accent); }
+    footer {
+      margin-top: 3rem;
+      padding: 1.5rem 2rem 2rem;
+      border-top: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+    code {
+      background: rgba(0, 0, 0, 0.35);
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.85em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bold Checkout Payment Booster — Order creation flow</h1>
+    <p>
+      Illustration of the end-to-end path from “Place order” through Magento <code>saveOrder</code>,
+      comparing behaviour <strong>without</strong> and <strong>with</strong>
+      <code>Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard</code> (M1 + FireCheckout).
+    </p>
+    <div class="legend">
+      <span><i class="dot" style="background:var(--frontend)"></i> Browser / base.phtml</span>
+      <span><i class="dot" style="background:var(--magento)"></i> Magento checkout</span>
+      <span><i class="dot" style="background:var(--bold-api)"></i> Bold EPS / auth</span>
+      <span><i class="dot" style="background:var(--guard)"></i> PlacementGuard</span>
+      <span><i class="dot" style="background:var(--danger)"></i> Duplicate / race risk</span>
+      <span><i class="dot" style="background:var(--success)"></i> Success path</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="columns">
+      <!-- WITHOUT GUARD -->
+      <section class="column">
+        <h2>
+          Without PlacementGuard
+          <span class="badge badge-danger">Duplicate risk</span>
+        </h2>
+        <p class="subtitle">Typical failure mode: double-click, FireCheckout reload, or multiple SPI listeners → parallel <code>saveOrder</code>.</p>
+
+        <div class="flow">
+          <div class="lane-label">1 — Shopper</div>
+          <div class="step frontend">
+            <strong>Place order</strong>
+            <small>FireCheckout or standard one-page checkout</small>
+          </div>
+          <div class="arrow">↓</div>
+
+          <div class="lane-label">2 — Frontend (base.phtml)</div>
+          <div class="step frontend">
+            <strong><code>checkout.save()</code> intercepted</strong>
+            <small>If Bold selected → SPI tokenize (postMessage) before Magento save</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step frontend success">
+            <strong>Tokenize success → <code>checkout.save()</code> again</strong>
+            <small>POST to <code>checkout/onepage/saveOrder</code> or <code>firecheckout/index/saveOrder</code></small>
+          </div>
+          <div class="arrow">↓</div>
+
+          <div class="lane-label">3 — Magento (no predispatch guard)</div>
+          <div class="fork">
+            <div class="step magento danger">
+              <strong>Request A</strong>
+              <small>saveOrder runs immediately</small>
+            </div>
+            <div class="step magento danger">
+              <strong>Request B (duplicate)</strong>
+              <small>Same quote / same Bold <code>public_id</code></small>
+            </div>
+          </div>
+          <div class="arrow">↓ ↓</div>
+          <div class="step magento">
+            <strong><code>checkout_type_onepage_save_order</code></strong>
+            <small>CheckoutObserver::beforeSaveOrder — hydrate quote, Bold auth</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step bold">
+            <strong>Bold payment authorized</strong>
+            <small>Order entity created; quote may be deactivated</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="fork">
+            <div class="step magento danger">
+              <strong>Order #1001 created</strong>
+              <small>Mapping <code>public_id</code> saved</small>
+            </div>
+            <div class="step magento danger">
+              <strong>Order #1002 created</strong>
+              <small>Second charge / duplicate Magento order</small>
+            </div>
+          </div>
+
+          <div class="outcome-box" style="border-color: rgba(239,68,68,0.4);">
+            <h3>Typical outcomes (no guard)</h3>
+            <ul>
+              <li>Two or more Magento orders for one checkout session</li>
+              <li>Customer charged twice or conflicting order state</li>
+              <li>Race on <code>bold_checkout_payment_booster_order</code> <code>public_id</code> (logged if caught in afterSaveOrder)</li>
+              <li>No “already being placed” message — errors are inconsistent</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- WITH GUARD -->
+      <section class="column">
+        <h2>
+          With PlacementGuard
+          <span class="badge badge-guard">Protected</span>
+        </h2>
+        <p class="subtitle">
+          <code>SaveOrderObserver::predispatchSaveOrder</code> runs before the controller; second requests are blocked or redirected to the existing order.
+        </p>
+
+        <div class="flow">
+          <div class="lane-label">1 — Shopper</div>
+          <div class="step frontend">
+            <strong>Place order</strong>
+            <small>Same frontend path (tokenize → saveOrder)</small>
+          </div>
+          <div class="arrow">↓</div>
+
+          <div class="lane-label">2 — First saveOrder request</div>
+          <div class="step guard">
+            <strong>Predispatch: <code>evaluatePlacementRequest()</code></strong>
+            <small>Payment method is Bold / Fastlane only</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step guard success">
+            <strong>Allow</strong>
+            <small>Session flag <code>bold_order_placement_in_progress</code> = 1<br />
+              MySQL <code>GET_LOCK(bold_checkout_place_…)</code> for <code>public_id</code></small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step magento">
+            <strong>Magento saveOrder proceeds</strong>
+            <small>beforeSaveOrder → <code>assertQuoteCanSubmit()</code> (2nd line of defence)</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step bold success">
+            <strong>Single order created + Bold mapping saved</strong>
+            <small>afterSaveOrder → <code>public_id</code> → Magento order id</small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step guard">
+            <strong>Postdispatch: <code>cleanupAfterSaveOrder()</code></strong>
+            <small>Clears session flag; <code>RELEASE_LOCK</code></small>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="step frontend success">
+            <strong>JSON success → redirect to checkout success</strong>
+          </div>
+
+          <div class="lane-label" style="margin-top:1rem;">3 — Concurrent duplicate request</div>
+          <div class="step guard">
+            <strong>Predispatch: evaluate again</strong>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="fork">
+            <div class="step guard danger">
+              <strong>Flag still set OR lock held</strong>
+              <small><code>block_in_progress</code></small>
+            </div>
+            <div class="step guard" style="border-left-color:var(--accent);">
+              <strong>Order already exists for <code>public_id</code></strong>
+              <small><code>success_existing</code></small>
+            </div>
+          </div>
+          <div class="arrow">↓</div>
+          <div class="fork">
+            <div class="step magento warn">
+              <strong>Exception shown to user</strong>
+              <small><em>“Your order is already being placed. Please wait.”</em></small>
+            </div>
+            <div class="step magento success">
+              <strong>JSON redirect to success</strong>
+              <small>Same order — no second Magento order</small>
+            </div>
+          </div>
+
+          <div class="outcome-box" style="border-color: rgba(6,182,212,0.4);">
+            <h3>Typical outcomes (with guard)</h3>
+            <ul>
+              <li>At most one Magento order per Bold <code>public_id</code> / placement window</li>
+              <li>Duplicate clicks get a clear wait message or success redirect</li>
+              <li>Duplicate attempts logged to <code>bold_checkout_payment_booster_duplicate_order.log</code></li>
+              <li>Frontend still benefits from single SPI runtime + tokenize cooldown (separate concern)</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Guard decision tree -->
+    <section class="guard-decision">
+      <h3>PlacementGuard::evaluatePlacementRequest() — decision tree (Bold payment only)</h3>
+      <div class="decision-tree">
+        <div class="decision-node">Quote missing? → <strong>block</strong> (“cart could not be found”)</div>
+        <div class="decision-node">Quote inactive + order exists for quote? → <strong>success_existing</strong> (redirect)</div>
+        <div class="decision-node">Session <code>bold_order_placement_in_progress</code>? → <strong>block_in_progress</strong> (“already being placed…”)</div>
+        <div class="decision-node"><code>public_id</code> already mapped to order? → <strong>success_existing</strong> + log duplicate attempt</div>
+        <div class="decision-node">Cannot acquire MySQL lock for <code>public_id</code>? → <strong>block_in_progress</strong> (“already being placed…”)</div>
+        <div class="decision-node">EPS <code>order_id</code> already used? → <strong>success_existing</strong></div>
+        <div class="decision-node result-allow">Otherwise → set session flag, return <strong>allow</strong> → Magento saveOrder runs</div>
+      </div>
+    </section>
+
+    <!-- Sequence diagrams -->
+    <section class="diagram-section">
+      <h2>Sequence — without guard (duplicate submit)</h2>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as Shopper
+    participant FE as base.phtml
+    participant SPI as Bold SPI
+    participant M as Magento saveOrder
+    participant B as Bold Auth API
+
+    U->>FE: Place order
+    FE->>SPI: Tokenize
+    SPI-->>FE: Success
+    par Double submit
+        FE->>M: saveOrder (A)
+        FE->>M: saveOrder (B)
+    end
+    M->>B: Authorize (A)
+    M->>B: Authorize (B)
+    M-->>U: Order 1001
+    M-->>U: Order 1002 (duplicate)
+        </pre>
+      </div>
+    </section>
+
+    <section class="diagram-section">
+      <h2>Sequence — with PlacementGuard</h2>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant U as Shopper
+    participant FE as base.phtml
+    participant G as PlacementGuard
+    participant M as Magento saveOrder
+    participant B as Bold Auth API
+
+    U->>FE: Place order
+    FE->>M: saveOrder (1st)
+    M->>G: predispatch evaluate
+    G->>G: SET flag + GET_LOCK
+    G-->>M: allow
+    M->>B: Authorize
+    M-->>U: Order created
+    M->>G: postdispatch cleanup
+    G->>G: CLEAR flag + RELEASE_LOCK
+
+    U->>FE: saveOrder (2nd / double-click)
+    FE->>M: saveOrder (2nd)
+    M->>G: predispatch evaluate
+    G-->>M: block_in_progress
+    M-->>U: "Your order is already being placed. Please wait."
+        </pre>
+      </div>
+    </section>
+
+    <section class="diagram-section">
+      <h2>Observers &amp; routes (with guard enabled)</h2>
+      <div class="mermaid-wrap">
+        <pre class="mermaid">
+flowchart LR
+    subgraph routes["saveOrder routes"]
+        OPC["checkout/onepage/saveOrder"]
+        FC["firecheckout/index/saveOrder"]
+        FCOC["firecheckout/onecolumn/saveOrder"]
+    end
+
+    subgraph predispatch["controller_action_predispatch_*"]
+        SO["SaveOrderObserver::predispatchSaveOrder"]
+        PG["PlacementGuard::evaluatePlacementRequest"]
+    end
+
+    subgraph magento["Magento core"]
+        SAVE["Place order / deactivate quote"]
+    end
+
+    subgraph event["checkout_type_onepage_save_order"]
+        BO["CheckoutObserver::beforeSaveOrder"]
+        AS["assertQuoteCanSubmit"]
+        AUTH["Bold Auth::full"]
+    end
+
+    subgraph post["controller_action_postdispatch_*"]
+        CL["cleanupAfterSaveOrder"]
+    end
+
+    OPC --> SO
+    FC --> SO
+    FCOC --> SO
+    SO --> PG
+    PG -->|allow| SAVE
+    SAVE --> BO
+    BO --> AS
+    BO --> AUTH
+    SAVE --> CL
+        </pre>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      Source references:
+      <code>Service/Order/PlacementGuard.php</code>,
+      <code>Observer/SaveOrderObserver.php</code>,
+      <code>Observer/CheckoutObserver.php</code>,
+      <code>etc/config.xml</code> (predispatch/postdispatch on saveOrder),
+      <code>design/.../payment/form/base.phtml</code> (checkout.save wrap + tokenize).
+    </p>
+    <p>Open this file in a browser. Mermaid diagrams render via CDN (requires network once).</p>
+  </footer>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#1a2332',
+        primaryTextColor: '#e7ecf3',
+        primaryBorderColor: '#2d3a4d',
+        lineColor: '#8b9cb3',
+        secondaryColor: '#152033',
+        tertiaryColor: '#0f1419'
+      }
+    });
+  </script>
+</body>
+</html>

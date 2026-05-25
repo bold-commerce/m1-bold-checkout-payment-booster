@@ -17,6 +17,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate
     public static function hydrate(Mage_Sales_Model_Quote $quote)
     {
         $quote->collectTotals();
+        Bold_CheckoutPaymentBooster_Service_Bold::assertPublicOrderMatchesQuote($quote);
         $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
         if (!$publicOrderId) {
             Mage::throwException('There is no public order ID in the checkout session.');
