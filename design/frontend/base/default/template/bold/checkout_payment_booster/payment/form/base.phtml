@@ -5,6 +5,10 @@
 ?>
 
 <script type="text/javascript">
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+
     /**
      * Bold Payments base class.
      */
@@ -16,6 +20,8 @@
         gatewayData: null,
         buildFastlaneInstanceInProgress: false,
         buildPaymentsInstanceInProgress: false,
+        cachedCartData: null,
+        getCartDataPromise: null,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
@@ -435,11 +441,13 @@
                         const data = await scaResult.json();
                         return {card: data};
                     }.bind(this),
-                    'onRequireOrderData': async function (requirements) {
+                    'onRequireOrderData': function (requirements) {
                         try {
-                            return await this.onRequireOrderDataCallback(requirements);
+                            return this.onRequireOrderDataCallback(requirements);
                         } catch (e) {
-                            checkout.setLoadWaiting('billing', false);
+                            if (typeof checkout !== 'undefined') {
+                                checkout.setLoadWaiting('billing', false);
+                            }
                             throw e;
                         }
                     }.bind(this),
@@ -482,23 +490,205 @@
             return document.getElementById('billing:email');
         },
         /**
+         * Store cart payload for wallet callbacks (Apple Pay requires synchronous access).
+         *
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        cacheCartData: function (cartData) {
+            this.cachedCartData = cartData;
+            return cartData;
+        },
+        /**
+         * Return warmed cart data for onRequireOrderData.
+         *
+         * @return {{}|null}
+         */
+        getCachedCartData: function () {
+            return this.cachedCartData;
+        },
+        /**
+         * Prefetch cart data so wallet buttons can start without awaiting Ajax on click.
+         *
+         * @returns {Promise<{}>}
+         */
+        prefetchCartData: function () {
+            return this.getCartData();
+        },
+        /**
          * Pull cart data from backend.
          *
          * @returns {Promise<{}>}
          */
-        getCartData: async function () {
-            return new Promise((resolve, reject) => {
+        getCartData: function () {
+            if (this.getCartDataPromise) {
+                return this.getCartDataPromise;
+            }
+            this.getCartDataPromise = new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
                     parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
-                    onSuccess: function (response) {
-                        resolve(JSON.parse(response.responseText));
+                    onSuccess: (response) => {
+                        try {
+                            resolve(this.cacheCartData(JSON.parse(response.responseText)));
+                        } catch (e) {
+                            reject(e);
+                        }
                     },
-                    onFailure: function () {
+                    onFailure: () => {
                         reject(new Error('Failed to get cart data'));
+                    },
+                    onComplete: () => {
+                        this.getCartDataPromise = null;
                     }
                 });
             });
+            return this.getCartDataPromise;
+        },
+        /**
+         * Resolve billing address for wallet customer requirements.
+         *
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        resolveBillingAddressForCustomerRequirement: function (cartData) {
+            if (typeof cartData.billingAddress === 'function') {
+                return cartData.billingAddress();
+            }
+            return cartData.billing_address || {};
+        },
+        /**
+         * Coerce wallet amounts to integer cents (Payments SDK rejects NaN/undefined).
+         *
+         * @param {*} value
+         * @return {number}
+         */
+        normalizeWalletAmountCents: function (value) {
+            const amount = Number(value);
+            if (!isFinite(amount) || isNaN(amount)) {
+                return 0;
+            }
+            return Math.round(amount);
+        },
+        /**
+         * Parse displayed currency text to cents.
+         *
+         * @param {string} text
+         * @return {number}
+         */
+        parsePriceTextToCents: function (text) {
+            if (!text) {
+                return 0;
+            }
+            const cleaned = String(text).replace(/[^\d.-]/g, '');
+            const dollars = parseFloat(cleaned);
+            if (!isFinite(dollars) || isNaN(dollars)) {
+                return 0;
+            }
+            return Math.round(dollars * 100);
+        },
+        /**
+         * Read grand total from checkout review DOM when server cart data is unavailable.
+         *
+         * @return {number}
+         */
+        readCheckoutGrandTotalCents: function () {
+            const selectors = [
+                '#checkout-review-table .grand-total .price',
+                '.checkout-review-table .grand-total .price',
+                '#review-total-table .grand-total .price',
+                '.firecheckout-summary .grand-total .price',
+                '.grand-total .price'
+            ];
+            for (let i = 0; i < selectors.length; i++) {
+                const el = document.querySelector(selectors[i]);
+                if (el) {
+                    const cents = this.parsePriceTextToCents(el.innerText || el.textContent);
+                    if (cents > 0) {
+                        return cents;
+                    }
+                }
+            }
+            return 0;
+        },
+        /**
+         * Build wallet totals in the shape expected by payments_sdk (see expresspay.js).
+         *
+         * @param {{}} totals
+         * @return {{}}
+         */
+        buildWalletTotalsFromCartData: function (totals) {
+            const orderBalanceCents = this.normalizeWalletAmountCents(totals.order_total);
+            return {
+                order_total: orderBalanceCents / 100,
+                order_balance: orderBalanceCents,
+                shipping_total: this.normalizeWalletAmountCents(totals.shipping_total),
+                discounts_total: this.normalizeWalletAmountCents(totals.discount_total),
+                fees_total: this.normalizeWalletAmountCents(totals.fee_total),
+                taxes_total: this.normalizeWalletAmountCents(totals.tax_total),
+            };
+        },
+        /**
+         * Normalize shipping options for wallet payments.
+         *
+         * @param {Array} shippingOptions
+         * @return {Array}
+         */
+        normalizeWalletShippingOptions: function (shippingOptions) {
+            return (shippingOptions || []).map(function (option) {
+                return {
+                    id: option.id || option.rate_id || '',
+                    label: option.label || '',
+                    amount: this.normalizeWalletAmountCents(option.amount),
+                    is_selected: !!option.is_selected,
+                };
+            }.bind(this));
+        },
+        /**
+         * Build order data for Payments SDK from cart payload.
+         *
+         * @param {string[]} requirements
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        buildOrderDataFromCartData: function (requirements, cartData) {
+            const orderData = {};
+            for (const requirement of requirements) {
+                switch (requirement) {
+                    case 'customer': {
+                        const billingAddress = this.resolveBillingAddressForCustomerRequirement(cartData);
+                        const customer = cartData.customer || {};
+                        const email = customer.email || customer.email_address || '';
+                        orderData[requirement] = {
+                            first_name: billingAddress.first_name || billingAddress.firstname || '',
+                            last_name: billingAddress.last_name || billingAddress.lastname || '',
+                            email_address: email,
+                        };
+                        break;
+                    }
+                    case 'items':
+                        orderData[requirement] = (cartData.cart_items || []).map(function (item) {
+                            return {
+                                amount: this.normalizeWalletAmountCents(item.price),
+                                label: item.title || item.name || '',
+                            };
+                        }.bind(this));
+                        break;
+                    case 'billing_address':
+                        orderData[requirement] = cartData.billing_address;
+                        break;
+                    case 'shipping_address':
+                        orderData[requirement] = cartData.shipping_address;
+                        break;
+                    case 'shipping_options':
+                        orderData[requirement] = this.normalizeWalletShippingOptions(cartData.shipping_options);
+                        break;
+                    case 'totals':
+                        orderData[requirement] = this.buildWalletTotalsFromCartData(cartData.totals || {});
+                        break;
+                }
+            }
+            return orderData;
         },
         /**
          * Call backend to create express order.
@@ -529,54 +719,49 @@
             });
         },
         /**
-         * Handle order data requirements.
+         * Handle order data requirements synchronously from prefetched cart data.
          *
-         * @param requirements
-         * @return {Promise<{}>}
+         * Apple Pay requires ApplePaySession to be created in the same user gesture.
+         * Awaiting getCartData() here breaks that constraint.
+         *
+         * @param {string[]} requirements
+         * @return {{}}
          */
-        onRequireOrderDataCallback: async function (requirements) {
-            const orderData = {};
-            const cartData = await this.getCartData();
-            for (const requirement of requirements) {
-                switch (requirement) {
-                    case 'customer':
-                        let billingAddress = cartData.billingAddress();
-                        const email = cartData.customer.email;
-
-                        orderData[requirement] = {
-                            first_name: billingAddress.firstname,
-                            last_name: billingAddress.lastname,
-                            email_address: email,
-                        };
-                        break;
-                    case 'items':
-                        orderData[requirement] = cartData.cart_items.map(item => ({
-                            amount: item.price,
-                            label: item.title
-                        }));
-                        break;
-                    case 'billing_address':
-                        orderData[requirement] = cartData.billing_address;
-                        break;
-                    case 'shipping_address':
-                        orderData[requirement] = cartData.shipping_address;
-                        break;
-                    case 'shipping_options':
-                        orderData[requirement] = cartData.shipping_options;
-                        break;
-                    case 'totals':
-                        const totals = cartData.totals;
-                        orderData[requirement] = {
-                            order_total: totals.order_total,
-                            shipping_total: totals.shipping_total,
-                            discounts_total: totals.discount_total,
-                            fees_total: totals.fee_total || 0,
-                            taxes_total: totals.tax_total,
-                        };
-                        break;
-                }
+        onRequireOrderDataCallback: function (requirements) {
+            let cartData = this.getCachedCartData();
+            if (!cartData) {
+                this.prefetchCartData();
+                cartData = this.buildMinimalCartDataFallback();
             }
-            return orderData;
+            return this.buildOrderDataFromCartData(requirements, cartData);
+        },
+        /**
+         * Minimal cart snapshot when cache is cold (avoids breaking wallet button render).
+         *
+         * @return {{}}
+         */
+        buildMinimalCartDataFallback: function () {
+            const emailEl = document.getElementById('billing:email');
+            const firstEl = document.getElementById('billing:firstname');
+            const lastEl = document.getElementById('billing:lastname');
+            const orderTotalCents = this.readCheckoutGrandTotalCents();
+            return {
+                customer: {
+                    email_address: emailEl ? emailEl.value : '',
+                    first_name: firstEl ? firstEl.value : '',
+                    last_name: lastEl ? lastEl.value : '',
+                },
+                billing_address: {},
+                cart_items: [],
+                totals: {
+                    order_total: orderTotalCents,
+                    shipping_total: 0,
+                    discount_total: 0,
+                    tax_total: 0,
+                    fee_total: 0,
+                },
+                shipping_options: [],
+            };
         },
 
     });
@@ -585,5 +770,20 @@
             window.bold = {};
         }
         window.bold.baseInstance = new BoldBase();
+        if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+            window.bold.baseInstance.prefetchCartData().catch(function (e) {
+                console.warn('[Bold] Initial cart data prefetch failed', e);
+            });
+        }
+        if (!window.bold.firecheckoutCartPrefetchRegistered) {
+            window.bold.firecheckoutCartPrefetchRegistered = true;
+            document.observe('firecheckout:setResponseAfter', function () {
+                if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+                    window.bold.baseInstance.prefetchCartData().catch(function (e) {
+                        console.warn('[Bold] Firecheckout cart data prefetch failed', e);
+                    });
+                }
+            });
+        }
     });
 </script>

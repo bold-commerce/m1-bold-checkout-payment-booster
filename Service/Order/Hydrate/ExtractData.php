@@ -221,13 +221,16 @@ class Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData
         $totals = $quote->getTotals();
         $subTotal = isset($totals['subtotal']['value_excl_tax'])
             ? $totals['subtotal']['value_excl_tax']
-            : $totals['subtotal']['value'];
-        $shippingTotal = isset($totals['shipping']['value_excl_tax'])
-            ? $totals['shipping']['value_excl_tax']
-            : $totals['shipping']['value'];
+            : (isset($totals['subtotal']['value']) ? $totals['subtotal']['value'] : 0);
+        $shippingTotal = 0;
+        if (isset($totals['shipping'])) {
+            $shippingTotal = isset($totals['shipping']['value_excl_tax'])
+                ? $totals['shipping']['value_excl_tax']
+                : (isset($totals['shipping']['value']) ? $totals['shipping']['value'] : 0);
+        }
         $grandTotal = isset($totals['grand_total']['value_incl_tax'])
             ? $totals['grand_total']['value_incl_tax']
-            : $totals['grand_total']['value'];
+            : (isset($totals['grand_total']['value']) ? $totals['grand_total']['value'] : 0);
         $processedTotals = [
             'sub_total' => self::convertToCents($subTotal),
             'tax_total' => isset($totals['tax']['value']) && $totals['tax']['value'] ? self::convertToCents($totals['tax']['value']) : 0,
