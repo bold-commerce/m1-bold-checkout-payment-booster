@@ -2,11 +2,22 @@
 
 /**
  * Prevents duplicate Magento orders for the same Bold checkout session or Express Pay order.
+ *
+ * CHANGES vs main: new file. Used by SaveOrderObserver (predispatch saveOrder) and CheckoutObserver.
+ *
+ * Flow:
+ * 1. predispatch saveOrder → evaluatePlacementRequest() → allow | block | success_existing (redirect JSON).
+ * 2. checkout_type_onepage_save_order → assertQuoteCanSubmit() before Magento creates order.
+ *
+ * Identifiers checked: Bold public_order_id (session), payment[additional_data][order_id] (wallet/EPS),
+ * quote_id, MySQL GET_LOCK per public order id.
  */
 class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 {
+    /** [vs main] Session flag set while first saveOrder is in flight (blocks double-submit / FC reload). */
     const SESSION_PLACEMENT_FLAG = 'bold_order_placement_in_progress';
 
+    /** [vs main] Log file for duplicate placement attempts (var/log/). */
     const DUPLICATE_ORDER_LOG_FILE = 'bold_checkout_payment_booster_duplicate_order.log';
 
     /**
@@ -53,6 +64,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
+     * [vs main] Wallet/Express Pay order id from payment[additional_data][order_id] on saveOrder POST.
+     *
      * @return string|null
      */
     public static function getEpsOrderIdFromRequest()
@@ -149,6 +162,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
+     * [vs main] MySQL advisory lock to serialize concurrent saveOrder for same Bold public order id.
+     *
      * @param string $publicOrderId
      * @return bool
      */
@@ -185,6 +200,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
+     * [vs main] Core predispatch decision for SaveOrderObserver (FC + standard checkout).
+     *
      * @return array{action:string,order?:Mage_Sales_Model_Order,message?:string}
      */
     public static function evaluatePlacementRequest()
@@ -289,6 +306,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     }
 
     /**
+     * [vs main] Duplicate saveOrder: return JSON success + redirect (no second Magento order).
+     *
      * @param Mage_Core_Controller_Varien_Action $controller
      * @param Mage_Sales_Model_Order $order
      * @return void

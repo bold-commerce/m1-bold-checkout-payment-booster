@@ -2,9 +2,6 @@
 
 /**
  * Bold payment method block.
- *
- * CHANGES vs main (module branch firecheckout-changes):
- * - getWalletCheckoutJsConfig(): feeds window.bold.walletCheckoutConfig in base.phtml (Apple/Google Pay + FC saveOrder URL).
  */
 class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_Block_Form
 {
@@ -232,37 +229,5 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     public function getEpsAuthToken()
     {
         return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
-    }
-
-    /**
-     * URLs and flags for Apple Pay / Google Pay on checkout (used by base.phtml).
-     *
-     * [vs main] New method. Exposes Ajax endpoints for wallet create/update/approve and place order.
-     * saveOrderUrl uses firecheckout/index/saveOrder when module is firecheckout (TM Firecheckout).
-     * Address/shipping URLs still point at checkout/onepage/* (FC-specific routes may be added later).
-     *
-     * @return array
-     */
-    public function getWalletCheckoutJsConfig()
-    {
-        $request = Mage::app()->getFrontController()->getRequest();
-        // [vs main] Route saveOrder to Firecheckout controller when on FC checkout page.
-        $isFirecheckout = $request->getModuleName() === 'firecheckout';
-
-        return [
-            'formKey' => Mage::getSingleton('core/session')->getFormKey(),
-            'quoteId' => (string)$this->quote->getId(),
-            'quoteIsVirtual' => (bool)$this->quote->getIsVirtual(),
-            'createOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/createOrder', ['_secure' => true]),
-            'updateOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/updateOrder', ['_secure' => true]),
-            'saveOrderUrl' => $this->getUrl(
-                $isFirecheckout ? 'firecheckout/index/saveOrder' : 'checkout/onepage/saveOrder',
-                ['_secure' => true]
-            ),
-            'saveBillingUrl' => $this->getUrl('checkout/onepage/saveBilling', ['_secure' => true]),
-            'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', ['_secure' => true]),
-            'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', ['_secure' => true]),
-            'successUrl' => $this->getUrl('checkout/onepage/success', ['_secure' => true]),
-        ];
     }
 }

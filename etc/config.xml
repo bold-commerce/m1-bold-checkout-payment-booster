@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <config>
     <modules>
+        <!-- [vs main] 2.1.5 → 2.1.6: duplicate saveOrder guards + Firecheckout saveOrder observers -->
         <Bold_CheckoutPaymentBooster>
             <version>2.1.6</version>
         </Bold_CheckoutPaymentBooster>
@@ -92,6 +93,7 @@
                     </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
+            <!-- [vs main] Duplicate-order prevention: predispatch/postdispatch saveOrder (standard checkout) -->
             <controller_action_predispatch_checkout_onepage_saveOrder>
                 <observers>
                     <bold_checkout_prevent_duplicate_save_order>
@@ -108,6 +110,7 @@
                     </bold_checkout_clear_placement_state>
                 </observers>
             </controller_action_postdispatch_checkout_onepage_saveOrder>
+            <!-- [vs main] Same guards for TM Firecheckout index saveOrder -->
             <controller_action_predispatch_firecheckout_index_saveOrder>
                 <observers>
                     <bold_checkout_prevent_duplicate_save_order_fc>
@@ -124,6 +127,7 @@
                     </bold_checkout_clear_placement_state_fc>
                 </observers>
             </controller_action_postdispatch_firecheckout_index_saveOrder>
+            <!-- [vs main] Same guards for Firecheckout one-column layout saveOrder -->
             <controller_action_predispatch_firecheckout_onecolumn_saveOrder>
                 <observers>
                     <bold_checkout_prevent_duplicate_save_order_fc_oc>

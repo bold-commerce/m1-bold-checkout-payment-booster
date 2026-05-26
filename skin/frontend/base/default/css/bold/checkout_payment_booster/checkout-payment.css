@@ -1,0 +1,24 @@
+/**
+ * CHANGES vs main: new file (not on main branch).
+ *
+ * Bold checkout (SPI) on Firecheckout:
+ * - Hide PayPal/Venmo/Pay Later rendered inside SPI #paypalPanel (duplicate of wallet PPCP).
+ * - Show Apple Pay / Google Pay only in top-level #smart-ppcp-buttons (see bold_method.phtml markup).
+ */
+#payment_form_bold #paypalPanel {
+    display: none !important;
+}
+
+#payment_form_bold .TogglePanel:has(#paypalPanel) {
+    display: none !important;
+}
+
+/* Do not show a second wallet host inside the hidden PayPal panel */
+#payment_form_bold #paypalPanel #smart-ppcp-buttons {
+    display: none !important;
+}
+
+#payment_form_bold > #smart-ppcp-buttons,
+#payment_form_bold > .bold-checkout-wallet-buttons {
+    display: block !important;
+}

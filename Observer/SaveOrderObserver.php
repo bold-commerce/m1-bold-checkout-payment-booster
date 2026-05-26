@@ -2,10 +2,19 @@
 
 /**
  * Blocks duplicate Bold saveOrder requests (Firecheckout totals reload / double-submit).
+ *
+ * CHANGES vs main: new file. Wired in etc/config.xml on predispatch/postdispatch for:
+ * - checkout/onepage/saveOrder
+ * - firecheckout/index/saveOrder
+ * - firecheckout/onecolumn/saveOrder
+ *
+ * Delegates to Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard.
  */
 class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
 {
     /**
+     * [vs main] Predispatch: allow first placement, block in-progress, or return success for existing order.
+     *
      * @param Varien_Event_Observer $observer
      * @return void
      */
@@ -41,6 +50,8 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
     }
 
     /**
+     * [vs main] Postdispatch: clear session placement flag and MySQL lock after saveOrder completes or fails.
+     *
      * @param Varien_Event_Observer $observer
      * @return void
      */

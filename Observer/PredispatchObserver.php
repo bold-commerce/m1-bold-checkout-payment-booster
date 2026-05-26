@@ -3,6 +3,8 @@
 /**
  * Observer for `controller_action_predispatch` event
  *
+ * CHANGES vs main: allow Bold checkout session resume on TM Firecheckout routes (below).
+ *
  * @see Mage_Core_Controller_Varien_Action::preDispatch
  */
 class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
@@ -15,6 +17,7 @@ class Bold_CheckoutPaymentBooster_Observer_PredispatchObserver
         'catalog_product_view',
         'checkout_cart_index',
         'checkout_onepage_index',
+        // [vs main] Firecheckout: keep Bold checkout data on FC index + section Ajax actions.
         'firecheckout_index_index',
         'firecheckout_index_saveshippingmethod',
         'firecheckout_index_saveshipping',

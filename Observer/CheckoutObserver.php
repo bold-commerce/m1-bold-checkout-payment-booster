@@ -2,6 +2,11 @@
 
 /**
  * Bold checkout observer.
+ *
+ * CHANGES vs main (duplicate-order hardening):
+ * - beforeSaveOrder: assertQuoteCanSubmit() before auth/hydrate.
+ * - afterSaveOrder: catch duplicate public_id on bold_checkout_payment_booster_order mapping save.
+ * - isDuplicatePublicIdException(): detect UNQ public_id race on concurrent saveOrder.
  */
 class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
 {
@@ -26,6 +31,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         }
 
         $quote = $order->getQuote();
+        // [vs main] Second line of defense: reject duplicate Bold public order id / EPS order id / inactive quote.
         Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertQuoteCanSubmit($quote);
         $websiteId = $quote->getStore()->getWebsiteId();
         try {
@@ -65,6 +71,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             $extOrderData->setOrderId($order->getEntityId());
             $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             $extOrderData->setPublicId($publicOrderId);
+            // [vs main] Swallow duplicate public_id DB race; log and continue (order already placed).
             try {
                 $extOrderData->save();
             } catch (Exception $e) {
@@ -112,6 +119,8 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     }
 
     /**
+     * [vs main] New: identify concurrent insert on bold_checkout_payment_booster_order.public_id.
+     *
      * @param Exception $exception
      * @return bool
      */
