@@ -230,4 +230,25 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     {
         return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
     }
+
+    /**
+     * Config for wallet / Express Pay Ajax in base.phtml (standard onepage checkout).
+     *
+     * @return array
+     */
+    public function getWalletCheckoutJsConfig()
+    {
+        return array(
+            'formKey' => Mage::getSingleton('core/session')->getFormKey(),
+            'quoteId' => (string) $this->quote->getId(),
+            'quoteIsVirtual' => (bool) $this->quote->getIsVirtual(),
+            'createOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/createOrder', array('_secure' => true)),
+            'updateOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/updateOrder', array('_secure' => true)),
+            'saveOrderUrl' => $this->getUrl('checkout/onepage/saveOrder', array('_secure' => true)),
+            'saveBillingUrl' => $this->getUrl('checkout/onepage/saveBilling', array('_secure' => true)),
+            'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', array('_secure' => true)),
+            'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', array('_secure' => true)),
+            'successUrl' => $this->getUrl('checkout/onepage/success', array('_secure' => true)),
+        );
+    }
 }

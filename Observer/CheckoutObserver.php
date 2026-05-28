@@ -17,14 +17,25 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
         $paymentMethod = $order->getPayment()->getMethod();
-        $methodsToProcess = [
+        $methodsToProcess = array(
             Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
             Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
-        ];
-        if (!in_array($paymentMethod, $methodsToProcess)) {
+        );
+        if (!in_array($paymentMethod, $methodsToProcess, true)) {
             return;
         }
-        $quote = $order->getQuote();
+
+        $quote = $this->resolveQuoteForOrder($order);
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertQuoteCanSubmit($quote);
+
+        $epsOrderId = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getEpsOrderIdFromRequest();
+        if ($epsOrderId) {
+            $order->getPayment()->setAdditionalInformation(
+                Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::PAYMENT_ADDITIONAL_EPS_ORDER_ID,
+                $epsOrderId
+            );
+        }
+
         $websiteId = $quote->getStore()->getWebsiteId();
         try {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
@@ -40,8 +51,6 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     /**
      * Save Bold order data to database after order has been placed on Magento side.
      *
-     * After Magento order has been placed, we have order id and can save Bold order data(public id) to database.
-     *
      * @param Varien_Event_Observer $event
      * @return void
      */
@@ -49,25 +58,73 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
     {
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
-        $methodsToProcess = [
+        $methodsToProcess = array(
             Bold_CheckoutPaymentBooster_Model_Payment_Fastlane::CODE,
             Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
-        ];
-        if (!in_array($order->getPayment()->getMethod(), $methodsToProcess)) {
+        );
+        if (!in_array($order->getPayment()->getMethod(), $methodsToProcess, true)) {
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+
             return;
         }
+
         try {
             /** @var Bold_CheckoutPaymentBooster_Model_Order $extOrderData */
             $extOrderData = Mage::getModel(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
             $extOrderData->setOrderId($order->getEntityId());
-            $extOrderData->setPublicId(Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId());
-            $extOrderData->save();
+            $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
+            $extOrderData->setPublicId($publicOrderId);
+
+            try {
+                $extOrderData->save();
+            } catch (Exception $e) {
+                if ($publicOrderId && self::isDuplicatePublicIdException($e)) {
+                    Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logDuplicateOrderAttempt(
+                        $publicOrderId,
+                        'after_save_order mapping race magento_order=' . $order->getIncrementId()
+                    );
+                } else {
+                    throw $e;
+                }
+            }
+
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::clearPlacementState();
         } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
         }
+    }
+
+    /**
+     * Order model often has no loaded quote during checkout_type_onepage_save_order.
+     *
+     * @param Mage_Sales_Model_Order $order
+     * @return Mage_Sales_Model_Quote
+     * @throws Mage_Core_Exception
+     */
+    private function resolveQuoteForOrder(Mage_Sales_Model_Order $order)
+    {
+        $quote = $order->getQuote();
+        if ($quote && $quote->getId()) {
+            return $quote;
+        }
+
+        if ($order->getQuoteId()) {
+            $quote = Mage::getModel('sales/quote')->load($order->getQuoteId());
+            if ($quote->getId()) {
+                return $quote;
+            }
+        }
+
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $quote = $session->getQuote();
+        if ($quote && $quote->getId()) {
+            return $quote;
+        }
+
+        Mage::throwException(Mage::helper('checkout')->__('Your shopping cart could not be found.'));
     }
 
     /**
@@ -93,7 +150,19 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             ? $transactionData->transactions[0]->tender_details
             : null;
         if ($cardDetails) {
-            $order->getPayment()->setAdditionalInformation('card_details', serialize((array)$cardDetails));
+            $order->getPayment()->setAdditionalInformation('card_details', serialize((array) $cardDetails));
         }
+    }
+
+    /**
+     * @param Exception $exception
+     * @return bool
+     */
+    private static function isDuplicatePublicIdException(Exception $exception)
+    {
+        $message = $exception->getMessage();
+
+        return stripos($message, 'Duplicate entry') !== false
+            && stripos($message, 'UNQ_BOLD_CHECKOUT_PAYMENT_BOOSTER_ORDER_PUBLIC_ID') !== false;
     }
 }
