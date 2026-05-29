@@ -148,7 +148,48 @@ class Mage_Core_Exception extends Exception
 
 class Zend_Log
 {
+    const DEBUG = 7;
     const WARN = 4;
+}
+
+class Bold_CheckoutPaymentBooster_Model_Config
+{
+    const RESOURCE = 'bold_checkout_payment_booster/config';
+    const LOG_FILE_NAME = 'bold_checkout_payment_booster.log';
+
+    public function isLogEnabled($websiteId)
+    {
+        return true;
+    }
+}
+
+class Mage_Core_Model_App
+{
+    public function getStore()
+    {
+        return new Mage_Core_Model_Store();
+    }
+
+    public function getRequest()
+    {
+        return new Mage_Core_Model_Request_Http();
+    }
+}
+
+class Mage_Core_Model_Request_Http
+{
+    public function getParam($key)
+    {
+        return null;
+    }
+}
+
+class Mage_Core_Model_Store
+{
+    public function getWebsiteId()
+    {
+        return 1;
+    }
 }
 
 class Bold_CheckoutPaymentBooster_Model_Payment_Bold
@@ -179,6 +220,11 @@ class Mage
     public static function getSingleton($key)
     {
         return Bold_CheckoutPaymentBooster_Test_Stub_Mage::getSingleton($key);
+    }
+
+    public static function app()
+    {
+        return new Mage_Core_Model_App();
     }
 
     public static function getModel($name)

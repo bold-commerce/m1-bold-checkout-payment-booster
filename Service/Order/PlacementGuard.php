@@ -17,12 +17,6 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     /** Session flag set while first saveOrder is in flight (blocks double-submit). */
     const SESSION_PLACEMENT_FLAG = 'bold_order_placement_in_progress';
 
-    /** Log file for duplicate placement attempts (var/log/). */
-    const DUPLICATE_ORDER_LOG_FILE = 'bold_checkout_payment_booster_duplicate_order.log';
-
-    /** Log file for placement guard check trail (var/log/). */
-    const PLACEMENT_GUARD_LOG_FILE = 'bold_checkout_payment_booster_placement_guard.log';
-
     /** Payment additional_information key for EPS wallet order id (exact lookup). */
     const PAYMENT_ADDITIONAL_EPS_ORDER_ID = 'bold_eps_order_id';
 
@@ -30,6 +24,37 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      * @var string|null
      */
     private static $heldLockPublicId = null;
+
+    /**
+     * Predispatch saveOrder entry (logs even when payment method is skipped).
+     *
+     * @param string|null $paymentMethod
+     * @param bool $willEvaluate
+     * @return void
+     */
+    public static function logSaveOrderPredispatch($paymentMethod, $willEvaluate)
+    {
+        self::writeLog('[PlacementGuard] ' . json_encode(array(
+            'event' => 'saveOrder_predispatch',
+            'payment_method' => $paymentMethod,
+            'will_evaluate' => $willEvaluate,
+            'request_path' => self::getRequestPathSafe(),
+        )));
+    }
+
+    /**
+     * @return string|null
+     */
+    private static function getRequestPathSafe()
+    {
+        try {
+            return Mage::app()->getRequest()->getRequestUri();
+        } catch (Exception $e) {
+            return null;
+        } catch (Error $e) {
+            return null;
+        }
+    }
 
     /**
      * @return string[]
@@ -131,7 +156,10 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             $message .= ' [' . $context . ']';
         }
 
-        Mage::log($message, Zend_Log::WARN, self::DUPLICATE_ORDER_LOG_FILE);
+        self::writeLog(
+            '[DuplicateOrder] ' . $message,
+            defined('Zend_Log::WARN') ? Zend_Log::WARN : 4
+        );
     }
 
     /**
@@ -153,13 +181,77 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             $payload['context'] = $context;
         }
 
-        $logLevel = defined('Zend_Log::INFO') ? Zend_Log::INFO : 6;
+        self::writeLog('[PlacementGuard] ' . json_encode($payload));
+    }
+
+    /**
+     * Same logging path as Bold API logs: bold_checkout_payment_booster.log with forceLog.
+     *
+     * @param string $message
+     * @param int $level
+     * @return void
+     */
+    private static function writeLog($message, $level = null)
+    {
+        if (!self::isBoldLoggingEnabled()) {
+            return;
+        }
+
+        if ($level === null) {
+            $level = defined('Zend_Log::DEBUG') ? Zend_Log::DEBUG : 7;
+        }
 
         Mage::log(
-            '[PlacementGuard] ' . json_encode($payload),
-            $logLevel,
-            self::PLACEMENT_GUARD_LOG_FILE
+            $message,
+            $level,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+            true
         );
+    }
+
+    /**
+     * @return bool
+     */
+    private static function isBoldLoggingEnabled()
+    {
+        if (!class_exists('Bold_CheckoutPaymentBooster_Model_Config', false)) {
+            return false;
+        }
+
+        try {
+            /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+            $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+            if (!$config) {
+                return false;
+            }
+
+            return $config->isLogEnabled(self::resolveWebsiteIdForLogging());
+        } catch (Exception $e) {
+            return false;
+        } catch (Error $e) {
+            return false;
+        }
+    }
+
+    /**
+     * @return int
+     */
+    private static function resolveWebsiteIdForLogging()
+    {
+        try {
+            /** @var Mage_Checkout_Model_Session $session */
+            $session = Mage::getSingleton('checkout/session');
+            $quote = $session->getQuote();
+            if ($quote && $quote->getId() && $quote->getStore()) {
+                return (int) $quote->getStore()->getWebsiteId();
+            }
+        } catch (Exception $e) {
+            // fall through
+        } catch (Error $e) {
+            // fall through
+        }
+
+        return (int) Mage::app()->getStore()->getWebsiteId();
     }
 
     /**
@@ -190,7 +282,13 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             return null;
         }
 
-        return self::getPaymentMethodFromRequest();
+        try {
+            return self::getPaymentMethodFromRequest();
+        } catch (Exception $e) {
+            return null;
+        } catch (Error $e) {
+            return null;
+        }
     }
 
     /**

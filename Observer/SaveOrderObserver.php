@@ -17,7 +17,13 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
     public function predispatchSaveOrder(Varien_Event_Observer $observer)
     {
         $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
-        if (!Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod)) {
+        $willEvaluate = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod);
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logSaveOrderPredispatch(
+            $paymentMethod,
+            $willEvaluate
+        );
+
+        if (!$willEvaluate) {
             return;
         }
 

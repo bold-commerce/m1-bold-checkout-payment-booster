@@ -8,7 +8,7 @@ Manual checks for **2.1.6** (standard `checkout/onepage` + Express Pay security)
 
 - Bold Payment Booster enabled; **standard one-page checkout** with Bold and/or Express Pay / wallet buttons.
 - Two isolated browser profiles (Session A / Session B).
-- Access to `var/log/bold_checkout_payment_booster_duplicate_order.log` and `var/log/bold_checkout_payment_booster_placement_guard.log`.
+- Access to `var/log/bold_checkout_payment_booster.log` (Enable Log must be Yes in Bold advanced settings).
 - Optional: curl scripts in [curl/](curl/) (set env vars documented in each script).
 
 ---
@@ -62,7 +62,7 @@ Manual checks for **2.1.6** (standard `checkout/onepage` + Express Pay security)
 - Express Pay / wallet create order + place order on **checkout/onepage** (if enabled).
 - Other payment methods still selectable and place order.
 - Non-Bold `saveOrder` unaffected (guards only when `payment[method]` is `bold` or `bold_fastlane`).
-- Duplicate `saveOrder` on same session logs checks in `placement_guard.log` and returns `success_existing` when appropriate.
+- Duplicate `saveOrder` on same session logs `[PlacementGuard]` / `[DuplicateOrder]` lines in `bold_checkout_payment_booster.log` and returns `success_existing` when appropriate.
 
 ---
 

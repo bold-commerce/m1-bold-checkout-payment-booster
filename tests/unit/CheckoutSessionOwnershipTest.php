@@ -7,6 +7,10 @@ class CheckoutSessionOwnershipTest extends TestCase
     protected function setUp(): void
     {
         Bold_CheckoutPaymentBooster_Test_Stub_Mage::reset();
+        Bold_CheckoutPaymentBooster_Test_Stub_Mage::setSingleton(
+            Bold_CheckoutPaymentBooster_Model_Config::RESOURCE,
+            new Bold_CheckoutPaymentBooster_Model_Config()
+        );
     }
 
     public function testOrderBelongsWhenQuoteIdsMatchForGuestWithoutEmails()
