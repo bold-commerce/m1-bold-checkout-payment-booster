@@ -16,6 +16,11 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
      */
     public function predispatchSaveOrder(Varien_Event_Observer $observer)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            1,
+            'SaveOrderObserver::predispatchSaveOrder'
+        );
+
         $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
         $willEvaluate = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod);
         Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logSaveOrderPredispatch(
@@ -24,16 +29,35 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
         );
 
         if (!$willEvaluate) {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                2,
+                'predispatch skipped (payment=' . ($paymentMethod ?: 'none') . ')'
+            );
+
             return;
         }
+
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            2,
+            'predispatch evaluating guard (payment=' . $paymentMethod . ')'
+        );
 
         $evaluation = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::evaluatePlacementRequest();
 
         if ($evaluation['action'] === 'allow') {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                4,
+                'predispatch allow'
+            );
+
             return;
         }
 
         if ($evaluation['action'] === 'success_existing' && !empty($evaluation['order'])) {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                4,
+                'predispatch success_existing order=' . $evaluation['order']->getIncrementId()
+            );
             /** @var Mage_Core_Controller_Varien_Action $controller */
             $controller = $observer->getEvent()->getControllerAction();
             Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::respondWithExistingOrderSuccess(
@@ -43,6 +67,11 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
 
             return;
         }
+
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            4,
+            'predispatch block action=' . $evaluation['action']
+        );
 
         $message = !empty($evaluation['message'])
             ? $evaluation['message']
@@ -59,6 +88,11 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
      */
     public function cleanupAfterSaveOrder(Varien_Event_Observer $observer)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            12,
+            'SaveOrderObserver::cleanupAfterSaveOrder'
+        );
+
         $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
         if (!Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod)) {
             return;

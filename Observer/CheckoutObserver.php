@@ -14,6 +14,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      */
     public function beforeSaveOrder(Varien_Event_Observer $event)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            5,
+            'CheckoutObserver::beforeSaveOrder (checkout_type_onepage_save_order)'
+        );
+
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
         $paymentMethod = $order->getPayment()->getMethod();
@@ -22,8 +27,18 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             Bold_CheckoutPaymentBooster_Model_Payment_Bold::CODE,
         );
         if (!in_array($paymentMethod, $methodsToProcess, true)) {
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                6,
+                'beforeSaveOrder skipped (payment=' . ($paymentMethod ?: 'none') . ')'
+            );
+
             return;
         }
+
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            6,
+            'beforeSaveOrder bold payment=' . $paymentMethod
+        );
 
         $quote = $this->resolveQuoteForOrder($order);
         Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::assertQuoteCanSubmit($quote);
@@ -36,12 +51,21 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             );
         }
 
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            8,
+            'beforeSaveOrder hydrate + authorize'
+        );
+
         $websiteId = $quote->getStore()->getWebsiteId();
         try {
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
             $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);
             $this->saveTransaction($order, $transactionData);
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                9,
+                'beforeSaveOrder auth complete public_id=' . ($publicOrderId ?: 'none')
+            );
         } catch (Mage_Core_Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
             Mage::throwException(Mage::helper('core')->__('Payment Authorization Failure.'));
@@ -56,6 +80,11 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
      */
     public function afterSaveOrder(Varien_Event_Observer $event)
     {
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+            10,
+            'CheckoutObserver::afterSaveOrder (checkout_submit_all_after)'
+        );
+
         /** @var Mage_Sales_Model_Order $order */
         $order = $event->getEvent()->getOrder();
         $methodsToProcess = array(
@@ -91,6 +120,10 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
             Bold_CheckoutPaymentBooster_Service_Order_Update::updateOrderState($order);
             Bold_CheckoutPaymentBooster_Service_Bold::clearBoldCheckoutData();
             Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::clearPlacementState();
+            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
+                11,
+                'afterSaveOrder complete order=' . $order->getIncrementId()
+            );
         } catch (Exception $e) {
             Mage::log($e->getMessage(), Zend_Log::CRIT);
         }

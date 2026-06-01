@@ -26,6 +26,48 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
     private static $heldLockPublicId = null;
 
     /**
+     * Simple numbered trace for debugging observer/guard flow (always forceLog).
+     *
+     * @param int|string $step
+     * @param string $message
+     * @return void
+     */
+    public static function logStep($step, $message)
+    {
+        $detail = trim($message);
+        $path = self::getRequestPathSafe();
+        if ($path) {
+            $detail .= ' | ' . $path;
+        }
+
+        Mage::log(
+            '[BoldCheckout] step ' . $step . ': ' . $detail,
+            defined('Zend_Log::DEBUG') ? Zend_Log::DEBUG : 7,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+            true
+        );
+    }
+
+    /**
+     * Duplicate-check sub-step under a parent step (always forceLog).
+     *
+     * @param int|string $parentStep
+     * @param string $check
+     * @param string $outcome
+     * @param string $detail
+     * @return void
+     */
+    public static function logDupStep($parentStep, $check, $outcome, $detail = '')
+    {
+        $message = 'dup ' . $check . ' ' . $outcome;
+        if ($detail !== '') {
+            $message .= ' ' . $detail;
+        }
+
+        self::logStep($parentStep . '-dup', $message);
+    }
+
+    /**
      * Predispatch saveOrder entry (logs even when payment method is skipped).
      *
      * @param string|null $paymentMethod
@@ -377,6 +419,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      */
     public static function evaluatePlacementRequest()
     {
+        self::logStep(3, 'PlacementGuard::evaluatePlacementRequest');
+
         /** @var Mage_Checkout_Model_Session $session */
         $session = Mage::getSingleton('checkout/session');
 
@@ -408,6 +452,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
         self::logPlacementCheck($phase, 'start', 'evaluating', $baseContext);
 
         if (!$quote || !$quote->getId()) {
+            self::logDupStep(3, 'quote_exists', 'block', 'missing_quote');
             self::logPlacementCheck($phase, 'quote_exists', 'block', array('reason' => 'missing_quote'));
 
             return array(
@@ -416,14 +461,28 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             );
         }
 
+        self::logDupStep(3, 'quote_exists', 'pass', 'quote_id=' . (int) $quote->getId());
+
         if (!$quote->getIsActive()) {
             $existingOrder = self::findOrderByQuoteId($quote->getId());
+            self::logDupStep(
+                3,
+                'quote_active',
+                'inactive',
+                'existing_order=' . ($existingOrder ? $existingOrder->getIncrementId() : 'none')
+            );
             self::logPlacementCheck($phase, 'quote_active', 'inactive', array(
                 'existing_order_id' => $existingOrder ? (int) $existingOrder->getId() : null,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
             ));
 
             if ($existingOrder) {
+                self::logDupStep(
+                    3,
+                    'quote_active',
+                    'duplicate',
+                    'success_existing order=' . $existingOrder->getIncrementId()
+                );
                 $result = Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::buildSuccessExistingEvaluation(
                     $existingOrder,
                     $quote,
@@ -443,9 +502,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             );
         }
 
+        self::logDupStep(3, 'quote_active', 'pass', 'quote_id=' . (int) $quote->getId());
         self::logPlacementCheck($phase, 'quote_active', 'pass', array('quote_id' => (int) $quote->getId()));
 
         if ($session->getData(self::SESSION_PLACEMENT_FLAG)) {
+            self::logDupStep(3, 'session_placement_flag', 'block_in_progress');
             self::logPlacementCheck($phase, 'session_placement_flag', 'block_in_progress', array(
                 'flag' => self::SESSION_PLACEMENT_FLAG,
             ));
@@ -456,10 +517,18 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             );
         }
 
+        self::logDupStep(3, 'session_placement_flag', 'pass');
         self::logPlacementCheck($phase, 'session_placement_flag', 'pass');
 
         if ($publicOrderId) {
             $existingOrder = self::findOrderByPublicId($publicOrderId);
+            self::logDupStep(
+                3,
+                'public_order_id',
+                $existingOrder ? 'duplicate' : 'not_found',
+                'public_id=' . $publicOrderId
+                . ($existingOrder ? ' order=' . $existingOrder->getIncrementId() : '')
+            );
             self::logPlacementCheck($phase, 'public_order_id_lookup', $existingOrder ? 'found' : 'not_found', array(
                 'public_order_id' => $publicOrderId,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
@@ -467,6 +536,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 
             if ($existingOrder) {
                 self::logDuplicateOrderAttempt($publicOrderId, 'predispatch');
+                self::logDupStep(
+                    3,
+                    'public_order_id',
+                    'duplicate_success_existing',
+                    'order=' . $existingOrder->getIncrementId()
+                );
 
                 $result = Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::buildSuccessExistingEvaluation(
                     $existingOrder,
@@ -481,6 +556,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             }
 
             $lockAcquired = self::acquireLock($publicOrderId);
+            self::logDupStep(
+                3,
+                'mysql_get_lock',
+                $lockAcquired ? 'acquired' : 'failed',
+                'public_id=' . $publicOrderId
+            );
             self::logPlacementCheck($phase, 'mysql_get_lock', $lockAcquired ? 'acquired' : 'failed', array(
                 'public_order_id' => $publicOrderId,
             ));
@@ -495,6 +576,13 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             self::$heldLockPublicId = $publicOrderId;
 
             $existingOrder = self::findOrderByPublicId($publicOrderId);
+            self::logDupStep(
+                3,
+                'public_order_id_after_lock',
+                $existingOrder ? 'duplicate' : 'not_found',
+                'public_id=' . $publicOrderId
+                . ($existingOrder ? ' order=' . $existingOrder->getIncrementId() : '')
+            );
             self::logPlacementCheck($phase, 'public_order_id_lookup_after_lock', $existingOrder ? 'found' : 'not_found', array(
                 'public_order_id' => $publicOrderId,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
@@ -502,6 +590,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 
             if ($existingOrder) {
                 self::releaseLock();
+                self::logDupStep(
+                    3,
+                    'public_order_id_after_lock',
+                    'duplicate_success_existing',
+                    'order=' . $existingOrder->getIncrementId()
+                );
 
                 $result = Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::buildSuccessExistingEvaluation(
                     $existingOrder,
@@ -515,11 +609,19 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
                 return $result;
             }
         } else {
+            self::logDupStep(3, 'public_order_id', 'skipped', 'no_public_id');
             self::logPlacementCheck($phase, 'public_order_id_lookup', 'skipped', array('reason' => 'no_public_order_id'));
         }
 
         if ($epsOrderId) {
             $existingOrder = self::findOrderByEpsOrderId($epsOrderId);
+            self::logDupStep(
+                3,
+                'eps_order_id',
+                $existingOrder ? 'duplicate' : 'not_found',
+                'eps_id=' . $epsOrderId
+                . ($existingOrder ? ' order=' . $existingOrder->getIncrementId() : '')
+            );
             self::logPlacementCheck($phase, 'eps_order_id_lookup', $existingOrder ? 'found' : 'not_found', array(
                 'eps_order_id' => $epsOrderId,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
@@ -527,6 +629,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 
             if ($existingOrder) {
                 self::releaseLock();
+                self::logDupStep(
+                    3,
+                    'eps_order_id',
+                    'duplicate_success_existing',
+                    'order=' . $existingOrder->getIncrementId()
+                );
 
                 $result = Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::buildSuccessExistingEvaluation(
                     $existingOrder,
@@ -540,10 +648,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
                 return $result;
             }
         } else {
+            self::logDupStep(3, 'eps_order_id', 'skipped', 'no_eps_id');
             self::logPlacementCheck($phase, 'eps_order_id_lookup', 'skipped', array('reason' => 'no_eps_order_id'));
         }
 
         $session->setData(self::SESSION_PLACEMENT_FLAG, 1);
+        self::logDupStep(3, 'final', 'allow', 'placement_flag_set');
         self::logPlacementCheck($phase, 'final', 'allow', array('placement_flag_set' => true));
 
         return array('action' => 'allow');
@@ -631,6 +741,8 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
      */
     public static function assertQuoteCanSubmit(Mage_Sales_Model_Quote $quote)
     {
+        self::logStep(7, 'PlacementGuard::assertQuoteCanSubmit quote_id=' . (int) $quote->getId());
+
         $phase = 'assert_submit';
         /** @var Mage_Checkout_Model_Session $session */
         $session = Mage::getSingleton('checkout/session');
@@ -650,6 +762,13 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
 
         if ($publicOrderId) {
             $existingOrder = self::findOrderByPublicId($publicOrderId);
+            self::logDupStep(
+                7,
+                'public_order_id',
+                $existingOrder ? 'duplicate' : 'not_found',
+                'public_id=' . $publicOrderId
+                . ($existingOrder ? ' order=' . $existingOrder->getIncrementId() : '')
+            );
             self::logPlacementCheck($phase, 'public_order_id_lookup', $existingOrder ? 'found' : 'not_found', array(
                 'public_order_id' => $publicOrderId,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
@@ -659,11 +778,19 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
                 self::assertExistingOrderBlocksPlacement($existingOrder, $quote, $publicOrderId, 'assert_public_order_id', $alreadyUsedMessage, $phase);
             }
         } else {
+            self::logDupStep(7, 'public_order_id', 'skipped', 'no_public_id');
             self::logPlacementCheck($phase, 'public_order_id_lookup', 'skipped', array('reason' => 'no_public_order_id'));
         }
 
         if ($epsOrderId) {
             $existingOrder = self::findOrderByEpsOrderId($epsOrderId);
+            self::logDupStep(
+                7,
+                'eps_order_id',
+                $existingOrder ? 'duplicate' : 'not_found',
+                'eps_id=' . $epsOrderId
+                . ($existingOrder ? ' order=' . $existingOrder->getIncrementId() : '')
+            );
             self::logPlacementCheck($phase, 'eps_order_id_lookup', $existingOrder ? 'found' : 'not_found', array(
                 'eps_order_id' => $epsOrderId,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
@@ -673,17 +800,30 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
                 self::assertExistingOrderBlocksPlacement($existingOrder, $quote, $epsOrderId, 'assert_eps_order_id', $alreadyUsedMessage, $phase);
             }
         } else {
+            self::logDupStep(7, 'eps_order_id', 'skipped', 'no_eps_id');
             self::logPlacementCheck($phase, 'eps_order_id_lookup', 'skipped', array('reason' => 'no_eps_order_id'));
         }
 
         if (!$quote->getIsActive()) {
             $existingOrder = self::findOrderByQuoteId($quote->getId());
+            self::logDupStep(
+                7,
+                'quote_active',
+                'inactive',
+                'existing_order=' . ($existingOrder ? $existingOrder->getIncrementId() : 'none')
+            );
             self::logPlacementCheck($phase, 'quote_active', 'inactive', array(
                 'existing_order_id' => $existingOrder ? (int) $existingOrder->getId() : null,
                 'existing_increment_id' => $existingOrder ? $existingOrder->getIncrementId() : null,
             ));
 
             if ($existingOrder) {
+                self::logDupStep(
+                    7,
+                    'quote_active',
+                    'duplicate',
+                    'block order=' . $existingOrder->getIncrementId()
+                );
                 $alreadyPlacedMessage = Mage::helper('checkout')->__('This order has already been placed.');
                 self::assertExistingOrderBlocksPlacement(
                     $existingOrder,
@@ -695,9 +835,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
                 );
             }
         } else {
+            self::logDupStep(7, 'quote_active', 'pass', 'quote_id=' . (int) $quote->getId());
             self::logPlacementCheck($phase, 'quote_active', 'pass', array('quote_id' => (int) $quote->getId()));
         }
 
+        self::logDupStep(7, 'final', 'allow');
         self::logPlacementCheck($phase, 'final', 'allow');
     }
 
@@ -723,6 +865,13 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             $quote
         );
 
+        self::logDupStep(
+            7,
+            'session_ownership',
+            $belongs ? 'owned' : 'foreign',
+            'context=' . $context . ' order=' . $existingOrder->getIncrementId()
+        );
+
         self::logPlacementCheck($phase, 'session_ownership', $belongs ? 'owned' : 'foreign', array(
             'context' => $context,
             'existing_increment_id' => $existingOrder->getIncrementId(),
@@ -731,8 +880,16 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
         ));
 
         if (!$belongs) {
+            self::logDupStep(7, 'session_ownership', 'block', 'foreign_session context=' . $context);
             self::logDuplicateOrderAttempt($logId, 'assert_rejected_' . $context);
         }
+
+        self::logDupStep(
+            7,
+            $context,
+            'block',
+            $belongs ? 'duplicate_same_session' : 'duplicate_foreign_session'
+        );
 
         self::logPlacementCheck($phase, $context, 'block', array(
             'reason' => $belongs ? 'duplicate_same_session' : 'duplicate_foreign_session',
