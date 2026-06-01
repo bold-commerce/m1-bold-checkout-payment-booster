@@ -317,8 +317,7 @@
         },
         /* [vs main] New: TM Firecheckout AJAX hooks (main: no FC observers). */
         registerCheckoutObservers: function () {
-        	console.log('registerCheckoutObservers');
-		    if (window.bold.boldPaymentMethodObserversRegistered) {
+            if (window.bold.boldPaymentMethodObserversRegistered) {
                 return;
             }
 		
@@ -413,6 +412,40 @@
                 this.paymentMethodElement.style.display = 'block';
             }
         },
+        getSpiPostMessageTargetOrigin: function () {
+            if (window.bold.baseInstance && window.bold.baseInstance.epsUrl) {
+                try {
+                    return new URL(window.bold.baseInstance.epsUrl).origin;
+                } catch (e) {
+                    return '*';
+                }
+            }
+
+            return '*';
+        },
+        isTrustedSpiMessage: function (event) {
+            if (!event || !event.data || !event.data.eventType) {
+                return false;
+            }
+
+            const iframe = document.getElementById('spi_frame_payment_form_bold');
+            if (iframe && iframe.contentWindow && event.source === iframe.contentWindow) {
+                return true;
+            }
+
+            if (window.bold.baseInstance && window.bold.baseInstance.epsUrl) {
+                try {
+                    const epsOrigin = new URL(window.bold.baseInstance.epsUrl).origin;
+                    if (event.origin === epsOrigin) {
+                        return true;
+                    }
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            return false;
+        },
         tokenize: async function () {
             const iframe = document.getElementById('spi_frame_payment_form_bold');
             if (!iframe || !iframe.contentWindow) {
@@ -426,6 +459,7 @@
                 return;
             }
             const cartData = await window.bold.baseInstance.getCartData();
+            const targetOrigin = this.getSpiPostMessageTargetOrigin();
             iframe.contentWindow.postMessage({
                 actionType: 'ACTION_SPI_TOKENIZE',
                 payload: {
@@ -434,10 +468,16 @@
                     shipping_address: cartData.shipping_address || cartData.billing_address,
                     totals: cartData.totals,
                 }
-            }, '*');
+            }, targetOrigin);
         },
-        subscribeToSpiEvents() {
-            window.addEventListener('message', ({data}) => {
+        subscribeToSpiEvents: function () {
+            const self = this;
+            window.addEventListener('message', function (event) {
+                if (!self.isTrustedSpiMessage(event)) {
+                    return;
+                }
+
+                const data = event.data;
                 const eventType = data.eventType;
                 if (!eventType) {
                     return;
@@ -445,11 +485,11 @@
                 switch (eventType) {
                     case 'EVENT_SPI_TOKENIZED':
                         if (!data.payload.success) {
-                            this.paymentId = null;
+                            self.paymentId = null;
                             checkout.setLoadWaiting(false);
                             return;
                         }
-                        this.paymentId = data.payload?.payload?.data?.payment_id;
+                        self.paymentId = data.payload?.payload?.data?.payment_id;
                         if (checkout.save) {
                             checkout.save();
                         } else {
@@ -457,7 +497,7 @@
                         }
                         break;
                     case 'EVENT_SPI_TOKENIZE_FAILED':
-                        this.paymentId = null;
+                        self.paymentId = null;
                         checkout.setLoadWaiting(false);
                         break;
                     case 'EVENT_SPI_PAYMENT_ORDER_SCA':
