@@ -1,63 +1,28 @@
 <?php
 
 /**
- * Blocks duplicate Bold saveOrder requests (double-submit on standard checkout).
- *
- * Wired in etc/config.xml on predispatch/postdispatch for checkout/onepage/saveOrder.
- * Delegates to Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard.
+ * Blocks duplicate Bold saveOrder requests (Firecheckout totals reload / double-submit).
  */
 class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
 {
     /**
-     * [vs main] Predispatch: allow first placement, block in-progress, or return success for existing order.
-     *
      * @param Varien_Event_Observer $observer
      * @return void
      */
     public function predispatchSaveOrder(Varien_Event_Observer $observer)
     {
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-            1,
-            'SaveOrderObserver::predispatchSaveOrder'
-        );
-
         $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
-        $willEvaluate = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod);
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logSaveOrderPredispatch(
-            $paymentMethod,
-            $willEvaluate
-        );
-
-        if (!$willEvaluate) {
-            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-                2,
-                'predispatch skipped (payment=' . ($paymentMethod ?: 'none') . ')'
-            );
-
+        if (!Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod)) {
             return;
         }
-
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-            2,
-            'predispatch evaluating guard (payment=' . $paymentMethod . ')'
-        );
 
         $evaluation = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::evaluatePlacementRequest();
 
         if ($evaluation['action'] === 'allow') {
-            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-                4,
-                'predispatch allow'
-            );
-
             return;
         }
 
         if ($evaluation['action'] === 'success_existing' && !empty($evaluation['order'])) {
-            Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-                4,
-                'predispatch success_existing order=' . $evaluation['order']->getIncrementId()
-            );
             /** @var Mage_Core_Controller_Varien_Action $controller */
             $controller = $observer->getEvent()->getControllerAction();
             Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::respondWithExistingOrderSuccess(
@@ -68,11 +33,6 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
             return;
         }
 
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-            4,
-            'predispatch block action=' . $evaluation['action']
-        );
-
         $message = !empty($evaluation['message'])
             ? $evaluation['message']
             : Mage::helper('checkout')->__('Unable to place your order. Please try again.');
@@ -81,18 +41,11 @@ class Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver
     }
 
     /**
-     * [vs main] Postdispatch: clear session placement flag and MySQL lock after saveOrder completes or fails.
-     *
      * @param Varien_Event_Observer $observer
      * @return void
      */
     public function cleanupAfterSaveOrder(Varien_Event_Observer $observer)
     {
-        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::logStep(
-            12,
-            'SaveOrderObserver::cleanupAfterSaveOrder'
-        );
-
         $paymentMethod = Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::getPaymentMethodFromRequest();
         if (!Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::isBoldPaymentMethod($paymentMethod)) {
             return;

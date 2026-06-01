@@ -108,6 +108,38 @@
                     </bold_checkout_clear_placement_state>
                 </observers>
             </controller_action_postdispatch_checkout_onepage_saveOrder>
+            <controller_action_predispatch_firecheckout_index_saveOrder>
+                <observers>
+                    <bold_checkout_prevent_duplicate_save_order_fc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>predispatchSaveOrder</method>
+                    </bold_checkout_prevent_duplicate_save_order_fc>
+                </observers>
+            </controller_action_predispatch_firecheckout_index_saveOrder>
+            <controller_action_postdispatch_firecheckout_index_saveOrder>
+                <observers>
+                    <bold_checkout_clear_placement_state_fc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>cleanupAfterSaveOrder</method>
+                    </bold_checkout_clear_placement_state_fc>
+                </observers>
+            </controller_action_postdispatch_firecheckout_index_saveOrder>
+            <controller_action_predispatch_firecheckout_onecolumn_saveOrder>
+                <observers>
+                    <bold_checkout_prevent_duplicate_save_order_fc_oc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>predispatchSaveOrder</method>
+                    </bold_checkout_prevent_duplicate_save_order_fc_oc>
+                </observers>
+            </controller_action_predispatch_firecheckout_onecolumn_saveOrder>
+            <controller_action_postdispatch_firecheckout_onecolumn_saveOrder>
+                <observers>
+                    <bold_checkout_clear_placement_state_fc_oc>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>cleanupAfterSaveOrder</method>
+                    </bold_checkout_clear_placement_state_fc_oc>
+                </observers>
+            </controller_action_postdispatch_firecheckout_onecolumn_saveOrder>
         </events>
         <routers>
             <checkoutpaymentbooster>
@@ -193,7 +225,7 @@
             <bold>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Bold</model>
                 <active>1</active>
-                <title>Bold Payments</title>
+                <title></title>
             </bold>
             <bold_fastlane>
                 <model>Bold_CheckoutPaymentBooster_Model_Payment_Fastlane</model>

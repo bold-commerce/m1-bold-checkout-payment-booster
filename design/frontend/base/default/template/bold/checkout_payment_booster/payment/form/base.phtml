@@ -1,10 +1,28 @@
 <?php
 /**
  * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Base $this
+ *
+ * CHANGES vs main (Bold checkout + TM Firecheckout + Apple Pay / Google Pay):
+ * - walletCheckoutConfig: PHP URLs for wallet Ajax (saveOrder, billing, shipping, shipping method).
+ * - ensureBoldBaseInstance + bold:baseInstanceReady: create BoldBase before bold_method runs (fixes baseInstance race).
+ * - Payments SDK callbacks: Apple/Google wallet create/update/approve (main: PPCP-only; onUpdate was no-op).
+ * - onRequireOrderData: synchronous + cached cart (main: async await getCartData — breaks Apple Pay gesture).
+ * - Cart prefetch/cache, wallet amount/address helpers, buildOrderDataFromCartData (main: simpler onRequireOrderDataCallback).
+ * - Wallet quote sync: applyWallet* posts to Magento before place order.
+ * - postWalletSaveOrder: Form.serialize(FC form) + saveOrder (main: N/A; avoids Translator + "Invalid data" from minimal Ajax).
+ * - Firecheckout: prefetch cart on firecheckout:setResponseAfter.
+ * - createExpressOrder: uses walletCheckoutConfig URLs (main: hardcoded paths).
  */
 ?>
 
 <script type="text/javascript">
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+
+    /* [vs main] New: config for wallet checkout Ajax (Base.php getWalletCheckoutJsConfig). */
+    window.bold.walletCheckoutConfig = <?php echo json_encode($this->getWalletCheckoutJsConfig()) ?>;
+
     /**
      * Bold Payments base class.
      */
@@ -16,6 +34,9 @@
         gatewayData: null,
         buildFastlaneInstanceInProgress: false,
         buildPaymentsInstanceInProgress: false,
+        /* [vs main] New: cache + in-flight guard for Apple Pay onRequireOrderData (must not await on click). */
+        cachedCartData: null,
+        getCartDataPromise: null,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
@@ -382,32 +403,54 @@
                     }
                 ],
                 'callbacks': {
+                    /* [vs main] onCreatePaymentOrder: added Apple/Google via handleWalletCreatePaymentOrder (main: ppcp only). */
                     'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
-                        if (paymentType !== 'ppcp') {
-                            return;
-                        }
                         try {
+                            if (this.isWalletCheckoutPayment(paymentPayload)) {
+                                return await this.handleWalletCreatePaymentOrder(paymentPayload);
+                            }
+                            if (paymentType !== 'ppcp') {
+                                return;
+                            }
                             const createOrderResult = await this.createExpressOrder(paymentPayload);
                             return {payment_data: {id: createOrderResult.order_id}};
                         } catch (e) {
-                            console.error('Failed to create express order', e);
+                            console.error('Failed to create payment order', e);
                             throw e;
                         }
                     }.bind(this),
-                    'onUpdatePaymentOrder': async function () {
-                        // We won't handle updating an order from PayPal data, we will disable address changes etc
+                    /* [vs main] onUpdatePaymentOrder: was empty no-op; now syncs wallet address/shipping + order data. */
+                    'onUpdatePaymentOrder': async function (paymentType, paymentPayload) {
+                        if (this.isWalletCheckoutPayment(paymentPayload)) {
+                            return await this.handleWalletUpdatePaymentOrder(paymentPayload);
+                        }
                     }.bind(this),
-                    'onApprovePaymentOrder': async function (paymentType, paymentInformation) {
-                        // A PayPal payment has been completed, we need to capture the payment ID and pass it through
-                        if (paymentType !== 'ppcp') {
-                            return;
+                    /* [vs main] onApprovePaymentOrder: added 3rd arg paymentPayload; wallet uses placeWalletOrder (main: ppcp + payment.save only). */
+                    'onApprovePaymentOrder': async function (paymentType, paymentInformation, paymentPayload) {
+                        try {
+                            if (paymentType === 'google' || paymentType === 'apple'
+                                || this.isWalletCheckoutPayment(paymentPayload)) {
+                                await this.handleWalletApprovePaymentOrder(paymentPayload, paymentInformation);
+                                return;
+                            }
+                            if (paymentType !== 'ppcp') {
+                                return;
+                            }
+                            if (!paymentInformation.payment_id) {
+                                console.error('No payment ID provided from PayPal.');
+                                return;
+                            }
+                            if (window.bold.boldPaymentMethod) {
+                                window.bold.boldPaymentMethod.paymentId = paymentInformation.payment_id;
+                            }
+                            /* [vs main] Guard payment.save when payment object missing (FC edge cases). */
+                            if (typeof payment !== 'undefined' && payment.save) {
+                                payment.save();
+                            }
+                        } catch (e) {
+                            console.error('Failed to approve payment order', e);
+                            throw e;
                         }
-                        if (!paymentInformation.payment_id) {
-                            console.error('No payment ID provided from PayPal.');
-                            return;
-                        }
-                        window.bold.boldPaymentMethod.paymentId = paymentInformation.payment_id;
-                        payment.save();
                     }.bind(this),
                     'onScaPaymentOrder': async function (type, payload) {
                         if (type !== 'ppcp') {
@@ -435,11 +478,15 @@
                         const data = await scaResult.json();
                         return {card: data};
                     }.bind(this),
-                    'onRequireOrderData': async function (requirements) {
+                    /* [vs main] onRequireOrderData: synchronous (main: async) — required for Apple Pay user gesture. */
+                    'onRequireOrderData': function (requirements) {
                         try {
-                            return await this.onRequireOrderDataCallback(requirements);
+                            return this.onRequireOrderDataCallback(requirements);
                         } catch (e) {
-                            checkout.setLoadWaiting('billing', false);
+                            /* [vs main] Guard checkout global before setLoadWaiting. */
+                            if (typeof checkout !== 'undefined') {
+                                checkout.setLoadWaiting('billing', false);
+                            }
                             throw e;
                         }
                     }.bind(this),
@@ -481,41 +528,522 @@
         getEmailField: function () {
             return document.getElementById('billing:email');
         },
+        /* ========== [vs main] Block below: cart cache, wallet order-data builders, quote sync, FC place order ========== */
         /**
-         * Pull cart data from backend.
+         * Store cart payload for wallet callbacks (Apple Pay requires synchronous access).
+         *
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        cacheCartData: function (cartData) {
+            this.cachedCartData = cartData;
+            return cartData;
+        },
+        /**
+         * Return warmed cart data for onRequireOrderData.
+         *
+         * @return {{}|null}
+         */
+        getCachedCartData: function () {
+            return this.cachedCartData;
+        },
+        /**
+         * Prefetch cart data so wallet buttons can start without awaiting Ajax on click.
          *
          * @returns {Promise<{}>}
          */
-        getCartData: async function () {
-            return new Promise((resolve, reject) => {
+        prefetchCartData: function () {
+            return this.getCartData();
+        },
+        /**
+         * Pull cart data from backend.
+         * [vs main] Deduped in-flight requests + cacheCartData on success (main: new Promise each call, no cache).
+         *
+         * @returns {Promise<{}>}
+         */
+        getCartData: function () {
+            if (this.getCartDataPromise) {
+                return this.getCartDataPromise;
+            }
+            this.getCartDataPromise = new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
                     parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
-                    onSuccess: function (response) {
-                        resolve(JSON.parse(response.responseText));
+                    onSuccess: (response) => {
+                        try {
+                            resolve(this.cacheCartData(JSON.parse(response.responseText)));
+                        } catch (e) {
+                            reject(e);
+                        }
                     },
-                    onFailure: function () {
+                    onFailure: () => {
                         reject(new Error('Failed to get cart data'));
+                    },
+                    onComplete: () => {
+                        this.getCartDataPromise = null;
+                    }
+                });
+            });
+            return this.getCartDataPromise;
+        },
+        /**
+         * Resolve billing address for wallet customer requirements.
+         *
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        resolveBillingAddressForCustomerRequirement: function (cartData) {
+            if (typeof cartData.billingAddress === 'function') {
+                return cartData.billingAddress();
+            }
+            return cartData.billing_address || {};
+        },
+        /**
+         * Coerce wallet amounts to integer cents (Payments SDK rejects NaN/undefined).
+         *
+         * @param {*} value
+         * @return {number}
+         */
+        normalizeWalletAmountCents: function (value) {
+            const amount = Number(value);
+            if (!isFinite(amount) || isNaN(amount)) {
+                return 0;
+            }
+            return Math.round(amount);
+        },
+        /**
+         * Parse displayed currency text to cents.
+         *
+         * @param {string} text
+         * @return {number}
+         */
+        parsePriceTextToCents: function (text) {
+            if (!text) {
+                return 0;
+            }
+            const cleaned = String(text).replace(/[^\d.-]/g, '');
+            const dollars = parseFloat(cleaned);
+            if (!isFinite(dollars) || isNaN(dollars)) {
+                return 0;
+            }
+            return Math.round(dollars * 100);
+        },
+        /**
+         * Read grand total from checkout review DOM when server cart data is unavailable.
+         *
+         * @return {number}
+         */
+        readCheckoutGrandTotalCents: function () {
+            const selectors = [
+                '#checkout-review-table .grand-total .price',
+                '.checkout-review-table .grand-total .price',
+                '#review-total-table .grand-total .price',
+                '.firecheckout-summary .grand-total .price',
+                '.grand-total .price'
+            ];
+            for (let i = 0; i < selectors.length; i++) {
+                const el = document.querySelector(selectors[i]);
+                if (el) {
+                    const cents = this.parsePriceTextToCents(el.innerText || el.textContent);
+                    if (cents > 0) {
+                        return cents;
+                    }
+                }
+            }
+            return 0;
+        },
+        /**
+         * Build wallet totals in the shape expected by payments_sdk (see expresspay.js).
+         *
+         * @param {{}} totals
+         * @return {{}}
+         */
+        buildWalletTotalsFromCartData: function (totals) {
+            const orderBalanceCents = this.normalizeWalletAmountCents(totals.order_total);
+            return {
+                order_total: orderBalanceCents / 100,
+                order_balance: orderBalanceCents,
+                shipping_total: this.normalizeWalletAmountCents(totals.shipping_total),
+                discounts_total: this.normalizeWalletAmountCents(totals.discount_total),
+                fees_total: this.normalizeWalletAmountCents(totals.fee_total),
+                taxes_total: this.normalizeWalletAmountCents(totals.tax_total),
+            };
+        },
+        /**
+         * Normalize shipping options for wallet payments.
+         *
+         * @param {Array} shippingOptions
+         * @return {Array}
+         */
+        normalizeWalletShippingOptions: function (shippingOptions) {
+            return (shippingOptions || []).map(function (option) {
+                return {
+                    id: option.id || option.rate_id || '',
+                    label: option.label || '',
+                    amount: this.normalizeWalletAmountCents(option.amount),
+                    is_selected: !!option.is_selected,
+                };
+            }.bind(this));
+        },
+        /**
+         * Build order data for Payments SDK from cart payload.
+         *
+         * @param {string[]} requirements
+         * @param {{}} cartData
+         * @return {{}}
+         */
+        buildOrderDataFromCartData: function (requirements, cartData) {
+            const orderData = {};
+            for (const requirement of requirements) {
+                switch (requirement) {
+                    case 'customer': {
+                        const billingAddress = this.resolveBillingAddressForCustomerRequirement(cartData);
+                        const customer = cartData.customer || {};
+                        const email = customer.email || customer.email_address || '';
+                        orderData[requirement] = {
+                            first_name: billingAddress.first_name || billingAddress.firstname || '',
+                            last_name: billingAddress.last_name || billingAddress.lastname || '',
+                            email_address: email,
+                        };
+                        break;
+                    }
+                    case 'items':
+                        orderData[requirement] = (cartData.cart_items || []).map(function (item) {
+                            return {
+                                amount: this.normalizeWalletAmountCents(item.price),
+                                label: item.title || item.name || '',
+                            };
+                        }.bind(this));
+                        break;
+                    case 'billing_address':
+                        orderData[requirement] = cartData.billing_address;
+                        break;
+                    case 'shipping_address':
+                        orderData[requirement] = cartData.shipping_address;
+                        break;
+                    case 'shipping_options':
+                        orderData[requirement] = this.normalizeWalletShippingOptions(cartData.shipping_options);
+                        break;
+                    case 'totals':
+                        orderData[requirement] = this.buildWalletTotalsFromCartData(cartData.totals || {});
+                        break;
+                }
+            }
+            return orderData;
+        },
+        /* [vs main] New: detect Apple Pay / Google Pay checkout (not express-pay page). */
+        isWalletCheckoutPayment: function (paymentPayload) {
+            const walletType = paymentPayload
+                && paymentPayload.payment_data
+                && paymentPayload.payment_data.payment_type;
+            return walletType === 'apple' || walletType === 'google';
+        },
+        cloneWalletPayload: function (paymentPayload) {
+            try {
+                return JSON.parse(JSON.stringify(paymentPayload));
+            } catch (e) {
+                return paymentPayload;
+            }
+        },
+        /**
+         * Remember EPS order id across wallet callbacks (Google Pay approve often omits order_id).
+         *
+         * @param {string} orderId
+         * @return {void}
+         */
+        cacheWalletOrderId: function (orderId) {
+            if (orderId) {
+                window.bold.lastWalletEpsOrderId = String(orderId);
+            }
+        },
+        /**
+         * Resolve Bold/EPS order id from approve/create/update payloads (id vs order_id vs paymentInformation).
+         *
+         * @param {Object} paymentPayload
+         * @param {Object} paymentInformation
+         * @return {string|null}
+         */
+        resolveWalletOrderId: function (paymentPayload, paymentInformation) {
+            const data = paymentPayload && paymentPayload.payment_data ? paymentPayload.payment_data : {};
+            if (data.order_id) {
+                return String(data.order_id);
+            }
+            if (data.id) {
+                return String(data.id);
+            }
+            if (paymentInformation) {
+                if (paymentInformation.order_id) {
+                    return String(paymentInformation.order_id);
+                }
+                if (paymentInformation.payment_id) {
+                    return String(paymentInformation.payment_id);
+                }
+            }
+            if (window.bold.lastWalletEpsOrderId) {
+                return window.bold.lastWalletEpsOrderId;
+            }
+            return null;
+        },
+        normalizeWalletAddressFields: function (addressData) {
+            if (!addressData) {
+                return null;
+            }
+            const street = [];
+            if (addressData.addressLines && addressData.addressLines.length) {
+                street.push(addressData.addressLines[0]);
+                if (addressData.addressLines[1]) {
+                    street.push(addressData.addressLines[1]);
+                }
+            } else {
+                street.push(
+                    addressData.address_line_1 || addressData.address_line1 || addressData.address1 || ''
+                );
+                const line2 = addressData.address_line_2 || addressData.address_line2 || addressData.address2;
+                if (line2) {
+                    street.push(line2);
+                }
+            }
+            return {
+                email: addressData.email || addressData.emailAddress || '',
+                firstname: addressData.first_name || addressData.givenName || 'Unknown',
+                lastname: addressData.last_name || addressData.familyName || 'Person',
+                street: street,
+                city: addressData.city || addressData.locality || '',
+                postcode: addressData.postal_code || addressData.postalCode || '',
+                country_id: addressData.country_code || addressData.countryCode || 'US',
+                telephone: addressData.phone || addressData.phoneNumber || '5555551234',
+                region: addressData.state || addressData.administrativeArea || '',
+            };
+        },
+        /* [vs main] New: shared Ajax helper for wallet billing/shipping/method saves. */
+        postWalletForm: function (url, parameters) {
+            return new Promise(function (resolve, reject) {
+                new Ajax.Request(url, {
+                    method: 'post',
+                    parameters: parameters,
+                    onSuccess: function (transport) {
+                        try {
+                            resolve(transport.responseText.evalJSON());
+                        } catch (e) {
+                            resolve({});
+                        }
+                    },
+                    onFailure: function (transport) {
+                        reject(new Error('Request failed: ' + url));
                     }
                 });
             });
         },
+        /* [vs main] New: Firecheckout place order without checkout.save() (avoids missing Translator on wallet approve). */
+        getCheckoutPlaceOrderForm: function () {
+            const selectors = [
+                '#firecheckout-form',
+                'form#checkout-form',
+                'form[name="firecheckout"]',
+                'form[action*="firecheckout"]',
+            ];
+            let i;
+            for (i = 0; i < selectors.length; i++) {
+                const match = document.querySelector(selectors[i]);
+                if (match && match.tagName === 'FORM') {
+                    return match;
+                }
+            }
+            const paymentSection = document.getElementById('co-payment-form');
+            if (paymentSection) {
+                if (paymentSection.tagName === 'FORM') {
+                    return paymentSection;
+                }
+                if (paymentSection.closest) {
+                    const parentForm = paymentSection.closest('form');
+                    if (parentForm) {
+                        return parentForm;
+                    }
+                }
+            }
+            const boldPaymentForm = document.getElementById('payment_form_bold');
+            if (boldPaymentForm && boldPaymentForm.closest) {
+                return boldPaymentForm.closest('form');
+            }
+            return null;
+        },
+        handleWalletSaveOrderResult: function (result) {
+            const cfg = window.bold.walletCheckoutConfig;
+            if (!result) {
+                return;
+            }
+            if (result.error_messages) {
+                const message = Array.isArray(result.error_messages)
+                    ? result.error_messages.join('\n')
+                    : result.error_messages;
+                throw new Error(message);
+            }
+            if (result.error && result.message) {
+                throw new Error(result.message);
+            }
+            if (result.redirect) {
+                window.location.href = result.redirect;
+                return;
+            }
+            if (result.success) {
+                window.location.href = cfg.successUrl;
+                return;
+            }
+            if (result.goto_section && typeof checkout !== 'undefined' && checkout.gotoSection) {
+                checkout.gotoSection(result.goto_section, result.redirect);
+                throw new Error(
+                    result.message || 'Please complete all required checkout fields before placing your order.'
+                );
+            }
+        },
+        postWalletSaveOrder: async function (orderId) {
+            const cfg = window.bold.walletCheckoutConfig;
+            const form = this.getCheckoutPlaceOrderForm();
+            let parameters = 'form_key=' + encodeURIComponent(cfg.formKey);
+            if (form && typeof Form !== 'undefined' && Form.serialize) {
+                parameters = Form.serialize(form);
+                if (!/[&?]form_key=/.test(parameters)) {
+                    parameters += '&form_key=' + encodeURIComponent(cfg.formKey);
+                }
+            }
+            parameters += '&payment[method]=bold';
+            parameters += '&payment[additional_data][order_id]=' + encodeURIComponent(orderId);
+            const result = await new Promise(function (resolve, reject) {
+                new Ajax.Request(cfg.saveOrderUrl, {
+                    method: 'post',
+                    postBody: parameters,
+                    contentType: 'application/x-www-form-urlencoded',
+                    onSuccess: function (transport) {
+                        try {
+                            resolve(transport.responseText.evalJSON());
+                        } catch (e) {
+                            resolve({});
+                        }
+                    },
+                    onFailure: function () {
+                        reject(new Error('Request failed: ' + cfg.saveOrderUrl));
+                    }
+                });
+            });
+            this.handleWalletSaveOrderResult(result);
+        },
+        applyWalletAddressToQuote: async function (addressType, addressData) {
+            const normalized = this.normalizeWalletAddressFields(addressData);
+            if (!normalized) {
+                return;
+            }
+            const cfg = window.bold.walletCheckoutConfig;
+            const params = {
+                form_key: cfg.formKey,
+                source: 'bold_wallet_checkout'
+            };
+            const prefix = addressType + '[';
+            params[prefix + 'firstname]'] = normalized.firstname;
+            params[prefix + 'lastname]'] = normalized.lastname;
+            params[prefix + 'street][]'] = normalized.street[0] || '';
+            if (normalized.street[1]) {
+                params[prefix + 'street][]'] = normalized.street[1];
+            }
+            params[prefix + 'city]'] = normalized.city;
+            params[prefix + 'postcode]'] = normalized.postcode;
+            params[prefix + 'country_id]'] = normalized.country_id;
+            params[prefix + 'telephone]'] = normalized.telephone;
+            params[prefix + 'region]'] = normalized.region;
+            if (normalized.email) {
+                params[prefix + 'email]'] = normalized.email;
+            }
+            const url = addressType === 'shipping' ? cfg.saveShippingUrl : cfg.saveBillingUrl;
+            await this.postWalletForm(url, params);
+        },
+        applyWalletAddressesFromPayload: async function (paymentPayload) {
+            const data = paymentPayload.payment_data || {};
+            if (!window.bold.walletCheckoutConfig.quoteIsVirtual && data.shipping_address) {
+                await this.applyWalletAddressToQuote('shipping', data.shipping_address);
+            }
+            if (data.billing_address) {
+                await this.applyWalletAddressToQuote('billing', data.billing_address);
+            }
+        },
+        applyWalletShippingFromPayload: async function (paymentPayload) {
+            const cfg = window.bold.walletCheckoutConfig;
+            if (cfg.quoteIsVirtual) {
+                return;
+            }
+            const shippingOptions = paymentPayload.payment_data && paymentPayload.payment_data.shipping_options;
+            if (!shippingOptions) {
+                return;
+            }
+            const optionId = shippingOptions.id || shippingOptions.identifier;
+            if (!optionId || optionId === 'shipping_option_unselected') {
+                return;
+            }
+            await this.postWalletForm(cfg.saveShippingMethodUrl, {
+                form_key: cfg.formKey,
+                shipping_method: optionId
+            });
+        },
+        /* [vs main] New: wallet onCreate — sync addresses then createExpressOrder. */
+        handleWalletCreatePaymentOrder: async function (paymentPayload) {
+            const payload = this.cloneWalletPayload(paymentPayload);
+            await this.applyWalletAddressesFromPayload(payload);
+            const createOrderResult = await this.createExpressOrder(payload);
+            const orderId = createOrderResult.order_id;
+            this.cacheWalletOrderId(orderId);
+            return {payment_data: {id: orderId, order_id: orderId}};
+        },
+        handleWalletUpdatePaymentOrder: async function (paymentPayload) {
+            const payload = this.cloneWalletPayload(paymentPayload);
+            if (payload.payment_data) {
+                this.cacheWalletOrderId(payload.payment_data.order_id || payload.payment_data.id);
+            }
+            if (!window.bold.walletCheckoutConfig.quoteIsVirtual) {
+                if (payload.payment_data && payload.payment_data.shipping_address) {
+                    await this.applyWalletAddressToQuote('shipping', payload.payment_data.shipping_address);
+                }
+                await this.applyWalletShippingFromPayload(payload);
+            }
+            if (payload.payment_data && payload.payment_data.billing_address) {
+                await this.applyWalletAddressToQuote('billing', payload.payment_data.billing_address);
+            }
+            await this.prefetchCartData();
+            if (payload.require_order_data) {
+                return this.onRequireOrderDataCallback(payload.require_order_data);
+            }
+        },
+        /* [vs main] New: wallet onApprove — sync quote then bold_method.placeWalletOrder → postWalletSaveOrder. */
+        handleWalletApprovePaymentOrder: async function (paymentPayload, paymentInformation) {
+            const orderId = this.resolveWalletOrderId(paymentPayload, paymentInformation);
+            if (!orderId) {
+                throw new Error('Wallet order id is missing');
+            }
+            this.cacheWalletOrderId(orderId);
+            await this.applyWalletAddressesFromPayload(paymentPayload);
+            await this.applyWalletShippingFromPayload(paymentPayload);
+            const method = window.bold.boldPaymentMethod;
+            if (!method) {
+                throw new Error('Bold payment method is not initialized');
+            }
+            method.paymentId = orderId;
+            await method.placeWalletOrder();
+        },
         /**
          * Call backend to create express order.
+         * [vs main] Uses walletCheckoutConfig URLs (main: hardcoded /checkoutpaymentbooster/expresspay/createOrder).
          *
          * @param paymentPayload
          * @return {Promise<unknown>}
          */
         createExpressOrder: async function (paymentPayload) {
+            const cfg = window.bold.walletCheckoutConfig;
             return new Promise((resolve, reject) => {
-                new Ajax.Request('/checkoutpaymentbooster/expresspay/createOrder', {
+                new Ajax.Request(cfg.createOrderUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     parameters: {
-                        form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>',
-                        quote_id: '<?php echo $this->getQuoteId(); ?>',
+                        form_key: cfg.formKey,
+                        quote_id: cfg.quoteId,
                         gateway_id: paymentPayload.gateway_id,
                         shipping_strategy: paymentPayload.shipping_strategy || 'dynamic'
                     },
@@ -529,61 +1057,100 @@
             });
         },
         /**
-         * Handle order data requirements.
+         * Handle order data requirements synchronously from prefetched cart data.
+         * [vs main] Replaces async onRequireOrderDataCallback that always awaited getCartData().
          *
-         * @param requirements
-         * @return {Promise<{}>}
+         * Apple Pay requires ApplePaySession to be created in the same user gesture.
+         * Awaiting getCartData() here breaks that constraint.
+         *
+         * @param {string[]} requirements
+         * @return {{}}
          */
-        onRequireOrderDataCallback: async function (requirements) {
-            const orderData = {};
-            const cartData = await this.getCartData();
-            for (const requirement of requirements) {
-                switch (requirement) {
-                    case 'customer':
-                        let billingAddress = cartData.billingAddress();
-                        const email = cartData.customer.email;
-
-                        orderData[requirement] = {
-                            first_name: billingAddress.firstname,
-                            last_name: billingAddress.lastname,
-                            email_address: email,
-                        };
-                        break;
-                    case 'items':
-                        orderData[requirement] = cartData.cart_items.map(item => ({
-                            amount: item.price,
-                            label: item.title
-                        }));
-                        break;
-                    case 'billing_address':
-                        orderData[requirement] = cartData.billing_address;
-                        break;
-                    case 'shipping_address':
-                        orderData[requirement] = cartData.shipping_address;
-                        break;
-                    case 'shipping_options':
-                        orderData[requirement] = cartData.shipping_options;
-                        break;
-                    case 'totals':
-                        const totals = cartData.totals;
-                        orderData[requirement] = {
-                            order_total: totals.order_total,
-                            shipping_total: totals.shipping_total,
-                            discounts_total: totals.discount_total,
-                            fees_total: totals.fee_total || 0,
-                            taxes_total: totals.tax_total,
-                        };
-                        break;
-                }
+        onRequireOrderDataCallback: function (requirements) {
+            let cartData = this.getCachedCartData();
+            if (!cartData) {
+                this.prefetchCartData();
+                cartData = this.buildMinimalCartDataFallback();
             }
-            return orderData;
+            if (!cartData.cart_items || !cartData.cart_items.length) {
+                const totals = cartData.totals || {};
+                const amount = this.normalizeWalletAmountCents(totals.order_total) || this.readCheckoutGrandTotalCents();
+                cartData.cart_items = [{price: amount, title: 'Order'}];
+            }
+            try {
+                return this.buildOrderDataFromCartData(requirements, cartData);
+            } catch (e) {
+                console.error('[Bold] onRequireOrderData failed', e);
+                return this.buildOrderDataFromCartData(requirements, this.buildMinimalCartDataFallback());
+            }
+        },
+        /**
+         * Minimal cart snapshot when cache is cold (avoids breaking wallet button render).
+         *
+         * @return {{}}
+         */
+        buildMinimalCartDataFallback: function () {
+            const emailEl = document.getElementById('billing:email');
+            const firstEl = document.getElementById('billing:firstname');
+            const lastEl = document.getElementById('billing:lastname');
+            const orderTotalCents = this.readCheckoutGrandTotalCents();
+            return {
+                customer: {
+                    email_address: emailEl ? emailEl.value : '',
+                    first_name: firstEl ? firstEl.value : '',
+                    last_name: lastEl ? lastEl.value : '',
+                },
+                billing_address: {},
+                cart_items: [],
+                totals: {
+                    order_total: orderTotalCents,
+                    shipping_total: 0,
+                    discount_total: 0,
+                    tax_total: 0,
+                    fee_total: 0,
+                },
+                shipping_options: [],
+            };
         },
 
     });
-    document.observe('dom:loaded', function () {
+
+    /* [vs main] New: eager BoldBase + event (main: only window.bold.baseInstance = new BoldBase() on dom:loaded). */
+    window.bold.ensureBoldBaseInstance = function () {
         if (typeof window.bold === 'undefined') {
             window.bold = {};
         }
-        window.bold.baseInstance = new BoldBase();
+        const created = !window.bold.baseInstance;
+        if (!window.bold.baseInstance) {
+            window.bold.baseInstance = new BoldBase();
+        }
+        if (created && window.bold.baseInstance
+            && typeof window.bold.baseInstance.getBoldPaymentsInstance === 'function') {
+            document.fire('bold:baseInstanceReady');
+        }
+        return window.bold.baseInstance;
+    };
+
+    window.bold.ensureBoldBaseInstance();
+
+    document.observe('dom:loaded', function () {
+        window.bold.ensureBoldBaseInstance();
+        /* [vs main] New: warm cart cache for wallet buttons on page load. */
+        if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+            window.bold.baseInstance.prefetchCartData().catch(function (e) {
+                console.warn('[Bold] Initial cart data prefetch failed', e);
+            });
+        }
+        /* [vs main] New: re-prefetch after Firecheckout AJAX (shipping/qty/payment-method reload). */
+        if (!window.bold.firecheckoutCartPrefetchRegistered) {
+            window.bold.firecheckoutCartPrefetchRegistered = true;
+            document.observe('firecheckout:setResponseAfter', function () {
+                if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+                    window.bold.baseInstance.prefetchCartData().catch(function (e) {
+                        console.warn('[Bold] Firecheckout cart data prefetch failed', e);
+                    });
+                }
+            });
+        }
     });
 </script>

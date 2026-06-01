@@ -108,7 +108,7 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Fastlane extends Mage_Payment_Mo
         }
 
         $infoInstance = $this->getInfoInstance();
-        $cardDetails = $infoInstance->getAdditionalInformation('card_details');
+        $cardDetails  = $infoInstance->getAdditionalInformation('card_details');
 
         if ($cardDetails) {
             $cardDetails = @unserialize($cardDetails);

@@ -90,29 +90,21 @@ class Bold_CheckoutPaymentBooster_Model_Payment_Bold extends Mage_Payment_Model_
             return $this->getConfigData('title');
         }
 
-        try {
-            $infoInstance = $this->getInfoInstance();
+        $infoInstance = $this->getInfoInstance();
+        $cardDetails  = $infoInstance->getAdditionalInformation('card_details');
 
-            if ($infoInstance && $infoInstance->getAdditionalInformation('title')) {
-                return $infoInstance->getAdditionalInformation('title');
-            }
+        if ($cardDetails) {
+            $cardDetails = @unserialize($cardDetails);
 
-            $cardDetails = $infoInstance->getAdditionalInformation('card_details');
-            if ($cardDetails) {
-                $cardDetails = @unserialize($cardDetails);
+            if (is_array($cardDetails)) {
+                if (isset($cardDetails['brand'], $cardDetails['last_four'])) {
+                    return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
+                }
 
-                if (is_array($cardDetails)) {
-                    if (isset($cardDetails['brand'], $cardDetails['last_four'])) {
-                        return ucfirst($cardDetails['brand']) . ': ending in ' . $cardDetails['last_four'];
-                    }
-
-                    if (isset($cardDetails['account'], $cardDetails['email'])) {
-                        return 'PayPal: ' . $cardDetails['email'];
-                    }
+                if (isset($cardDetails['account'], $cardDetails['email'])) {
+                    return 'PayPal: ' . $cardDetails['email'];
                 }
             }
-        } catch (Exception $e) {
-            // No payment info instance in admin config / source model contexts
         }
 
         return $this->getConfigData('title');
