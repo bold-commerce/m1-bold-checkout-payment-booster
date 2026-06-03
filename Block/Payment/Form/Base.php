@@ -249,6 +249,26 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
             'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', array('_secure' => true)),
             'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', array('_secure' => true)),
             'successUrl' => $this->getUrl('checkout/onepage/success', array('_secure' => true)),
+            'getCheckoutSessionUrl' => $this->getUrl(
+                'checkoutpaymentbooster/index/getCheckoutSession',
+                array('_secure' => true)
+            ),
+        );
+    }
+
+    /**
+     * Current Bold checkout session for client sync (public order id + tokens).
+     *
+     * @return array
+     */
+    public function getCheckoutSessionPayload()
+    {
+        return array(
+            'public_order_id' => $this->getPublicOrderID(),
+            'jwt_token' => $this->getJwtToken(),
+            'eps_auth_token' => $this->getEpsAuthToken(),
+            'bold_api_url' => $this->getBoldApiUrl(),
+            'eps_gateway_id' => $this->getEpsGatewayId(),
         );
     }
 }

@@ -145,6 +145,18 @@ class Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership
     }
 
     /**
+     * Clear wallet EPS order id when Bold public order rotates.
+     *
+     * @return void
+     */
+    public static function clearWalletEpsOrderId()
+    {
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $session->unsetData(self::SESSION_WALLET_EPS_ORDER_ID);
+    }
+
+    /**
      * @param string $epsOrderId
      * @return void
      * @throws Mage_Core_Exception

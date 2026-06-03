@@ -58,6 +58,7 @@ class Bold_CheckoutPaymentBooster_Observer_CheckoutObserver
 
         $websiteId = $quote->getStore()->getWebsiteId();
         try {
+            Bold_CheckoutPaymentBooster_Service_Bold::initBoldCheckoutData($quote);
             Bold_CheckoutPaymentBooster_Service_Order_Hydrate::hydrate($quote);
             $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
             $transactionData = Bold_CheckoutPaymentBooster_Service_Payment_Auth::full($publicOrderId, $websiteId);

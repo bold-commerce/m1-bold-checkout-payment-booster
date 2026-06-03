@@ -354,24 +354,26 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             return null;
         }
 
+        $serializedValue = 's:' . strlen($epsOrderId) . ':"' . $epsOrderId . '"';
+
         /** @var Mage_Sales_Model_Resource_Order_Payment_Collection $collection */
         $collection = Mage::getModel('sales/order_payment')->getCollection();
         $collection->addFieldToFilter('method', array('in' => self::getBoldPaymentMethodCodes()));
-        $collection->addFieldToFilter(
-            'additional_information',
-            array('like' => '%' . self::PAYMENT_ADDITIONAL_EPS_ORDER_ID . '%')
-        );
-        $collection->setPageSize(50);
+        $collection->addFieldToFilter('additional_information', array('like' => '%' . $serializedValue . '%'));
+        $collection->setPageSize(1);
 
-        foreach ($collection as $payment) {
-            if ($payment->getAdditionalInformation(self::PAYMENT_ADDITIONAL_EPS_ORDER_ID) === $epsOrderId) {
-                $order = Mage::getModel('sales/order')->load($payment->getParentId());
-
-                return $order->getId() ? $order : null;
-            }
+        $payment = $collection->getFirstItem();
+        if (!$payment->getId()) {
+            return null;
         }
 
-        return null;
+        if ($payment->getAdditionalInformation(self::PAYMENT_ADDITIONAL_EPS_ORDER_ID) !== $epsOrderId) {
+            return null;
+        }
+
+        $order = Mage::getModel('sales/order')->load($payment->getParentId());
+
+        return $order->getId() ? $order : null;
     }
 
     /**
@@ -458,6 +460,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
             return array(
                 'action' => 'block',
                 'message' => Mage::helper('checkout')->__('Your shopping cart could not be found.'),
+            );
+        }
+
+        if ($epsOrderId) {
+            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::assertWalletEpsOrderIdBelongsToSession(
+                $epsOrderId
             );
         }
 
@@ -748,6 +756,12 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
         $session = Mage::getSingleton('checkout/session');
         $publicOrderId = Bold_CheckoutPaymentBooster_Service_Bold::getPublicOrderId();
         $epsOrderId = self::getEpsOrderIdFromRequest();
+
+        if ($epsOrderId) {
+            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::assertWalletEpsOrderIdBelongsToSession(
+                $epsOrderId
+            );
+        }
 
         self::logPlacementCheck(
             $phase,
