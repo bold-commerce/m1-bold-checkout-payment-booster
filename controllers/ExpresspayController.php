@@ -65,6 +65,17 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
+        $recentWalletOrderId = Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::getRecentWalletEpsOrderId(
+            (int) $quote->getId()
+        );
+        if ($recentWalletOrderId !== '') {
+            $this->getResponse()
+                ->setHeader('Content-Type', 'application/json')
+                ->setBody(json_encode(['order_id' => $recentWalletOrderId]));
+
+            return;
+        }
+
         $websiteId = $quote->getStore()->getWebsiteId();
         $uri = '/checkout/orders/{{shopId}}/wallet_pay';
         $quoteConverter = new Bold_CheckoutPaymentBooster_Service_ExpressPay_QuoteConverter();
@@ -109,6 +120,11 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
 
             return;
         }
+
+        Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::rememberWalletEpsOrderCreate(
+            (int) $quote->getId(),
+            (string) $result->data->order_id
+        );
 
         $this->getResponse()
             ->setHeader('Content-Type', 'application/json')
