@@ -3,46 +3,121 @@
  * Bold Payments PIGI iframe template.
  *
  * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Bold $this
+ *
+ * CHANGES vs main (Firecheckout + SPI + Apple Pay / Google Pay):
+ * - Markup: visible #payment_form_bold + top-level #smart-ppcp-buttons (main: empty hidden div only).
+ * - whenBoldBaseReady / ensureBoldPaymentMethod: wait for base.phtml BoldBase (main: poll baseInstance only).
+ * - Lazy DOM refs (refreshDomReferences): survive FC payment-method AJAX reload (main: static getElementById at load).
+ * - renderWalletPayments on #smart-ppcp-buttons + SPI render guards (main: renderPayments only, no wallets).
+ * - Firecheckout observers: setResponseAfter, paymentMethod:afterInitAfter (main: none).
+ * - placeWalletOrder / syncPaymentIdToForm: wallet approve → postWalletSaveOrder (main: N/A).
+ * - wrapCheckoutSave / wrapPaymentSave + SPI tokenize unchanged from main intent.
  */
 ?>
-<div id='payment_form_bold' style="display: none"></div>
+<!-- [vs main] Wallet host outside SPI #paypalPanel; paired with checkout-payment.css to hide duplicate PayPal -->
+<div id="payment_form_bold">
+    <div id="smart-ppcp-buttons" class="bold-checkout-wallet-buttons"></div>
+</div>
 
 <script type="text/javascript">
-    /**
-     * Bold order data sync class.
-     */
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+
+    /* [vs main] New: callback when base.phtml fires bold:baseInstanceReady. */
+    window.bold.whenBoldBaseReady = function (callback) {
+        const isReady = function () {
+            if (typeof window.bold.ensureBoldBaseInstance === 'function') {
+                window.bold.ensureBoldBaseInstance();
+            }
+            return window.bold.baseInstance
+                && typeof window.bold.baseInstance.getBoldPaymentsInstance === 'function';
+        };
+        if (isReady()) {
+            callback();
+            return;
+        }
+        const onReady = function () {
+            document.stopObserving('bold:baseInstanceReady', onReady);
+            if (isReady()) {
+                callback();
+            }
+        };
+        document.observe('bold:baseInstanceReady', onReady);
+        let attempts = 0;
+        const intervalId = setInterval(function () {
+            attempts += 1;
+            if (isReady()) {
+                clearInterval(intervalId);
+                document.stopObserving('bold:baseInstanceReady', onReady);
+                callback();
+            } else if (attempts >= 200) {
+                clearInterval(intervalId);
+                document.stopObserving('bold:baseInstanceReady', onReady);
+                console.error(
+                    '[Bold] BoldBase never became ready. Is bold.payments.base (base.phtml) on this page?'
+                );
+            }
+        }, 50);
+    };
+
     let BoldPaymentMethod = Class.create({
-        paymentMethodElement: document.getElementById('p_method_bold').parentNode,
-        paymentContainer: document.getElementById('bold-payments-container'),
-        paymentCheckbox: document.getElementById('p_method_bold'),
+        /* [vs main] null until refreshDomReferences — FC replaces payment-method HTML. */
+        paymentMethodElement: null,
+        paymentCheckbox: null,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         isFastlaneAvailable: <?php echo $this->isFastlaneAvailable(); ?>,
         paymentId: null,
-        /**
-         * Initialize class.
-         *
-         * @returns {*|boolean}
-         */
+        /* [vs main] New: avoid duplicate renderWalletPayments after FC AJAX. */
+        walletButtonsRendered: false,
         initialize: async function () {
+            this.refreshDomReferences();
             if (!this.isAvailable) {
                 this.hidePaymentMethod();
                 return;
             }
             await this.waitForBaseInstance();
-            await this.renderPaymentForm();
+            if (this.hasValidBaseInstance()) {
+                await this.renderPaymentForm();
+            } else {
+                const self = this;
+                window.bold.whenBoldBaseReady(function () {
+                    self.renderPaymentForm();
+                });
+            }
             this.subscribeToSpiEvents();
             this.waitForPaymentInitialization();
             this.waitForCheckoutInitialization();
+            /* [vs main] New: re-bind after FC partial reloads. */
+            this.registerCheckoutObservers();
         },
-        /**
-         * Wait for base instance to be initialized.
-         *
-         * @return {Promise<unknown>}
-         */
+        /* [vs main] New: re-query #p_method_bold after firecheckout:setResponseAfter payment-method. */
+        refreshDomReferences: function () {
+            const checkbox = document.getElementById('p_method_bold');
+            this.paymentCheckbox = checkbox;
+            this.paymentMethodElement = checkbox ? checkbox.parentNode : null;
+        },
+        /* [vs main] New: stricter than typeof baseInstance !== 'undefined'. */
+        hasValidBaseInstance: function () {
+            return !!(window.bold
+                && window.bold.baseInstance
+                && typeof window.bold.baseInstance.getBoldPaymentsInstance === 'function');
+        },
         waitForBaseInstance: function () {
             return new Promise((resolve) => {
+                /* [vs main] New: call ensureBoldBaseInstance from base.phtml. */
+                if (typeof window.bold.ensureBoldBaseInstance === 'function') {
+                    window.bold.ensureBoldBaseInstance();
+                }
+                if (this.hasValidBaseInstance()) {
+                    resolve();
+                    return;
+                }
                 const intervalId = setInterval(() => {
-                    if (typeof window.bold.baseInstance !== 'undefined') {
+                    if (typeof window.bold.ensureBoldBaseInstance === 'function') {
+                        window.bold.ensureBoldBaseInstance();
+                    }
+                    if (this.hasValidBaseInstance()) {
                         clearInterval(intervalId);
                         resolve();
                     }
@@ -53,33 +128,230 @@
                 }, 10000);
             });
         },
-        /**
-         * Render payment form considering Fastlane.
-         *
-         * @returns {void}
-         */
-        renderPaymentForm: async function () {
-            const boldPaymentsForm = document.getElementById('payment_form_bold');
-            if (this.isFastlaneAvailable) {
-                if (boldPaymentsForm.innerHTML.trim() === '') {
-                    this.hidePaymentMethod();
+        /* [vs main] New: host for renderWalletPayments (Apple Pay / Google Pay). */
+        getWalletButtonsHost: function () {
+            const form = document.getElementById('payment_form_bold');
+            if (form && form.children) {
+                for (let i = 0; i < form.children.length; i++) {
+                    const child = form.children[i];
+                    if (child.id === 'smart-ppcp-buttons'
+                        || (child.className && child.className.indexOf('bold-checkout-wallet-buttons') !== -1)) {
+                        return child;
+                    }
                 }
+            }
+            return document.getElementById('smart-ppcp-buttons');
+        },
+        showPaymentForm: function () {
+            const form = document.getElementById('payment_form_bold');
+            if (form) {
+                form.style.display = 'block';
+            }
+        },
+        /* [vs main] New: hidden payment[additional_data][order_id] on checkout form for saveOrder POST. */
+        syncPaymentIdToForm: function (orderId) {
+            const container = document.getElementById('payment_form_bold');
+            if (!container || !orderId) {
                 return;
             }
-            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
-            await paymentInstance.renderPayments(
-                'payment_form_bold',
-                {
-                    fastlane: !!this.isFastlaneAvailable,
-                    shouldRenderSpiFrame: !this.isFastlaneAvailable
-                }
-            );
+            const hostForm = container.closest('form') || container;
+            let input = document.getElementById('bold_wallet_payment_order_id');
+            if (!input) {
+                input = document.createElement('input');
+                input.type = 'hidden';
+                input.id = 'bold_wallet_payment_order_id';
+                input.name = 'payment[additional_data][order_id]';
+                hostForm.appendChild(input);
+            } else if (input.parentNode !== hostForm) {
+                hostForm.appendChild(input);
+            }
+            input.value = orderId;
         },
-        /**
-         * Wait for checkout to initialize.
-         *
-         * @returns {void}
-         */
+        selectBoldPaymentMethod: function () {
+            if (typeof payment !== 'undefined' && payment.switchMethod) {
+                payment.switchMethod('bold');
+                return;
+            }
+            this.refreshDomReferences();
+            if (this.paymentCheckbox) {
+                this.paymentCheckbox.checked = true;
+            }
+        },
+        /* [vs main] New: wallet approve — serialize FC form via base.postWalletSaveOrder (not checkout.save). */
+        placeWalletOrder: async function () {
+            if (!this.paymentId) {
+                throw new Error('Wallet payment id is missing');
+            }
+            this.syncPaymentIdToForm(this.paymentId);
+            this.selectBoldPaymentMethod();
+            if (window.bold.baseInstance && typeof window.bold.baseInstance.postWalletSaveOrder === 'function') {
+                return window.bold.baseInstance.postWalletSaveOrder(this.paymentId);
+            }
+            if (typeof payment !== 'undefined' && payment.save) {
+                payment.save();
+                return;
+            }
+            /* [vs main] Fallback only when Translator exists (FC checkout.save throws without it). */
+            if (typeof checkout !== 'undefined' && checkout.save && typeof Translator !== 'undefined') {
+                checkout.save();
+                return;
+            }
+            throw new Error('Checkout is not ready to place order');
+        },
+        /* [vs main] New: renderWalletPayments (main had no wallet buttons on checkout). */
+        renderWalletButtons: async function (paymentInstance) {
+            if (!paymentInstance || typeof paymentInstance.renderWalletPayments !== 'function') {
+                return false;
+            }
+            const host = this.getWalletButtonsHost();
+            if (!host) {
+                console.warn('[Bold] #smart-ppcp-buttons host not found');
+                return false;
+            }
+            if (this.walletButtonsRendered && host.children.length > 0) {
+                this.showPaymentForm();
+                this.showPaymentMethod();
+                return true;
+            }
+            const shopName = window.bold.baseInstance && window.bold.baseInstance.groupLabel
+                ? window.bold.baseInstance.groupLabel
+                : '';
+            try {
+                host.innerHTML = '';
+                await paymentInstance.renderWalletPayments(host.id, {
+                    allowedCountries: ['US', 'CA'],
+                    fastlane: !!this.isFastlaneAvailable,
+                    isPhoneRequired: true,
+                    pageSource: 'checkout',
+                    shopName: shopName,
+                });
+                this.walletButtonsRendered = true;
+                this.showPaymentForm();
+                this.showPaymentMethod();
+                return true;
+            } catch (e) {
+                console.error('[Bold] Failed to render wallet buttons', e);
+                return false;
+            }
+        },
+        refreshWalletButtons: async function () {
+            if (!this.isAvailable || !this.hasValidBaseInstance()) {
+                return;
+            }
+            this.refreshDomReferences();
+            await this.waitForBaseInstance();
+            if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+                try {
+                    await window.bold.baseInstance.prefetchCartData();
+                } catch (e) {
+                    console.warn('[Bold] Could not refresh cart data for wallets', e);
+                }
+            }
+            this.walletButtonsRendered = false;
+            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+            await this.renderWalletButtons(paymentInstance);
+        },
+        isSpiFrameLoaded: function () {
+            const form = document.getElementById('payment_form_bold');
+            if (!form) {
+                return !!document.getElementById('spi_frame_payment_form_bold');
+            }
+            return !!form.querySelector('#spi_frame_payment_form_bold');
+        },
+        needsPaymentUiRender: function () {
+            const form = document.getElementById('payment_form_bold');
+            if (!form) {
+                return false;
+            }
+            const host = this.getWalletButtonsHost();
+            if (host && host.children.length === 0) {
+                return true;
+            }
+            if (!this.isFastlaneAvailable && !this.isSpiFrameLoaded()) {
+                return true;
+            }
+            return false;
+        },
+        /* [vs main] SPI + wallet render with needsPaymentUiRender / isSpiFrameLoaded guards (main: always renderPayments). */
+        renderPaymentForm: async function () {
+            if (!this.hasValidBaseInstance()) {
+                return;
+            }
+            if (!this.needsPaymentUiRender()) {
+                this.showPaymentForm();
+                this.showPaymentMethod();
+                return;
+            }
+            const boldPaymentsForm = document.getElementById('payment_form_bold');
+            if (!boldPaymentsForm) {
+                return;
+            }
+            if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
+                try {
+                    await window.bold.baseInstance.prefetchCartData();
+                } catch (e) {
+                    console.warn('[Bold] Could not prefetch cart data before payment render', e);
+                }
+            }
+            const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
+
+            if (!this.isFastlaneAvailable && !this.isSpiFrameLoaded()) {
+                await paymentInstance.renderPayments(
+                    'payment_form_bold',
+                    {
+                        fastlane: false,
+                        shouldRenderSpiFrame: true,
+                    }
+                );
+            }
+
+            await this.renderWalletButtons(paymentInstance);
+            this.showPaymentForm();
+        },
+        onBoldPaymentSelected: function () {
+            this.showPaymentMethod();
+            this.showPaymentForm();
+            if (!this.walletButtonsRendered) {
+                this.refreshWalletButtons();
+            }
+        },
+        /* [vs main] New: TM Firecheckout AJAX hooks (main: no FC observers). */
+        registerCheckoutObservers: function () {
+        	console.log('registerCheckoutObservers');
+		    if (window.bold.boldPaymentMethodObserversRegistered) {
+                return;
+            }
+		
+            window.bold.boldPaymentMethodObserversRegistered = true;
+            document.observe('payment-method:switched', function (e) {
+                if (e.memo && e.memo.method_code === 'bold' && window.bold.boldPaymentMethod) {
+                    window.bold.boldPaymentMethod.onBoldPaymentSelected();
+                }
+            });
+            document.observe('firecheckout:setResponseAfter', function (e) {
+                const sections = e.memo && e.memo.response && e.memo.response.update_section;
+                if (!sections) {
+                    return;
+                }
+                if (sections['payment-method']) {
+                    window.bold.ensureBoldPaymentMethod(true);
+                    return;
+                }
+                if (!window.bold.boldPaymentMethod) {
+                    return;
+                }
+                const shouldRefresh = ['cart', 'total', 'shipping-method', 'billing']
+                    .some(function (section) {
+                        return !!sections[section];
+                    });
+                if (shouldRefresh) {
+                    window.bold.boldPaymentMethod.refreshWalletButtons();
+                }
+            });
+            document.observe('firecheckout:paymentMethod:afterInitAfter', function () {
+                window.bold.ensureBoldPaymentMethod(true);
+            });
+        },
         waitForCheckoutInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof checkout !== 'undefined' && checkout.save) {
@@ -87,15 +359,8 @@
                     clearInterval(intervalId);
                 }
             }, 100);
-            setTimeout(() => {
-                clearInterval(intervalId);
-            }, 10000);
+            setTimeout(() => clearInterval(intervalId), 10000);
         },
-        /**
-         * Wait for payment to initialize.
-         *
-         * @returns {void}
-         */
         waitForPaymentInitialization: function () {
             const intervalId = setInterval(() => {
                 if (typeof payment !== 'undefined' && payment.save) {
@@ -103,22 +368,12 @@
                     clearInterval(intervalId);
                 }
             }, 100);
-            setTimeout(() => {
-                clearInterval(intervalId);
-            }, 10000);
+            setTimeout(() => clearInterval(intervalId), 10000);
         },
-        /**
-         * Wrap checkout save method to process order on Bold side first.
-         *
-         * @return {void}
-         */
         wrapCheckoutSave: function () {
             checkout.save = checkout.save.wrap(
                 function (checkoutSaveMethod) {
-                    if (!this.paymentCheckbox) {
-                        return checkoutSaveMethod();
-                    }
-                    if (!this.paymentCheckbox.checked) {
+                    if (!this.paymentCheckbox || !this.paymentCheckbox.checked) {
                         return checkoutSaveMethod();
                     }
                     checkout.validate();
@@ -132,18 +387,10 @@
                 }.bind(this)
             );
         },
-        /**
-         * Wrap payment save method to get PayPal token first.
-         *
-         * @return {void}
-         */
         wrapPaymentSave: function () {
             payment.save = payment.save.wrap(
                 function (paymentSaveMethod) {
-                    if (!this.paymentCheckbox) {
-                        return paymentSaveMethod();
-                    }
-                    if (!this.paymentCheckbox.checked) {
+                    if (!this.paymentCheckbox || !this.paymentCheckbox.checked) {
                         return paymentSaveMethod();
                     }
                     if (!this.paymentId) {
@@ -156,79 +403,107 @@
                 }.bind(this)
             );
         },
-        /**
-         * Hide payment method section.
-         */
         hidePaymentMethod: function () {
-            this.paymentMethodElement.style.display = 'none';
+            if (this.paymentMethodElement) {
+                this.paymentMethodElement.style.display = 'none';
+            }
         },
-        /**
-         * Show payment method section.
-         */
         showPaymentMethod: function () {
-            this.paymentMethodElement.style.display = 'block';
+            if (this.paymentMethodElement) {
+                this.paymentMethodElement.style.display = 'block';
+            }
         },
-        /**
-         * Send tokenize action to SPI iframe.
-         *
-         * @return {Promise<void>}
-         */
         tokenize: async function () {
-            const iframeWindow = document.getElementById('spi_frame_payment_form_bold').contentWindow;
+            const iframe = document.getElementById('spi_frame_payment_form_bold');
+            if (!iframe || !iframe.contentWindow) {
+                console.error('[Bold] SPI iframe is not available');
+                checkout.setLoadWaiting(false);
+                return;
+            }
+            if (!this.hasValidBaseInstance()) {
+                console.error('[Bold] baseInstance is not available for tokenize');
+                checkout.setLoadWaiting(false);
+                return;
+            }
             const cartData = await window.bold.baseInstance.getCartData();
-            const payload = {
-                customer: cartData.customer,
-                billing_address: cartData.billing_address,
-                shipping_address: cartData.shipping_address || cartData.billing_address,
-                totals: cartData.totals,
-            };
-            iframeWindow.postMessage({actionType: 'ACTION_SPI_TOKENIZE', payload: payload}, '*');
+            iframe.contentWindow.postMessage({
+                actionType: 'ACTION_SPI_TOKENIZE',
+                payload: {
+                    customer: cartData.customer,
+                    billing_address: cartData.billing_address,
+                    shipping_address: cartData.shipping_address || cartData.billing_address,
+                    totals: cartData.totals,
+                }
+            }, '*');
         },
-        /**
-         * Subscribe to SPI iframe events.
-         *
-         * @returns {void}
-         */
         subscribeToSpiEvents() {
             window.addEventListener('message', ({data}) => {
                 const eventType = data.eventType;
-                if (eventType) {
-                    switch (eventType) {
-                        case 'EVENT_SPI_TOKENIZED':
-                            if (!data.payload.success) {
-                                this.paymentId = null;
-                                console.error('Failed to tokenize');
-                                checkout.setLoadWaiting(false);
-                                return;
-                            }
-                            this.paymentId = data.payload?.payload?.data?.payment_id;
-                            if (checkout.save) {
-                                checkout.save();
-                                return;
-                            }
-                            payment.save();
-                            break;
-                        case 'EVENT_SPI_TOKENIZE_FAILED':
+                if (!eventType) {
+                    return;
+                }
+                switch (eventType) {
+                    case 'EVENT_SPI_TOKENIZED':
+                        if (!data.payload.success) {
                             this.paymentId = null;
-                            console.error('Failed to tokenize');
                             checkout.setLoadWaiting(false);
-                            break;
-                        case 'EVENT_SPI_PAYMENT_ORDER_SCA':
-                            checkout.setLoadWaiting(false);
-                            break;
-                        case 'EVENT_SPI_ENABLE_FULLSCREEN':
-                            checkout.setLoadWaiting(false);
-                            break;
-                        case 'EVENT_SPI_DISABLE_FULLSCREEN':
-                            checkout.setLoadWaiting('payment', true);
-                            break;
-                    }
+                            return;
+                        }
+                        this.paymentId = data.payload?.payload?.data?.payment_id;
+                        if (checkout.save) {
+                            checkout.save();
+                        } else {
+                            payment.save();
+                        }
+                        break;
+                    case 'EVENT_SPI_TOKENIZE_FAILED':
+                        this.paymentId = null;
+                        checkout.setLoadWaiting(false);
+                        break;
+                    case 'EVENT_SPI_PAYMENT_ORDER_SCA':
+                    case 'EVENT_SPI_ENABLE_FULLSCREEN':
+                        checkout.setLoadWaiting(false);
+                        break;
+                    case 'EVENT_SPI_DISABLE_FULLSCREEN':
+                        checkout.setLoadWaiting('payment', true);
+                        break;
                 }
             });
         },
     });
-    if (typeof window.bold === 'undefined') {
-        window.bold = {};
-    }
-    window.bold.boldPaymentMethod = new BoldPaymentMethod();
+
+    /* [vs main] New: singleton BoldPaymentMethod; re-render when FC passes afterSectionReload=true. */
+    window.bold.ensureBoldPaymentMethod = function (afterSectionReload) {
+        const bootstrap = function () {
+            if (!window.bold.boldPaymentMethod) {
+                window.bold.boldPaymentMethod = new BoldPaymentMethod();
+                return;
+            }
+            const instance = window.bold.boldPaymentMethod;
+            instance.refreshDomReferences();
+            if (!afterSectionReload && !instance.needsPaymentUiRender()) {
+                return;
+            }
+            instance.walletButtonsRendered = false;
+            if (instance.hasValidBaseInstance()) {
+                instance.renderPaymentForm();
+            } else {
+                window.bold.whenBoldBaseReady(function () {
+                    instance.refreshDomReferences();
+                    instance.walletButtonsRendered = false;
+                    instance.renderPaymentForm();
+                });
+            }
+        };
+
+        if (typeof window.bold.ensureBoldBaseInstance === 'function') {
+            window.bold.ensureBoldBaseInstance();
+            bootstrap();
+        } else {
+            window.bold.whenBoldBaseReady(bootstrap);
+        }
+        return window.bold.boldPaymentMethod;
+    };
+
+    window.bold.ensureBoldPaymentMethod();
 </script>

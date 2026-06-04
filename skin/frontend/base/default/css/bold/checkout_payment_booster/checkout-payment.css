@@ -1,0 +1,60 @@
+/**
+ * CHANGES vs main: new file (not on main branch).
+ *
+ * Bold checkout (SPI) on Firecheckout:
+ * - Hide PayPal/Venmo/Pay Later rendered inside SPI #paypalPanel (duplicate of wallet PPCP).
+ * - Show Apple Pay / Google Pay only in top-level #smart-ppcp-buttons (see bold_method.phtml markup).
+ */
+#payment_form_bold #paypalPanel {
+    display: none !important;
+}
+
+#payment_form_bold .TogglePanel:has(#paypalPanel) {
+    display: none !important;
+}
+
+/* Do not show a second wallet host inside the hidden PayPal panel */
+#payment_form_bold #paypalPanel #smart-ppcp-buttons {
+    display: none !important;
+}
+
+#payment_form_bold > #smart-ppcp-buttons,
+#payment_form_bold > .bold-checkout-wallet-buttons {
+    display: block !important;
+}
+
+/* Keep SPI/wallet UI from covering other payment method radios */
+#payment_form_bold {
+    position: relative;
+    overflow: hidden;
+    max-width: 100%;
+}
+
+#payment_form_bold.bold-payment-inactive {
+    display: none !important;
+    pointer-events: none !important;
+}
+
+#payment_form_bold iframe,
+#payment_form_bold #spi_frame_payment_form_bold {
+    max-width: 100%;
+}
+
+/* Collapse Bold dd when another method is selected (SPI iframe can sit outside #payment_form_bold) */
+#dd_method_bold.bold-payment-dd-inactive,
+dd.bold-payment-dd-inactive {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+#checkout-payment-method-load dt,
+#co-payment-form dt {
+    position: relative;
+    z-index: 2;
+}

@@ -61,6 +61,10 @@
                 <type>skin_css</type>
                 <name>css/bold/checkout_payment_booster/expresspay.css</name>
             </action>
+            <action method="addItem">
+                <type>skin_css</type>
+                <name>css/bold/checkout_payment_booster/checkout-payment.css</name>
+            </action>
         </reference>
         <reference name="content">
             <block
@@ -75,8 +79,14 @@
         </reference>
     </checkout_onepage_index>
     <firecheckout_index_index>
+        <reference name="head">
+            <action method="addItem">
+                <type>skin_css</type>
+                <name>css/bold/checkout_payment_booster/checkout-payment.css</name>
+            </action>
+        </reference>
         <reference name="content">
-            <block type="bold_checkout_payment_booster/payment_form_base" name="bold.payments.base" as="bold.payments.base"/>
+            <block type="bold_checkout_payment_booster/payment_form_base" name="bold.payments.base" as="bold.payments.base" before="firecheckout"/>
         </reference>
     </firecheckout_index_index>
 </layout>

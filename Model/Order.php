@@ -30,4 +30,12 @@ class Bold_CheckoutPaymentBooster_Model_Order extends Mage_Core_Model_Abstract
     {
         $this->_init(Bold_CheckoutPaymentBooster_Model_Order::RESOURCE);
     }
+
+    /**
+     * @return Bold_CheckoutPaymentBooster_Model_Resource_Order_Collection
+     */
+    public function getCollection()
+    {
+        return $this->getResource()->getCollection();
+    }
 }
