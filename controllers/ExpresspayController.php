@@ -46,8 +46,22 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        $quote = $this->loadCheckoutSessionQuoteForRequest($quoteId);
-        if ($quote === null) {
+        if ($quoteId !== '') {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getModel('sales/quote')->load($quoteId);
+            $errorMessage = Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId);
+        } else {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getSingleton('checkout/session')->getQuote();
+            $errorMessage = Mage::helper('core')->__('Active quote not found.', $quoteId);
+        }
+
+        if ($quote->getId() === null) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setHeader('Content-Type', 'application/json')
+                ->setBody(json_encode(['error' => $errorMessage]));
+
             return;
         }
 
@@ -95,10 +109,6 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
 
             return;
         }
-
-        Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::registerWalletEpsOrderId(
-            (string) $result->data->order_id
-        );
 
         $this->getResponse()
             ->setHeader('Content-Type', 'application/json')
@@ -156,12 +166,21 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        if (!$this->assertWalletOrderIdForRequest($orderId)) {
-            return;
+        if ($quoteId !== '') {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getModel('sales/quote')->load($quoteId);
+            $errorMessage = Mage::helper('core')->__('Invalid quote ID "%s".', $quoteId);
+        } else {
+            /** @var Mage_Sales_Model_Quote $quote */
+            $quote = Mage::getSingleton('checkout/session')->getQuote();
+            $errorMessage = Mage::helper('core')->__('Active quote not found.', $quoteId);
         }
 
-        $quote = $this->loadCheckoutSessionQuoteForRequest($quoteId);
-        if ($quote === null) {
+        if ($quote->getId() === null) {
+            $this->getResponse()
+                ->setHttpResponseCode(400)
+                ->setBody(json_encode(['error' => $errorMessage]));
+
             return;
         }
 
@@ -253,10 +272,6 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
             return;
         }
 
-        if (!$this->assertWalletOrderIdForRequest($orderId)) {
-            return;
-        }
-
         $gatewayId = $this->getRequest()->getParam('gateway_id');
 
         if ($gatewayId === null) {
@@ -306,59 +321,6 @@ class Bold_CheckoutPaymentBooster_ExpresspayController extends Mage_Core_Control
         $this->getResponse()
             ->setHeader('Content-Type', 'application/json')
             ->setBody(json_encode($result->data));
-    }
-
-    /**
-     * @param string $orderId
-     * @return bool
-     */
-    private function assertWalletOrderIdForRequest($orderId)
-    {
-        try {
-            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::assertWalletEpsOrderIdBelongsToSession(
-                $orderId
-            );
-        } catch (Mage_Core_Exception $exception) {
-            $httpCode = ($exception->getCode()
-                === Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::EXCEPTION_QUOTE_ACCESS_DENIED)
-                ? 403
-                : 400;
-
-            $this->getResponse()
-                ->setHttpResponseCode($httpCode)
-                ->setHeader('Content-Type', 'application/json')
-                ->setBody(json_encode(array('error' => $exception->getMessage())));
-
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * @param string|null $quoteIdParam
-     * @return Mage_Sales_Model_Quote|null
-     */
-    private function loadCheckoutSessionQuoteForRequest($quoteIdParam)
-    {
-        try {
-            return Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::loadCheckoutSessionQuote(
-                $quoteIdParam
-            );
-        } catch (Mage_Core_Exception $exception) {
-            $message = $exception->getMessage();
-            $httpCode = ($exception->getCode()
-                === Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::EXCEPTION_QUOTE_ACCESS_DENIED)
-                ? 403
-                : 400;
-
-            $this->getResponse()
-                ->setHttpResponseCode($httpCode)
-                ->setHeader('Content-Type', 'application/json')
-                ->setBody(json_encode(array('error' => $message)));
-
-            return null;
-        }
     }
 
     /**

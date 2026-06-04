@@ -230,40 +230,4 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     {
         return Bold_CheckoutPaymentBooster_Service_Bold::getEpsAuthToken();
     }
-
-    /**
-     * @return string
-     */
-    private function getSaveOrderRoute()
-    {
-        $request = Mage::app()->getFrontController()->getRequest();
-        if ($request->getModuleName() === 'firecheckout') {
-            return $request->getControllerName() === 'onecolumn'
-                ? 'firecheckout/onecolumn/saveOrder'
-                : 'firecheckout/index/saveOrder';
-        }
-
-        return 'checkout/onepage/saveOrder';
-    }
-
-    /**
-     * URLs and flags for Apple Pay / Google Pay on checkout (used by base.phtml).
-     *
-     * @return array
-     */
-    public function getWalletCheckoutJsConfig()
-    {
-        return [
-            'formKey' => Mage::getSingleton('core/session')->getFormKey(),
-            'quoteId' => (string)$this->quote->getId(),
-            'quoteIsVirtual' => (bool)$this->quote->getIsVirtual(),
-            'createOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/createOrder', ['_secure' => true]),
-            'updateOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/updateOrder', ['_secure' => true]),
-            'saveOrderUrl' => $this->getUrl($this->getSaveOrderRoute(), ['_secure' => true]),
-            'saveBillingUrl' => $this->getUrl('checkout/onepage/saveBilling', ['_secure' => true]),
-            'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', ['_secure' => true]),
-            'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', ['_secure' => true]),
-            'successUrl' => $this->getUrl('checkout/onepage/success', ['_secure' => true]),
-        ];
-    }
 }
