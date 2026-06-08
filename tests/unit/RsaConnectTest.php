@@ -28,7 +28,7 @@ class RsaConnectTest extends TestCase
             $config
         );
 
-        $this->expectException(Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Exception::class);
+        $this->expectException(Mage_Core_Exception::class);
         $this->expectExceptionMessage('Bold shop ID is missing');
 
         Bold_CheckoutPaymentBooster_Service_Rsa_Connect::assertShopIdPresent(1);
