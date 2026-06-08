@@ -2,7 +2,7 @@
 <config>
     <modules>
         <Bold_CheckoutPaymentBooster>
-            <version>2.1.5</version>
+            <version>2.1.6</version>
         </Bold_CheckoutPaymentBooster>
     </modules>
     <global>
@@ -114,22 +114,10 @@
         <events>
             <admin_system_config_changed_section_checkout>
                 <observers>
-                    <save_shop_info>
+                    <bold_checkout_config_save_pipeline>
                         <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>saveShopInfo</method>
-                    </save_shop_info>
-                    <add_domain_to_cors_allow_list>
-                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>addDomainToCorsAllowList</method>
-                    </add_domain_to_cors_allow_list>
-                    <set_rsa_config>
-                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>setRsaConfig</method>
-                    </set_rsa_config>
-                    <process_flows>
-                        <class>Bold_CheckoutPaymentBooster_Observer_ConfigObserver</class>
-                        <method>processFlows</method>
-                    </process_flows>
+                        <method>onCheckoutConfigChanged</method>
+                    </bold_checkout_config_save_pipeline>
                 </observers>
             </admin_system_config_changed_section_checkout>
         </events>
