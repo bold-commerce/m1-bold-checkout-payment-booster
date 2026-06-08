@@ -14,3 +14,7 @@ require_once $moduleRoot . '/Service/Config/SavePipeline.php';
 require_once $moduleRoot . '/Service/Inbound/Auth.php';
 
 Bold_CheckoutPaymentBooster_Test_Stub_Mage::reset();
+Bold_CheckoutPaymentBooster_Test_Stub_Mage::setSingleton(
+    Bold_CheckoutPaymentBooster_Model_Config::RESOURCE,
+    new Bold_CheckoutPaymentBooster_Model_Config()
+);

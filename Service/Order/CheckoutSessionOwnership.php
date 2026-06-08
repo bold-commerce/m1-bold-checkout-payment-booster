@@ -13,6 +13,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership
     const SESSION_WALLET_EPS_CREATED_AT = 'bold_wallet_eps_created_at';
     /** Seconds to reuse the same wallet_pay order id for parallel createOrder calls. */
     const WALLET_EPS_COALESCE_SECONDS = 15;
+
     /**
      * @param Mage_Sales_Model_Order $order
      * @param Mage_Sales_Model_Quote $quote
@@ -190,6 +191,20 @@ class Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership
         $session->setData(self::SESSION_WALLET_EPS_ORDER_ID, (string) $epsOrderId);
         $session->setData(self::SESSION_WALLET_EPS_QUOTE_ID, $quoteId);
         $session->setData(self::SESSION_WALLET_EPS_CREATED_AT, time());
+    }
+
+    /**
+     * Clear wallet EPS order id when Bold public order rotates.
+     *
+     * @return void
+     */
+    public static function clearWalletEpsOrderId()
+    {
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $session->unsetData(self::SESSION_WALLET_EPS_ORDER_ID);
+        $session->unsetData(self::SESSION_WALLET_EPS_QUOTE_ID);
+        $session->unsetData(self::SESSION_WALLET_EPS_CREATED_AT);
     }
 
     /**

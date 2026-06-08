@@ -92,6 +92,22 @@
                     </authorize_bold_payment>
                 </observers>
             </checkout_type_onepage_save_order>
+            <controller_action_predispatch_checkout_onepage_saveOrder>
+                <observers>
+                    <bold_checkout_prevent_duplicate_save_order>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>predispatchSaveOrder</method>
+                    </bold_checkout_prevent_duplicate_save_order>
+                </observers>
+            </controller_action_predispatch_checkout_onepage_saveOrder>
+            <controller_action_postdispatch_checkout_onepage_saveOrder>
+                <observers>
+                    <bold_checkout_clear_placement_state>
+                        <class>Bold_CheckoutPaymentBooster_Observer_SaveOrderObserver</class>
+                        <method>cleanupAfterSaveOrder</method>
+                    </bold_checkout_clear_placement_state>
+                </observers>
+            </controller_action_postdispatch_checkout_onepage_saveOrder>
         </events>
         <routers>
             <checkoutpaymentbooster>

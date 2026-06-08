@@ -146,6 +146,17 @@ class Mage_Core_Exception extends Exception
 {
 }
 
+class Bold_CheckoutPaymentBooster_Model_Config
+{
+    const RESOURCE = 'bold_checkout_payment_booster/config';
+    const LOG_FILE_NAME = 'bold_checkout_payment_booster.log';
+
+    public function isLogEnabled($websiteId)
+    {
+        return true;
+    }
+}
+
 class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store
 {
     const URL_TYPE_WEB = 'web';
@@ -195,6 +206,37 @@ class Bold_CheckoutPaymentBooster_Test_Stub_Mage_App
     public function getWebsite($websiteId)
     {
         return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_Website($websiteId);
+    }
+
+    public function getStore()
+    {
+        return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store_Website('https://example.com/');
+    }
+
+    public function getRequest()
+    {
+        return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_Request();
+    }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store_Website extends Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store
+{
+    public function getWebsiteId()
+    {
+        return 1;
+    }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Request
+{
+    public function getRequestUri()
+    {
+        return '/checkout/onepage/saveOrder';
+    }
+
+    public function getParam($key)
+    {
+        return null;
     }
 }
 

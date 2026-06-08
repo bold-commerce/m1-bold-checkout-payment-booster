@@ -143,4 +143,29 @@ class PlacementGuardTest extends TestCase
         $this->assertSame('block', $result['action']);
         $this->assertArrayHasKey('message', $result);
     }
+
+    public function testEvaluateRejectsForeignWalletEpsOrderId()
+    {
+        $quote = new Mage_Sales_Model_Quote(array(
+            'entity_id' => 5,
+            'is_active' => 1,
+        ));
+        $session = new Mage_Checkout_Model_Session(array(
+            'quote' => $quote,
+            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::SESSION_WALLET_EPS_ORDER_ID => 'eps-mine',
+        ));
+        Bold_CheckoutPaymentBooster_Test_Stub_Mage::setSingleton('checkout/session', $session);
+
+        $this->expectException(Mage_Core_Exception::class);
+        $this->expectExceptionCode(
+            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::EXCEPTION_QUOTE_ACCESS_DENIED
+        );
+
+        Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard::evaluatePlacementRequestForQuote(
+            $session,
+            $quote,
+            'eps-theirs'
+        );
+    }
 }
+
