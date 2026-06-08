@@ -54,25 +54,25 @@ class RsaConnectTest extends TestCase
         );
     }
 
-    public function testIsRetriableRsaConflictDetectsExistingConfiguration()
+    public function testIsRsaNotConfiguredDetectsErrorCode02_89()
     {
         $result = (object)array(
-            'errors' => array((object)array('message' => 'RSA already configured')),
+            'errors' => array((object)array('code' => '02-89', 'message' => 'Remote State Authority not configured')),
         );
 
         $this->assertTrue(
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::isRetriableRsaConflict($result)
+            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::isRsaNotConfigured($result)
         );
     }
 
-    public function testIsRetriableRsaConflictReturnsFalseForUnknownErrors()
+    public function testIsRsaNotConfiguredReturnsFalseForOtherErrors()
     {
         $result = (object)array(
-            'errors' => array((object)array('message' => 'service unavailable')),
+            'errors' => array((object)array('code' => '02-02', 'message' => 'something else')),
         );
 
         $this->assertFalse(
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::isRetriableRsaConflict($result)
+            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::isRsaNotConfigured($result)
         );
     }
 }

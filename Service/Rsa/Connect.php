@@ -10,6 +10,9 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
 {
     const URL = 'checkout/shop/{{shopId}}/rsa_config';
 
+    /** Bold error code when RSA has never been registered (first-time setup). */
+    const CODE_RSA_NOT_CONFIGURED = '02-89';
+
     /**
      * Set RSA configuration (legacy entry point).
      *
@@ -47,7 +50,7 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
 
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        // Keep the new secret in memory until Bold confirms POST — if registration
+        // Keep the new secret in memory until Bold confirms PATCH/POST — if registration
         // fails, Magento must retain the previous secret so retries stay consistent.
         $sharedSecret = self::generateSharedSecret();
         $body = [
@@ -55,22 +58,15 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             'shared_secret' => $sharedSecret,
         ];
 
-        // POST first. Unconditional DELETE-before-POST left Bold without RSA when
-        // POST failed, while Magento still held the old secret (shared-secret drift).
-        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(self::URL, $websiteId, $body);
+        // PATCH updates RSA in place (Adobe Commerce pattern). Avoids DELETE-before-POST,
+        // which left Bold without RSA when POST failed (shared-secret drift).
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::patch(self::URL, $websiteId, $body);
+        if (self::isRsaNotConfigured($result)) {
+            $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(self::URL, $websiteId, $body);
+        }
         if (self::isRegistrationSuccess($result)) {
             $config->setSharedSecret($sharedSecret, $websiteId);
             return;
-        }
-
-        // Some shops require clearing existing RSA before a new secret can be posted.
-        if (self::isRetriableRsaConflict($result)) {
-            Bold_CheckoutPaymentBooster_Service_BoldClient::delete(self::URL, $websiteId);
-            $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(self::URL, $websiteId, $body);
-            if (self::isRegistrationSuccess($result)) {
-                $config->setSharedSecret($sharedSecret, $websiteId);
-                return;
-            }
         }
 
         $message = self::getRegistrationErrorMessage($result);
@@ -138,24 +134,24 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     }
 
     /**
-     * Bold may reject POST when RSA already exists; DELETE + POST is allowed once.
+     * Bold returns 02-89 when RSA has not been registered yet; POST is required once.
      *
      * @param stdClass|null $result
      * @return bool
      */
-    public static function isRetriableRsaConflict($result)
+    public static function isRsaNotConfigured($result)
     {
-        $message = strtolower(self::getRegistrationErrorMessage($result));
-
-        if ($message === '') {
+        if (!$result || !is_object($result) || !isset($result->errors[0])) {
             return false;
         }
 
-        $needles = ['rsa', 'already', 'exist', 'conflict', 'configured'];
-        foreach ($needles as $needle) {
-            if (strpos($message, $needle) !== false) {
-                return true;
-            }
+        $error = $result->errors[0];
+        if (is_object($error) && isset($error->code)) {
+            return (string)$error->code === self::CODE_RSA_NOT_CONFIGURED;
+        }
+
+        if (is_array($error) && isset($error['code'])) {
+            return (string)$error['code'] === self::CODE_RSA_NOT_CONFIGURED;
         }
 
         return false;
