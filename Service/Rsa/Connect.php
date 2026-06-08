@@ -1,11 +1,20 @@
 <?php
 
+/**
+ * Registers Magento as Bold's RSA (remote state authority) callback target.
+ *
+ * The shared secret generated here is used by Bold to sign inbound payment
+ * webhooks; Magento verifies those signatures in Model/Router::authorize().
+ */
 class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
 {
     const URL = 'checkout/shop/{{shopId}}/rsa_config';
 
+    /** Bold error code when RSA has never been registered (first-time setup). */
+    const CODE_RSA_NOT_CONFIGURED = '02-89';
+
     /**
-     * Set RSA configuration.
+     * Set RSA configuration (legacy entry point).
      *
      * @param int $websiteId
      * @return void
@@ -13,21 +22,164 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
      */
     public static function setRsaConfig($websiteId)
     {
+        self::registerRsaConfig($websiteId, true);
+    }
+
+    /**
+     * Register RSA configuration with Bold.
+     *
+     * @param int $websiteId
+     * @param bool $force When true, always register even if rotation is not required.
+     * @return void
+     * @throws Mage_Core_Exception
+     */
+    public static function registerRsaConfig($websiteId, $force = false)
+    {
+        // Routine admin saves should not rotate the secret — only first setup,
+        // API token change, or an explicit Re-sync should re-register RSA.
+        if (!$force && !Bold_CheckoutPaymentBooster_Service_Config_SavePipeline::shouldRotateRsa($websiteId, false)) {
+            Mage::log(
+                'RSA registration skipped (no rotation trigger)',
+                Zend_Log::DEBUG,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
+            return;
+        }
+
+        self::assertShopIdPresent($websiteId);
+
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        Bold_CheckoutPaymentBooster_Service_BoldClient::delete(self::URL, $websiteId);
+        // Keep the new secret in memory until Bold confirms PATCH/POST — if registration
+        // fails, Magento must retain the previous secret so retries stay consistent.
         $sharedSecret = self::generateSharedSecret();
         $body = [
-            'url' => Mage::app()->getStore()->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB) . 'rest/V1',
+            'url' => self::getRestCallbackUrl($websiteId),
             'shared_secret' => $sharedSecret,
         ];
-        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(self::URL, $websiteId, $body);
-        $message = isset($result->errors[0]->message) ? $result->errors[0]->message : null;
-        if (!$message) {
+
+        // PATCH updates RSA in place (Adobe Commerce pattern). Avoids DELETE-before-POST,
+        // which left Bold without RSA when POST failed (shared-secret drift).
+        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::patch(self::URL, $websiteId, $body);
+        if (self::isRsaNotConfigured($result)) {
+            $result = Bold_CheckoutPaymentBooster_Service_BoldClient::post(self::URL, $websiteId, $body);
+        }
+        if (self::isRegistrationSuccess($result)) {
             $config->setSharedSecret($sharedSecret, $websiteId);
             return;
         }
-        Mage::throwException($result->errors[0]->message);
+
+        $message = self::getRegistrationErrorMessage($result);
+        Mage::throwException(
+            $message
+                ? 'RSA registration failed: ' . $message . ' Inbound payment webhooks will not work until you save again or use Re-sync RSA.'
+                : 'RSA registration failed. Inbound payment webhooks will not work until you save again or use Re-sync RSA.'
+        );
+    }
+
+    /**
+     * Build the Magento REST callback URL for RSA registration.
+     *
+     * @param int $websiteId
+     * @return string
+     */
+    public static function getRestCallbackUrl($websiteId)
+    {
+        // Use the website being configured, not the admin user's current store scope.
+        $defaultStore = Mage::app()->getWebsite($websiteId)->getDefaultStore();
+
+        return $defaultStore->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB) . 'rest/V1';
+    }
+
+    /**
+     * Require a persisted shop_id before RSA calls.
+     *
+     * @param int $websiteId
+     * @return void
+     * @throws Mage_Core_Exception
+     */
+    public static function assertShopIdPresent($websiteId)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        // Read persisted shop_id only — ShopInfo::getShopId() would auto-fetch and
+        // mask a failed saveShopInfo, producing checkout/shop//rsa_config requests.
+        $shopId = $config->getShopId($websiteId);
+        if (!$shopId) {
+            Mage::throwException(
+                'Bold shop ID is missing. Save your API token first so shop info can be retrieved before RSA registration.'
+            );
+        }
+    }
+
+    /**
+     * @param stdClass|null $result
+     * @return bool
+     */
+    public static function isRegistrationSuccess($result)
+    {
+        if (!$result || !is_object($result)) {
+            return false;
+        }
+
+        if (isset($result->errors) && is_array($result->errors) && count($result->errors) > 0) {
+            return false;
+        }
+
+        if (isset($result->error)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Bold returns 02-89 when RSA has not been registered yet; POST is required once.
+     *
+     * @param stdClass|null $result
+     * @return bool
+     */
+    public static function isRsaNotConfigured($result)
+    {
+        if (!$result || !is_object($result) || !isset($result->errors[0])) {
+            return false;
+        }
+
+        $error = $result->errors[0];
+        if (is_object($error) && isset($error->code)) {
+            return (string)$error->code === self::CODE_RSA_NOT_CONFIGURED;
+        }
+
+        if (is_array($error) && isset($error['code'])) {
+            return (string)$error['code'] === self::CODE_RSA_NOT_CONFIGURED;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param stdClass|null $result
+     * @return string
+     */
+    public static function getRegistrationErrorMessage($result)
+    {
+        if (!$result || !is_object($result)) {
+            return '';
+        }
+
+        if (isset($result->errors[0]->message)) {
+            return (string)$result->errors[0]->message;
+        }
+
+        if (isset($result->error_description)) {
+            return (string)$result->error_description;
+        }
+
+        if (isset($result->error->message)) {
+            return (string)$result->error->message;
+        }
+
+        return '';
     }
 
     /**
