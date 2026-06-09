@@ -11,7 +11,7 @@ class Bold_CheckoutPaymentBooster_Adminhtml_RsaController extends Mage_Adminhtml
     }
 
     /**
-     * Rotate shared key with Bold and save locally after GET verification.
+     * Rotate shared key with Bold and save locally after Magento inbound auth verification.
      */
     public function rotateAction()
     {

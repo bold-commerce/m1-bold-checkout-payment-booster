@@ -52,8 +52,9 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $previousSharedSecret = $config->getSharedSecret($websiteId);
         $callbackUrl = self::getRestCallbackUrl($websiteId);
-        // Keep the new secret in memory until Bold confirms PATCH/POST and GET verification —
-        // if registration fails, Magento must retain the previous secret so retries stay consistent.
+        // Keep the new secret in memory until Bold confirms PATCH/POST and Magento accepts
+        // a simulated inbound webhook signed with it — if registration fails, Magento must
+        // retain the previous secret so retries stay consistent.
         $sharedSecret = self::generateSharedSecret();
         $body = [
             'url' => $callbackUrl,
@@ -75,7 +76,12 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             );
         }
 
-        if (!self::isRegisteredConfigVerified($websiteId, $body, $result)) {
+        if (!self::verifySharedSecretWithMagentoInboundSimulation(
+            $websiteId,
+            $sharedSecret,
+            $callbackUrl,
+            $previousSharedSecret
+        )) {
             if ($previousSharedSecret) {
                 self::attemptRestorePreviousRsaConfig($websiteId, $previousSharedSecret, $callbackUrl);
             }
@@ -87,35 +93,81 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     }
 
     /**
-     * Confirm Bold persisted the RSA config we just sent.
+     * Verify Magento accepts inbound webhooks signed with the new shared secret.
      *
      * @param int $websiteId
-     * @param array $expected Keys: url, shared_secret
-     * @param stdClass|null $registrationResult
+     * @param string $sharedSecret
+     * @param string $callbackUrl
+     * @param string|null $previousSharedSecret
      * @return bool
      */
-    public static function isRegisteredConfigVerified($websiteId, array $expected, $registrationResult)
-    {
-        $registrationConfig = self::extractRsaConfigFromResponse($registrationResult);
-        if (self::rsaConfigMatches($expected, $registrationConfig)) {
+    public static function verifySharedSecretWithMagentoInboundSimulation(
+        $websiteId,
+        $sharedSecret,
+        $callbackUrl,
+        $previousSharedSecret
+    ) {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $shopId = $config->getShopId($websiteId);
+
+        if (!$shopId) {
+            return false;
+        }
+
+        // Router::authorize() reads the persisted website secret during the simulated webhook.
+        $config->setSharedSecret($sharedSecret, $websiteId);
+
+        $simulation = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::sendSimulatedInboundWebhook(
+            $callbackUrl,
+            $shopId,
+            $sharedSecret
+        );
+
+        if ($simulation['http_code'] === 401) {
+            self::restoreLocalSharedSecret($config, $websiteId, $previousSharedSecret);
+            self::logVerificationFailure(
+                $websiteId,
+                'Magento rejected the simulated inbound webhook with HTTP 401.',
+                $simulation
+            );
+
+            return false;
+        }
+
+        if ($simulation['http_code'] !== 0) {
+            Mage::log(
+                'RSA shared secret verified via simulated Magento inbound webhook for website '
+                . $websiteId
+                . ' (HTTP ' . $simulation['http_code'] . ').',
+                Zend_Log::INFO,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+            );
+
             return true;
         }
 
-        $lastRemoteConfig = null;
-        for ($attempt = 0; $attempt < 3; $attempt++) {
-            if ($attempt > 0) {
-                usleep(500000);
-            }
+        self::restoreLocalSharedSecret($config, $websiteId, $previousSharedSecret);
 
-            $lastRemoteConfig = self::fetchRsaConfig($websiteId);
-            if (self::rsaConfigMatches($expected, $lastRemoteConfig)) {
-                return true;
-            }
+        if (!Bold_CheckoutPaymentBooster_Service_Inbound_Auth::verifySharedSecretLocally($sharedSecret)) {
+            self::logVerificationFailure(
+                $websiteId,
+                'Local HMAC verification failed for the new shared secret.',
+                $simulation
+            );
+
+            return false;
         }
 
-        self::logVerificationMismatch($websiteId, $expected, $registrationConfig, $lastRemoteConfig);
+        Mage::log(
+            'RSA webhook simulation unreachable for website ' . $websiteId
+            . '; verified shared secret locally instead. curl_error='
+            . $simulation['error'],
+            Zend_Log::WARN,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+        );
 
-        return false;
+        return true;
     }
 
     /**
@@ -158,123 +210,58 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     }
 
     /**
-     * Fetch RSA config from Bold (GET checkout/shop/{shopId}/rsa_config).
-     *
-     * @param int $websiteId
-     * @return array|null Keys: url, shared_secret
-     */
-    public static function fetchRsaConfig($websiteId)
-    {
-        $result = Bold_CheckoutPaymentBooster_Service_BoldClient::get(self::URL, $websiteId);
-
-        return self::extractRsaConfigFromResponse($result);
-    }
-
-    /**
-     * @param stdClass|null $result
-     * @return array|null Keys: url, shared_secret
-     */
-    public static function extractRsaConfigFromResponse($result)
-    {
-        if (!$result || !is_object($result)) {
-            return null;
-        }
-
-        if (isset($result->errors) && is_array($result->errors) && count($result->errors) > 0) {
-            return null;
-        }
-
-        if (isset($result->error)) {
-            return null;
-        }
-
-        $data = isset($result->data) ? $result->data : $result;
-        if (!is_object($data) || !isset($data->url, $data->shared_secret)) {
-            return null;
-        }
-
-        return [
-            'url' => (string)$data->url,
-            'shared_secret' => (string)$data->shared_secret,
-        ];
-    }
-
-    /**
-     * @param array|null $expected Keys: url, shared_secret
-     * @param array|null $remote Keys: url, shared_secret
-     * @return bool
-     */
-    public static function rsaConfigMatches(array $expected, $remote)
-    {
-        if (!is_array($remote)
-            || !isset($expected['url'], $expected['shared_secret'], $remote['url'], $remote['shared_secret'])
-        ) {
-            return false;
-        }
-
-        return (string)$expected['shared_secret'] === (string)$remote['shared_secret']
-            && self::normalizeRsaUrl($expected['url']) === self::normalizeRsaUrl($remote['url']);
-    }
-
-    /**
-     * @param string $url
-     * @return string
-     */
-    public static function normalizeRsaUrl($url)
-    {
-        $url = trim((string)$url);
-        if ($url === '') {
-            return '';
-        }
-
-        if (strpos($url, '://') === false) {
-            $url = 'https://' . $url;
-        }
-
-        $parts = parse_url($url);
-        if (!isset($parts['host'])) {
-            return rtrim($url, '/');
-        }
-
-        $host = strtolower(preg_replace('/^www\./', '', $parts['host']));
-        $path = isset($parts['path']) ? rtrim(strtolower($parts['path']), '/') : '';
-
-        return $host . $path;
-    }
-
-    /**
      * @param bool $hadPreviousSecret
      * @return string
      */
     public static function getVerificationFailureMessage($hadPreviousSecret)
     {
         if ($hadPreviousSecret) {
-            return 'RSA registration verification failed: Bold did not confirm the new shared secret. '
+            return 'RSA registration verification failed: Magento rejected the new shared secret. '
                 . 'Your previous RSA configuration was restored on Bold. '
                 . 'Inbound payment webhooks were not changed. '
-                . 'Check var/log/bold_checkout_payment_booster.log (enable logging in Advanced Settings) '
-                . 'and ensure the Magento base URL matches your Bold shop domain, then use Rotate Shared Key again.';
+                . 'Check var/log/bold_checkout_payment_booster.log and ensure the Magento REST callback URL is reachable, '
+                . 'then use Rotate Shared Key again.';
         }
 
-        return 'RSA registration verification failed: Bold did not confirm the new shared secret. '
+        return 'RSA registration verification failed: Magento rejected the new shared secret. '
             . 'Inbound payment webhooks will not work until you save again or use Rotate Shared Key. '
-            . 'Check var/log/bold_checkout_payment_booster.log and verify the Magento base URL matches your Bold shop domain.';
+            . 'Check var/log/bold_checkout_payment_booster.log and ensure the Magento REST callback URL is reachable.';
+    }
+
+    /**
+     * @param Bold_CheckoutPaymentBooster_Model_Config $config
+     * @param int $websiteId
+     * @param string|null $previousSharedSecret
+     * @return void
+     */
+    private static function restoreLocalSharedSecret($config, $websiteId, $previousSharedSecret)
+    {
+        if ($previousSharedSecret) {
+            $config->setSharedSecret($previousSharedSecret, $websiteId);
+            return;
+        }
+
+        Mage::getConfig()->deleteConfig(
+            Bold_CheckoutPaymentBooster_Model_Config::PATH_SHARED_SECRET,
+            'websites',
+            $websiteId
+        );
+        Mage::getConfig()->cleanCache();
     }
 
     /**
      * @param int $websiteId
-     * @param array $expected
-     * @param array|null $registrationConfig
-     * @param array|null $remoteConfig
+     * @param string $message
+     * @param array $simulation
      * @return void
      */
-    private static function logVerificationMismatch($websiteId, array $expected, $registrationConfig, $remoteConfig)
+    private static function logVerificationFailure($websiteId, $message, array $simulation)
     {
         Mage::log(
-            'RSA verification mismatch for website ' . $websiteId
-            . '. expected_url=' . self::normalizeRsaUrl($expected['url'])
-            . ' registration=' . json_encode($registrationConfig)
-            . ' remote=' . json_encode($remoteConfig),
+            'RSA verification failed for website ' . $websiteId
+            . '. reason=' . $message
+            . ' http_code=' . $simulation['http_code']
+            . ' curl_error=' . $simulation['error'],
             Zend_Log::WARN,
             Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
         );

@@ -160,6 +160,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
 class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store
 {
     const URL_TYPE_WEB = 'web';
+    const URL_TYPE_LINK = 'link';
 
     private $baseUrl;
 
@@ -168,7 +169,7 @@ class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Model_Store
         $this->baseUrl = $baseUrl;
     }
 
-    public function getBaseUrl($type)
+    public function getBaseUrl($type, $secure = null)
     {
         return $this->baseUrl;
     }

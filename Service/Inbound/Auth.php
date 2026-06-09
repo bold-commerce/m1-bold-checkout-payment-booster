@@ -57,9 +57,96 @@ class Bold_CheckoutPaymentBooster_Service_Inbound_Auth
     }
 
     /**
-     * @param string|null $sharedSecret
+     * Build the Signature header Bold sends on inbound REST webhooks.
+     *
+     * @param string $sharedSecret
+     * @param string $timestamp
      * @return string
      */
+    public static function buildBoldSignatureHeader($sharedSecret, $timestamp)
+    {
+        $signature = base64_encode(
+            hash_hmac(
+                'sha256',
+                'x-hmac-timestamp: ' . $timestamp,
+                $sharedSecret,
+                true
+            )
+        );
+
+        return 'keyId="X-HMAC",algorithm="hmac-sha256",headers="x-hmac-timestamp",signature="'
+            . $signature
+            . '"';
+    }
+
+    /**
+     * RFC1123 timestamp used by Bold inbound webhook signatures.
+     *
+     * @return string
+     */
+    public static function buildBoldTimestamp()
+    {
+        return gmdate('D, d M y H:i:s') . ' +0000';
+    }
+
+    /**
+     * Verify Magento would accept inbound webhooks signed with this shared secret.
+     *
+     * @param string $sharedSecret
+     * @return bool
+     */
+    public static function verifySharedSecretLocally($sharedSecret)
+    {
+        if (!$sharedSecret) {
+            return false;
+        }
+
+        $timestamp = self::buildBoldTimestamp();
+        $signatureHeader = self::buildBoldSignatureHeader($sharedSecret, $timestamp);
+
+        return self::verifyHmac($sharedSecret, $signatureHeader, $timestamp);
+    }
+
+    /**
+     * POST to Magento REST like a Bold inbound webhook.
+     *
+     * @param string $callbackUrl RSA callback base URL, e.g. https://store.example/rest/V1
+     * @param string $shopIdentifier
+     * @param string $sharedSecret
+     * @return array{http_code:int,error:string}
+     */
+    public static function sendSimulatedInboundWebhook($callbackUrl, $shopIdentifier, $sharedSecret)
+    {
+        $timestamp = self::buildBoldTimestamp();
+        $url = rtrim($callbackUrl, '/')
+            . '/shops/'
+            . rawurlencode($shopIdentifier)
+            . '/orders/rsa-rotation-verify/payments';
+
+        $curl = curl_init();
+        curl_setopt($curl, CURLOPT_URL, $url);
+        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
+        curl_setopt($curl, CURLOPT_POSTFIELDS, '{}');
+        curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+            'Signature: ' . self::buildBoldSignatureHeader($sharedSecret, $timestamp),
+            'X-HMAC-Timestamp: ' . $timestamp,
+            'Content-Type: application/json',
+        ));
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
+        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
+
+        curl_exec($curl);
+        $httpCode = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $error = curl_error($curl);
+        curl_close($curl);
+
+        return array(
+            'http_code' => $httpCode,
+            'error' => (string)$error,
+        );
+    }
+
     /**
      * Safe log identifier for diagnosing secret drift without logging the secret itself.
      */

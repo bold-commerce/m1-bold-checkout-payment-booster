@@ -55,4 +55,29 @@ class RouterAuthorizeTest extends TestCase
             Bold_CheckoutPaymentBooster_Service_Inbound_Auth::secretFingerprint('secret')
         );
     }
+
+    public function testBuildBoldSignatureHeaderMatchesVerifyHmac()
+    {
+        $timestamp = 'Sun, 07 Jun 26 18:25:49 +0000';
+        $secret = 'testsec1';
+        $signatureHeader = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::buildBoldSignatureHeader(
+            $secret,
+            $timestamp
+        );
+
+        $this->assertTrue(
+            Bold_CheckoutPaymentBooster_Service_Inbound_Auth::verifyHmac(
+                $secret,
+                $signatureHeader,
+                $timestamp
+            )
+        );
+    }
+
+    public function testVerifySharedSecretLocallyAcceptsValidSecret()
+    {
+        $this->assertTrue(
+            Bold_CheckoutPaymentBooster_Service_Inbound_Auth::verifySharedSecretLocally('testsec1')
+        );
+    }
 }

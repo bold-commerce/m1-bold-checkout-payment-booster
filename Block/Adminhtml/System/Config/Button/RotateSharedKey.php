@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Admin button to rotate the RSA shared key with Bold and save it locally after verification.
+ * Admin button to rotate the RSA shared key with Bold and save it locally after Magento auth verification.
  */
 class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_RotateSharedKey
     extends Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_AbstractRsaAction

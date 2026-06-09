@@ -76,69 +76,11 @@ class RsaConnectTest extends TestCase
         );
     }
 
-    public function testExtractRsaConfigFromResponseReadsDataWrapper()
-    {
-        $result = (object)array(
-            'data' => (object)array(
-                'url' => 'https://www.example.com/rest/V1/',
-                'shared_secret' => 'abc12345',
-            ),
-        );
-
-        $this->assertSame(
-            array(
-                'url' => 'https://www.example.com/rest/V1/',
-                'shared_secret' => 'abc12345',
-            ),
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::extractRsaConfigFromResponse($result)
-        );
-    }
-
-    public function testExtractRsaConfigFromResponseReturnsNullWhenFieldsMissing()
-    {
-        $result = (object)array('data' => (object)array('url' => 'https://www.example.com/rest/V1'));
-
-        $this->assertNull(
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::extractRsaConfigFromResponse($result)
-        );
-    }
-
-    public function testRsaConfigMatchesIgnoresTrailingSlashOnUrl()
-    {
-        $expected = array(
-            'url' => 'https://www.example.com/rest/V1',
-            'shared_secret' => 'abc12345',
-        );
-        $remote = array(
-            'url' => 'https://www.example.com/rest/V1/',
-            'shared_secret' => 'abc12345',
-        );
-
-        $this->assertTrue(
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::rsaConfigMatches($expected, $remote)
-        );
-    }
-
-    public function testRsaConfigMatchesReturnsFalseWhenSharedSecretDiffers()
-    {
-        $expected = array(
-            'url' => 'https://www.example.com/rest/V1',
-            'shared_secret' => 'abc12345',
-        );
-        $remote = array(
-            'url' => 'https://www.example.com/rest/V1',
-            'shared_secret' => 'other123',
-        );
-
-        $this->assertFalse(
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::rsaConfigMatches($expected, $remote)
-        );
-    }
-
     public function testGetVerificationFailureMessageIncludesRollbackNoteWhenPreviousSecretExists()
     {
         $message = Bold_CheckoutPaymentBooster_Service_Rsa_Connect::getVerificationFailureMessage(true);
 
         $this->assertStringContainsString('restored on Bold', $message);
+        $this->assertStringContainsString('Magento rejected the new shared secret', $message);
     }
 }
