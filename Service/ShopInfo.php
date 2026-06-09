@@ -37,7 +37,9 @@ class Bold_CheckoutPaymentBooster_Service_ShopInfo
     {
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
-        $config->setShopId(null, $websiteId);
+
+        // Do not clear shop_id before fetch. A failed shops/v1/info call used to leave
+        // shop_id empty while RSA registration still ran in the next observer.
         $apiToken = $config->getApiToken($websiteId);
         $headers = [
             'Authorization: Bearer ' . $apiToken,

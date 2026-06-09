@@ -50,7 +50,7 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
                 $path,
                 $websiteId,
                 $headers,
-                $body ? json_encode($body) : ''
+                self::encodeRequestBody($body)
             )
         );
     }
@@ -75,7 +75,7 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
                 $path,
                 $websiteId,
                 $headers,
-                $body ? json_encode($body) : ''
+                self::encodeRequestBody($body)
             )
         );
     }
@@ -100,7 +100,7 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
                 $path,
                 $websiteId,
                 $headers,
-                $body ? json_encode($body) : ''
+                self::encodeRequestBody($body)
             )
         );
     }
@@ -126,6 +126,19 @@ class Bold_CheckoutPaymentBooster_Service_BoldClient
                 $headers
             )
         );
+    }
+
+    /**
+     * @param array|null $body
+     * @return string
+     */
+    private static function encodeRequestBody(array $body = null)
+    {
+        if ($body === null || $body === array()) {
+            return '{}';
+        }
+
+        return json_encode($body);
     }
 
     /**
