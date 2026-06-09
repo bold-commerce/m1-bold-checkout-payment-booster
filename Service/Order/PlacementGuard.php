@@ -41,7 +41,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_PlacementGuard
         }
 
         Mage::log(
-            '[BoldCheckout] step ' . $step . ': ' . $detail,
+            '[Bold_Booster] step ' . $step . ': ' . $detail,
             defined('Zend_Log::DEBUG') ? Zend_Log::DEBUG : 7,
             Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
             true
