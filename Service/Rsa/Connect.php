@@ -75,8 +75,7 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             );
         }
 
-        $remoteConfig = self::fetchRsaConfig($websiteId);
-        if (!self::rsaConfigMatches($body, $remoteConfig)) {
+        if (!self::isRegisteredConfigVerified($websiteId, $body, $result)) {
             if ($previousSharedSecret) {
                 self::attemptRestorePreviousRsaConfig($websiteId, $previousSharedSecret, $callbackUrl);
             }
@@ -85,6 +84,38 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         }
 
         $config->setSharedSecret($sharedSecret, $websiteId);
+    }
+
+    /**
+     * Confirm Bold persisted the RSA config we just sent.
+     *
+     * @param int $websiteId
+     * @param array $expected Keys: url, shared_secret
+     * @param stdClass|null $registrationResult
+     * @return bool
+     */
+    public static function isRegisteredConfigVerified($websiteId, array $expected, $registrationResult)
+    {
+        $registrationConfig = self::extractRsaConfigFromResponse($registrationResult);
+        if (self::rsaConfigMatches($expected, $registrationConfig)) {
+            return true;
+        }
+
+        $lastRemoteConfig = null;
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            if ($attempt > 0) {
+                usleep(500000);
+            }
+
+            $lastRemoteConfig = self::fetchRsaConfig($websiteId);
+            if (self::rsaConfigMatches($expected, $lastRemoteConfig)) {
+                return true;
+            }
+        }
+
+        self::logVerificationMismatch($websiteId, $expected, $registrationConfig, $lastRemoteConfig);
+
+        return false;
     }
 
     /**
@@ -97,8 +128,12 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     {
         // Use the website being configured, not the admin user's current store scope.
         $defaultStore = Mage::app()->getWebsite($websiteId)->getDefaultStore();
+        $baseUrl = $defaultStore->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_LINK, true);
+        if (!$baseUrl || $baseUrl === 'http://' || $baseUrl === 'https://') {
+            $baseUrl = $defaultStore->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_LINK, false);
+        }
 
-        return $defaultStore->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB) . 'rest/V1';
+        return rtrim($baseUrl, '/') . '/rest/V1';
     }
 
     /**
@@ -187,7 +222,24 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
      */
     public static function normalizeRsaUrl($url)
     {
-        return rtrim((string)$url, '/');
+        $url = trim((string)$url);
+        if ($url === '') {
+            return '';
+        }
+
+        if (strpos($url, '://') === false) {
+            $url = 'https://' . $url;
+        }
+
+        $parts = parse_url($url);
+        if (!isset($parts['host'])) {
+            return rtrim($url, '/');
+        }
+
+        $host = strtolower(preg_replace('/^www\./', '', $parts['host']));
+        $path = isset($parts['path']) ? rtrim(strtolower($parts['path']), '/') : '';
+
+        return $host . $path;
     }
 
     /**
@@ -199,11 +251,33 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         if ($hadPreviousSecret) {
             return 'RSA registration verification failed: Bold did not confirm the new shared secret. '
                 . 'Your previous RSA configuration was restored on Bold. '
-                . 'Inbound payment webhooks were not changed. Try Save again or use Re-sync RSA.';
+                . 'Inbound payment webhooks were not changed. '
+                . 'Check var/log/bold_checkout_payment_booster.log (enable logging in Advanced Settings) '
+                . 'and ensure the Magento base URL matches your Bold shop domain, then use Rotate Shared Key again.';
         }
 
         return 'RSA registration verification failed: Bold did not confirm the new shared secret. '
-            . 'Inbound payment webhooks will not work until you save again or use Re-sync RSA.';
+            . 'Inbound payment webhooks will not work until you save again or use Rotate Shared Key. '
+            . 'Check var/log/bold_checkout_payment_booster.log and verify the Magento base URL matches your Bold shop domain.';
+    }
+
+    /**
+     * @param int $websiteId
+     * @param array $expected
+     * @param array|null $registrationConfig
+     * @param array|null $remoteConfig
+     * @return void
+     */
+    private static function logVerificationMismatch($websiteId, array $expected, $registrationConfig, $remoteConfig)
+    {
+        Mage::log(
+            'RSA verification mismatch for website ' . $websiteId
+            . '. expected_url=' . self::normalizeRsaUrl($expected['url'])
+            . ' registration=' . json_encode($registrationConfig)
+            . ' remote=' . json_encode($remoteConfig),
+            Zend_Log::WARN,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+        );
     }
 
     /**
