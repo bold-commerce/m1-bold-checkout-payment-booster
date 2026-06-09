@@ -19,14 +19,6 @@ class Bold_CheckoutPaymentBooster_Adminhtml_RsaController extends Mage_Adminhtml
     }
 
     /**
-     * Legacy route — same behavior as rotateAction().
-     */
-    public function resyncAction()
-    {
-        $this->executeSharedSecretRotation();
-    }
-
-    /**
      * @return void
      */
     private function executeSharedSecretRotation()

@@ -33,7 +33,7 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
     abstract public function getConfirmMessage();
 
     /**
-     * @return string Controller action name without suffix, e.g. rotate or resync
+     * @return string Controller action name without suffix, e.g. rotate
      */
     abstract public function getControllerAction();
 

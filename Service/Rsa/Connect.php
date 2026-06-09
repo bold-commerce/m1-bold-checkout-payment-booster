@@ -42,7 +42,7 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     public static function registerRsaConfig($websiteId, $force = false)
     {
         // Routine admin saves should not rotate the secret — only first setup,
-        // API token change, or an explicit Re-sync should re-register RSA.
+        // API token change, or an explicit Rotate Shared Key should re-register RSA.
         if (!$force && !Bold_CheckoutPaymentBooster_Service_Config_SavePipeline::shouldRotateRsa($websiteId, false)) {
             Mage::log(
                 'RSA registration skipped (no rotation trigger)',
@@ -77,8 +77,8 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             $message = self::getRegistrationErrorMessage($result);
             Mage::throwException(
                 $message
-                    ? 'RSA registration failed: ' . $message . ' Inbound payment webhooks will not work until you save again or use Re-sync RSA.'
-                    : 'RSA registration failed. Inbound payment webhooks will not work until you save again or use Re-sync RSA.'
+                    ? 'RSA registration failed: ' . $message . ' Inbound payment webhooks will not work until you save again or use Rotate Shared Key.'
+                    : 'RSA registration failed. Inbound payment webhooks will not work until you save again or use Rotate Shared Key.'
             );
         }
 
