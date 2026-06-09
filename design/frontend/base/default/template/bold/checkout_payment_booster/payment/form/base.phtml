@@ -5,6 +5,12 @@
 ?>
 
 <script type="text/javascript">
+    if (typeof window.bold === 'undefined') {
+        window.bold = {};
+    }
+
+    window.bold.walletCheckoutConfig = <?php echo json_encode($this->getWalletCheckoutJsConfig()) ?>;
+
     /**
      * Bold Payments base class.
      */
@@ -16,6 +22,8 @@
         gatewayData: null,
         buildFastlaneInstanceInProgress: false,
         buildPaymentsInstanceInProgress: false,
+        syncCheckoutSessionPromise: null,
+        publicOrderId: '<?php echo $this->getPublicOrderID(); ?>',
         isAvailable: <?php echo $this->isAvailable(); ?>,
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
@@ -351,11 +359,93 @@
             }
         },
         /**
+         * Sync Bold checkout session tokens from Magento before Payments SDK init.
+         *
+         * @returns {Promise<boolean>}
+         */
+        syncCheckoutSessionFromServer: function () {
+            if (this.syncCheckoutSessionPromise) {
+                return this.syncCheckoutSessionPromise;
+            }
+            const cfg = window.bold.walletCheckoutConfig;
+            if (!cfg || !cfg.getCheckoutSessionUrl) {
+                return Promise.resolve(false);
+            }
+            this.syncCheckoutSessionPromise = new Promise((resolve, reject) => {
+                new Ajax.Request(cfg.getCheckoutSessionUrl, {
+                    method: 'post',
+                    parameters: {form_key: cfg.formKey},
+                    requestHeaders: {Accept: 'application/json'},
+                    onSuccess: (response) => {
+                        try {
+                            resolve(this.applyCheckoutSessionPayload(JSON.parse(response.responseText)));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    },
+                    onFailure: () => {
+                        reject(new Error('Failed to sync Bold checkout session'));
+                    },
+                    onComplete: () => {
+                        this.syncCheckoutSessionPromise = null;
+                    }
+                });
+            });
+            return this.syncCheckoutSessionPromise;
+        },
+        /**
+         * Apply server checkout session payload; reset Payments SDK when public_order_id rotates.
+         *
+         * @param {{}} payload
+         * @returns {boolean}
+         */
+        applyCheckoutSessionPayload: function (payload) {
+            if (!payload || !payload.public_order_id) {
+                return false;
+            }
+            const previousId = this.publicOrderId;
+            const rotated = !!(previousId && previousId !== payload.public_order_id);
+            this.publicOrderId = payload.public_order_id;
+            window.bold.publicOrderId = payload.public_order_id;
+            if (payload.jwt_token) {
+                this.jwtToken = payload.jwt_token;
+            }
+            if (payload.eps_auth_token) {
+                this.epsAuthToken = payload.eps_auth_token;
+            }
+            if (payload.bold_api_url) {
+                this.boldApiUrl = payload.bold_api_url;
+            }
+            if (payload.eps_gateway_id) {
+                this.epsGatewayId = payload.eps_gateway_id;
+            }
+            if (rotated) {
+                console.warn('[Bold] public_order_id rotated', previousId, '->', payload.public_order_id);
+                this.resetBoldPaymentsInstance();
+                if (window.bold.boldPaymentMethod) {
+                    window.bold.boldPaymentMethod.walletButtonsRendered = false;
+                }
+            }
+            return rotated;
+        },
+        applyBoldCheckoutSession: function (payload) {
+            return this.applyCheckoutSessionPayload(payload);
+        },
+        resetBoldPaymentsInstance: function () {
+            this.boldPaymentsInstance = null;
+            this.buildPaymentsInstanceInProgress = false;
+        },
+        /**
          * Load SPI SDK.
          *
          * @returns {Promise<void>}
          */
         getBoldPaymentsInstance: async function () {
+            try {
+                await this.syncCheckoutSessionFromServer();
+            } catch (e) {
+                console.warn('[Bold] Checkout session sync failed before Payments SDK init', e);
+            }
             if (this.boldPaymentsInstance) {
                 this.buildPaymentsInstanceInProgress = false;
                 return this.boldPaymentsInstance;
@@ -373,7 +463,7 @@
                 'eps_url': this.epsUrl,
                 'eps_bucket_url': this.epsStaticUrl,
                 'group_label': this.groupLabel,
-                'trace_id': '<?php echo $this->getPublicOrderID(); ?>',
+                'trace_id': this.publicOrderId,
                 'payment_gateways': [
                     {
                         'gateway_id': Number(this.epsGatewayId),
@@ -424,7 +514,7 @@
                             body: JSON.stringify(
                                 {
                                     'order_id': orderId,
-                                    'public_order_id': '<?php echo $this->getPublicOrderID(); ?>',
+                                    'public_order_id': this.publicOrderId,
                                     'gateway_type': 'ppcp',
                                 }
                             ),
@@ -490,7 +580,6 @@
             return new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
-                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
                     },
@@ -581,9 +670,7 @@
 
     });
     document.observe('dom:loaded', function () {
-        if (typeof window.bold === 'undefined') {
-            window.bold = {};
-        }
+        window.bold.publicOrderId = '<?php echo $this->getPublicOrderID(); ?>';
         window.bold.baseInstance = new BoldBase();
     });
 </script>

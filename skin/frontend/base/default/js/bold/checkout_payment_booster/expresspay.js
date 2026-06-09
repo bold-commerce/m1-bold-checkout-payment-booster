@@ -822,6 +822,9 @@ const ExpressPay = async config => (async config => {
                 config.getCartTotalsUrl,
                 {
                     method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: formData
                 }
             );
@@ -853,6 +856,9 @@ const ExpressPay = async config => (async config => {
                 config.getCartItemsUrl,
                 {
                     method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: formData
                 }
             );
