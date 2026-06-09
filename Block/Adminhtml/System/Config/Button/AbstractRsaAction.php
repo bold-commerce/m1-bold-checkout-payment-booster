@@ -108,7 +108,38 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
         $actionUrl = $this->getActionUrl();
         $confirmMessage = Mage::helper('core')->jsonEncode($this->getConfirmMessage());
         $jsFunctionName = $this->getJsFunctionName();
-        $scopeParams = Mage::helper('core')->jsonEncode($this->getScopeParams());
+        $scopeParams = $this->getScopeParams();
+        $scopeFieldsJs = '';
+
+        foreach ($scopeParams as $key => $value) {
+            $scopeFieldsJs .= '
+            form.appendChild(new Element(\'input\', {
+                type: \'hidden\',
+                name: ' . Mage::helper('core')->jsonEncode($key) . ',
+                value: ' . Mage::helper('core')->jsonEncode($value) . '
+            }));';
+        }
+
+        $scopeFallbackJs = '';
+        if (empty($scopeParams)) {
+            $scopeFallbackJs = "
+            var websiteMatch = window.location.pathname.match(/\\/website\\/([^/]+)/);
+            if (websiteMatch) {
+                form.appendChild(new Element('input', {
+                    type: 'hidden',
+                    name: 'website',
+                    value: websiteMatch[1]
+                }));
+            }
+            var storeMatch = window.location.pathname.match(/\\/store\\/([^/]+)/);
+            if (storeMatch) {
+                form.appendChild(new Element('input', {
+                    type: 'hidden',
+                    name: 'store',
+                    value: storeMatch[1]
+                }));
+            }";
+        }
 
         return "
         <script type='text/javascript'>
@@ -119,7 +150,7 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
 
             var form = new Element('form', {
                 method: 'POST',
-                action: '{$actionUrl}'
+                action: " . Mage::helper('core')->jsonEncode($actionUrl) . "
             });
 
             var token = new Element('input', {
@@ -128,29 +159,8 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
                 value: FORM_KEY
             });
             form.appendChild(token);
-
-            var scopeParams = {$scopeParams};
-            if (!scopeParams.website && !scopeParams.store) {
-                var websiteMatch = window.location.pathname.match(/\\/website\\/([^/]+)/);
-                if (websiteMatch) {
-                    scopeParams.website = websiteMatch[1];
-                }
-                var storeMatch = window.location.pathname.match(/\\/store\\/([^/]+)/);
-                if (storeMatch) {
-                    scopeParams.store = storeMatch[1];
-                }
-            }
-
-            $H(scopeParams).each(function(pair) {
-                if (!pair.value) {
-                    return;
-                }
-                form.appendChild(new Element('input', {
-                    type: 'hidden',
-                    name: pair.key,
-                    value: pair.value
-                }));
-            });
+            {$scopeFieldsJs}
+            {$scopeFallbackJs}
 
             document.body.appendChild(form);
             form.submit();
