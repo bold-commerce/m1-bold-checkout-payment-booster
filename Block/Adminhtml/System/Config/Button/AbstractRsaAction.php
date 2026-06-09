@@ -38,13 +38,22 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
     abstract public function getControllerAction();
 
     /**
-     * @return string
+     * @return array
      */
-    public function getActionUrl()
+    protected function getScopeParams()
     {
         $params = array();
         $website = $this->getRequest()->getParam('website');
         $store = $this->getRequest()->getParam('store');
+
+        if (!$website && !$store) {
+            $requestUri = $this->getRequest()->getRequestUri();
+            if (preg_match('#/website/([^/?#]+)#', $requestUri, $matches)) {
+                $website = $matches[1];
+            } elseif (preg_match('#/store/([^/?#]+)#', $requestUri, $matches)) {
+                $store = $matches[1];
+            }
+        }
 
         if ($website) {
             $params['website'] = $website;
@@ -53,9 +62,17 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
             $params['store'] = $store;
         }
 
+        return $params;
+    }
+
+    /**
+     * @return string
+     */
+    public function getActionUrl()
+    {
         return $this->getUrl(
             'admin_bold/adminhtml_rsa/' . $this->getControllerAction(),
-            $params
+            $this->getScopeParams()
         );
     }
 
@@ -91,6 +108,7 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
         $actionUrl = $this->getActionUrl();
         $confirmMessage = Mage::helper('core')->jsonEncode($this->getConfirmMessage());
         $jsFunctionName = $this->getJsFunctionName();
+        $scopeParams = Mage::helper('core')->jsonEncode($this->getScopeParams());
 
         return "
         <script type='text/javascript'>
@@ -110,6 +128,29 @@ abstract class Bold_CheckoutPaymentBooster_Block_Adminhtml_System_Config_Button_
                 value: FORM_KEY
             });
             form.appendChild(token);
+
+            var scopeParams = {$scopeParams};
+            if (!scopeParams.website && !scopeParams.store) {
+                var websiteMatch = window.location.pathname.match(/\\/website\\/([^/]+)/);
+                if (websiteMatch) {
+                    scopeParams.website = websiteMatch[1];
+                }
+                var storeMatch = window.location.pathname.match(/\\/store\\/([^/]+)/);
+                if (storeMatch) {
+                    scopeParams.store = storeMatch[1];
+                }
+            }
+
+            $H(scopeParams).each(function(pair) {
+                if (!pair.value) {
+                    return;
+                }
+                form.appendChild(new Element('input', {
+                    type: 'hidden',
+                    name: pair.key,
+                    value: pair.value
+                }));
+            });
 
             document.body.appendChild(form);
             form.submit();

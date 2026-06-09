@@ -62,14 +62,43 @@ class Bold_CheckoutPaymentBooster_Adminhtml_RsaController extends Mage_Adminhtml
      */
     private function resolveWebsiteId()
     {
-        $websiteId = (int)$this->getRequest()->getParam('website', 0);
-        if ($websiteId === 0) {
-            $storeId = (int)$this->getRequest()->getParam('store', 0);
-            if ($storeId > 0) {
-                $websiteId = (int)Mage::app()->getStore($storeId)->getWebsiteId();
+        $website = $this->getRequest()->getParam('website');
+        if ($website) {
+            try {
+                return (int)Mage::app()->getWebsite($website)->getId();
+            } catch (Exception $exception) {
+                Mage::logException($exception);
             }
         }
 
-        return $websiteId;
+        $store = $this->getRequest()->getParam('store');
+        if ($store) {
+            try {
+                return (int)Mage::app()->getStore($store)->getWebsiteId();
+            } catch (Exception $exception) {
+                Mage::logException($exception);
+            }
+        }
+
+        $referer = (string)$this->getRequest()->getServer('HTTP_REFERER');
+        if ($referer !== '') {
+            if (preg_match('#/website/([^/?#]+)#', $referer, $matches)) {
+                try {
+                    return (int)Mage::app()->getWebsite($matches[1])->getId();
+                } catch (Exception $exception) {
+                    Mage::logException($exception);
+                }
+            }
+
+            if (preg_match('#/store/([^/?#]+)#', $referer, $matches)) {
+                try {
+                    return (int)Mage::app()->getStore($matches[1])->getWebsiteId();
+                } catch (Exception $exception) {
+                    Mage::logException($exception);
+                }
+            }
+        }
+
+        return 0;
     }
 }
