@@ -13,6 +13,12 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
     /** Bold error code when RSA has never been registered (first-time setup). */
     const CODE_RSA_NOT_CONFIGURED = '02-89';
 
+    /** Delay between inbound-auth verification retries while Magento config propagates. */
+    const VERIFICATION_PROPAGATION_DELAY_US = 1000000;
+
+    /** Max simulated webhook attempts (initial + retries ≈ 3s propagation window). */
+    const VERIFICATION_MAX_ATTEMPTS = 4;
+
     /**
      * Set RSA configuration (legacy entry point).
      *
@@ -115,36 +121,55 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             return false;
         }
 
-        // Router::authorize() reads the persisted website secret during the simulated webhook.
+        // Router::authorize() reads the persisted website secret on the storefront request.
+        // Config/cache propagation can take a few seconds after saveConfig — retry on 401.
         $config->setSharedSecret($sharedSecret, $websiteId);
 
-        $simulation = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::sendSimulatedInboundWebhook(
-            $callbackUrl,
-            $shopId,
-            $sharedSecret
-        );
+        $simulation = null;
+        for ($attempt = 1; $attempt <= self::VERIFICATION_MAX_ATTEMPTS; $attempt++) {
+            if ($attempt > 1) {
+                usleep(self::VERIFICATION_PROPAGATION_DELAY_US);
+                $config->setSharedSecret($sharedSecret, $websiteId);
+            }
 
-        if ($simulation['http_code'] === 401) {
+            $simulation = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::sendSimulatedInboundWebhook(
+                $callbackUrl,
+                $shopId,
+                $sharedSecret
+            );
+
+            if ($simulation['http_code'] === 401) {
+                continue;
+            }
+
+            if ($simulation['http_code'] !== 0) {
+                Mage::log(
+                    'RSA shared secret verified via simulated Magento inbound webhook for website '
+                    . $websiteId
+                    . ' (HTTP ' . $simulation['http_code']
+                    . ($attempt > 1 ? ', attempt ' . $attempt : '')
+                    . ').',
+                    Zend_Log::INFO,
+                    Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+                );
+
+                return true;
+            }
+
+            break;
+        }
+
+        if ($simulation && $simulation['http_code'] === 401) {
             self::restoreLocalSharedSecret($config, $websiteId, $previousSharedSecret);
             self::logVerificationFailure(
                 $websiteId,
-                'Magento rejected the simulated inbound webhook with HTTP 401.',
+                'Magento rejected the simulated inbound webhook with HTTP 401 after '
+                . self::VERIFICATION_MAX_ATTEMPTS
+                . ' attempts.',
                 $simulation
             );
 
             return false;
-        }
-
-        if ($simulation['http_code'] !== 0) {
-            Mage::log(
-                'RSA shared secret verified via simulated Magento inbound webhook for website '
-                . $websiteId
-                . ' (HTTP ' . $simulation['http_code'] . ').',
-                Zend_Log::INFO,
-                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
-            );
-
-            return true;
         }
 
         self::restoreLocalSharedSecret($config, $websiteId, $previousSharedSecret);
