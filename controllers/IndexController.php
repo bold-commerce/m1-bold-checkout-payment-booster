@@ -12,13 +12,6 @@ class Bold_CheckoutPaymentBooster_IndexController extends Mage_Core_Controller_F
      */
     public function getCartDataAction()
     {
-<<<<<<< Updated upstream
-        if (!$this->requirePostAjax() || !$this->validateFormKeyJson()) {
-            return;
-        }
-
-=======
->>>>>>> Stashed changes
         $quote = Mage::getSingleton('checkout/session')->getQuote();
         $cartData = Bold_CheckoutPaymentBooster_Service_Order_Hydrate_ExtractData::extractQuoteData($quote);
         $cartData['quote_currency_code'] = $quote->getQuoteCurrencyCode();
