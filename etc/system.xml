@@ -126,7 +126,7 @@
                             <depends>
                                 <is_payment_booster_enabled>1</is_payment_booster_enabled>
                             </depends>
-                            <comment><![CDATA[ Generate a new shared key, register it with Bold (PATCH + verification), and save it locally. Use when inbound payment webhooks fail authentication. ]]></comment>
+                            <comment><![CDATA[ Rotates the shared secret used by Bold to sign inbound payment webhooks. Use this if webhooks are failing authentication. ]]></comment>
                         </rotate_shared_key>
                     </fields>
                 </bold_checkout_payment_booster>
