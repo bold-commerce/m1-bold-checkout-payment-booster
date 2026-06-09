@@ -17,6 +17,8 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_IS_EXPRESS_PAY_ENABLED_PDP = 'checkout/bold_checkout_payment_booster/is_expresspay_enabled_pdp';
     const PATH_EXPRESS_PAY_EMPTY_CART_PDP = 'checkout/bold_checkout_payment_booster/expresspay_empty_cart_pdp';
     const PATH_API_TOKEN = 'checkout/bold_checkout_payment_booster/api_token';
+    // sha256 of decrypted API token — used to detect token rotation without re-registering RSA on every save
+    const PATH_API_TOKEN_FINGERPRINT = 'checkout/bold_checkout_payment_booster/api_token_fingerprint';
     const PATH_SHARED_SECRET = 'checkout/bold_checkout_payment_booster/shared_secret';
     const PATH_SHOP_ID = 'checkout/bold_checkout_payment_booster/shop_id';
     const PATH_SHOP_DOMAIN = 'checkout/bold_checkout_payment_booster/shop_domain';
@@ -126,6 +128,46 @@ class Bold_CheckoutPaymentBooster_Model_Config
         $encryptedToken = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_TOKEN);
 
         return Mage::helper('core')->decrypt($encryptedToken);
+    }
+
+    /**
+     * Retrieve stored API token fingerprint.
+     *
+     * @param int $websiteId
+     * @return string|null
+     */
+    public function getApiTokenFingerprint($websiteId)
+    {
+        return Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_API_TOKEN_FINGERPRINT);
+    }
+
+    /**
+     * Save API token fingerprint.
+     *
+     * @param string $fingerprint
+     * @param int $websiteId
+     * @return void
+     */
+    public function setApiTokenFingerprint($fingerprint, $websiteId)
+    {
+        Mage::getConfig()->saveConfig(self::PATH_API_TOKEN_FINGERPRINT, $fingerprint, 'websites', $websiteId);
+        Mage::getConfig()->cleanCache();
+    }
+
+    /**
+     * Build a fingerprint for the current API token.
+     *
+     * @param int $websiteId
+     * @return string|null
+     */
+    public function buildApiTokenFingerprint($websiteId)
+    {
+        $apiToken = $this->getApiToken($websiteId);
+        if (!$apiToken) {
+            return null;
+        }
+
+        return hash('sha256', $apiToken);
     }
 
     /**
