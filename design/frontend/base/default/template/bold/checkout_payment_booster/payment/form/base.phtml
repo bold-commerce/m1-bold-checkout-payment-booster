@@ -581,9 +581,13 @@
             const formKey = cfg.formKey || '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>';
             return new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
+<<<<<<< Updated upstream
                     method: 'post',
                     parameters: {form_key: formKey},
                     requestHeaders: {Accept: 'application/json'},
+=======
+                    method: 'get',
+>>>>>>> Stashed changes
                     onSuccess: function (response) {
                         resolve(JSON.parse(response.responseText));
                     },
