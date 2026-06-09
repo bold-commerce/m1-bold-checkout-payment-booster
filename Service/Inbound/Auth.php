@@ -90,64 +90,6 @@ class Bold_CheckoutPaymentBooster_Service_Inbound_Auth
     }
 
     /**
-     * Verify Magento would accept inbound webhooks signed with this shared secret.
-     *
-     * @param string $sharedSecret
-     * @return bool
-     */
-    public static function verifySharedSecretLocally($sharedSecret)
-    {
-        if (!$sharedSecret) {
-            return false;
-        }
-
-        $timestamp = self::buildBoldTimestamp();
-        $signatureHeader = self::buildBoldSignatureHeader($sharedSecret, $timestamp);
-
-        return self::verifyHmac($sharedSecret, $signatureHeader, $timestamp);
-    }
-
-    /**
-     * POST to Magento REST like a Bold inbound webhook.
-     *
-     * @param string $callbackUrl RSA callback base URL, e.g. https://store.example/rest/V1
-     * @param string $shopIdentifier
-     * @param string $sharedSecret
-     * @return array{http_code:int,error:string}
-     */
-    public static function sendSimulatedInboundWebhook($callbackUrl, $shopIdentifier, $sharedSecret)
-    {
-        $timestamp = self::buildBoldTimestamp();
-        $url = rtrim($callbackUrl, '/')
-            . '/shops/'
-            . rawurlencode($shopIdentifier)
-            . '/orders/rsa-rotation-verify/payments';
-
-        $curl = curl_init();
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'POST');
-        curl_setopt($curl, CURLOPT_POSTFIELDS, '{}');
-        curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-            'Signature: ' . self::buildBoldSignatureHeader($sharedSecret, $timestamp),
-            'X-HMAC-Timestamp: ' . $timestamp,
-            'Content-Type: application/json',
-        ));
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_TIMEOUT, 30);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-
-        curl_exec($curl);
-        $httpCode = (int)curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $error = curl_error($curl);
-        curl_close($curl);
-
-        return array(
-            'http_code' => $httpCode,
-            'error' => (string)$error,
-        );
-    }
-
-    /**
      * Safe log identifier for diagnosing secret drift without logging the secret itself.
      */
     public static function secretFingerprint($sharedSecret)

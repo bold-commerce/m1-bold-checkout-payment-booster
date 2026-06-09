@@ -274,10 +274,70 @@ class Bold_CheckoutPaymentBooster_Test_Stub_Config
         return hash('sha256', $this->values['api_token']);
     }
 
+    public function setSharedSecret($secret, $websiteId)
+    {
+        $this->values['shared_secret'] = $secret;
+    }
+
     public function getShopDomain($websiteId)
     {
         return isset($this->values['shop_domain']) ? $this->values['shop_domain'] : '';
     }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_BoldClient
+{
+    /** @var array<string, stdClass|null> Map of 'METHOD:url' → response object */
+    public static $responses = array();
+
+    public static function reset()
+    {
+        self::$responses = array();
+    }
+
+    public static function setResponse($method, $url, $response)
+    {
+        self::$responses[strtoupper($method) . ':' . $url] = $response;
+    }
+
+    public static function patch($url, $websiteId, $body)
+    {
+        return self::getResponse('PATCH', $url);
+    }
+
+    public static function post($url, $websiteId, $body)
+    {
+        return self::getResponse('POST', $url);
+    }
+
+    public static function get($url, $websiteId)
+    {
+        return self::getResponse('GET', $url);
+    }
+
+    private static function getResponse($method, $url)
+    {
+        $key = $method . ':' . $url;
+        if (array_key_exists($key, self::$responses)) {
+            return self::$responses[$key];
+        }
+
+        if (strpos($url, 'checkShared') !== false) {
+            return (object)array('data' => 1);
+        }
+
+        return (object)array('data' => (object)array('ok' => true));
+    }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Config
+{
+    public function deleteConfig($path, $scope, $scopeId) {}
+    public function cleanCache() {}
+}
+
+if (!class_exists('Bold_CheckoutPaymentBooster_Service_BoldClient', false)) {
+    class Bold_CheckoutPaymentBooster_Service_BoldClient extends Bold_CheckoutPaymentBooster_Test_Stub_BoldClient {}
 }
 
 class Bold_CheckoutPaymentBooster_Test_Stub_Request
@@ -310,6 +370,31 @@ class Bold_CheckoutPaymentBooster_Service_Bold
     public static function getPublicOrderId()
     {
         return Bold_CheckoutPaymentBooster_Test_Stub_Mage::$publicOrderId;
+    }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Resource
+{
+    public function getConnection($name)
+    {
+        return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Resource_Connection();
+    }
+}
+
+class Bold_CheckoutPaymentBooster_Test_Stub_Mage_Core_Resource_Connection
+{
+    public function fetchOne($sql, $bind = array())
+    {
+        if (stripos($sql, 'GET_LOCK') !== false) {
+            return '1';
+        }
+
+        return null;
+    }
+
+    public function query($sql, $bind = array())
+    {
+        return null;
     }
 }
 
@@ -385,6 +470,11 @@ class Bold_CheckoutPaymentBooster_Test_Stub_Mage
         return isset(self::$registry[$key]) ? self::$registry[$key] : null;
     }
 
+    public static function unregister($key)
+    {
+        unset(self::$registry[$key]);
+    }
+
     public static function app()
     {
         return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_App();
@@ -437,10 +527,22 @@ if (!class_exists('Mage', false)) {
             return Bold_CheckoutPaymentBooster_Test_Stub_Mage::registry($key);
         }
 
+        public static function unregister($key)
+        {
+            Bold_CheckoutPaymentBooster_Test_Stub_Mage::unregister($key);
+        }
+
         public static function throwException($message)
         {
             Bold_CheckoutPaymentBooster_Test_Stub_Mage::throwException($message);
         }
+
+        public static function getConfig()
+        {
+            return new Bold_CheckoutPaymentBooster_Test_Stub_Mage_Config();
+        }
+
+        public static function logException($exception) {}
     }
 }
 
@@ -459,7 +561,13 @@ if (!class_exists('Zend_Controller_Request_Http', false)) {
 if (!class_exists('Zend_Log', false)) {
     class Zend_Log
     {
-        const DEBUG = 7;
-        const WARN = 4;
+        const EMERG  = 0;
+        const ALERT  = 1;
+        const CRIT   = 2;
+        const ERR    = 3;
+        const WARN   = 4;
+        const NOTICE = 5;
+        const INFO   = 6;
+        const DEBUG  = 7;
     }
 }

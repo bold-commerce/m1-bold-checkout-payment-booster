@@ -32,6 +32,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_FASTLANE_ADDRESS_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_address_container_styles';
     const PATH_FASTLANE_EMAIL_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_email_container_styles';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
+    const PATH_IS_CHECK_SHARED_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_check_shared_enabled';
 
     /**
      * Check if the Payment Booster is enabled.
@@ -269,6 +270,15 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isLogEnabled($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_LOG_ENABLED);
+    }
+
+    /**
+     * @param int $websiteId
+     * @return bool
+     */
+    public function isCheckSharedEnabled($websiteId)
+    {
+        return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_CHECK_SHARED_ENABLED);
     }
 
     /**
