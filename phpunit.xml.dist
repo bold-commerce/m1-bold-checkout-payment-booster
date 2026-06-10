@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/unit/bootstrap.php"
+         colors="true"
+         convertDeprecationsToExceptions="false">
+    <testsuites>
+        <testsuite name="Bold Checkout Payment Booster Unit Tests">
+            <directory>tests/unit</directory>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist>
+            <directory suffix=".php">Service</directory>
+            <directory suffix=".php">Model</directory>
+        </whitelist>
+    </filter>
+</phpunit>

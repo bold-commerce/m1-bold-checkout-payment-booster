@@ -21,8 +21,24 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $tracingId = sha1(microtime());
         if ($config->isLogEnabled($websiteId)) {
+            $incomingRequest = self::collectIncomingRequestMetadata();
+            if ($incomingRequest !== array()) {
+                Mage::log(
+                    $tracingId . ': Incoming request: ' . json_encode($incomingRequest),
+                    Zend_Log::DEBUG,
+                    Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+                    true
+                );
+            }
+
             Mage::log(
                 $tracingId . ': Outgoing Call: ' . $method . ' ' . $url,
+                Zend_Log::DEBUG,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+                true
+            );
+            Mage::log(
+                $tracingId . ': Outgoing Call headers: ' . json_encode(self::sanitizeHeaderList($headers)),
                 Zend_Log::DEBUG,
                 Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
                 true
@@ -170,5 +186,106 @@ class Bold_CheckoutPaymentBooster_Service_Client_Http
             curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
         }
         curl_setopt($curl, CURLOPT_CUSTOMREQUEST, 'DELETE');
+    }
+
+    /**
+     * Incoming Magento HTTP request metadata (browser → shop), for bold_checkout_payment_booster.log.
+     *
+     * @return array
+     */
+    private static function collectIncomingRequestMetadata()
+    {
+        if (!method_exists('Mage', 'app')) {
+            return array();
+        }
+
+        /** @var Mage_Core_Controller_Request_Http $request */
+        $request = Mage::app()->getRequest();
+
+        return array(
+            'method' => $request->getMethod(),
+            'path' => $request->getRequestUri(),
+            'remote_addr' => $request->getClientIp(false),
+            'is_ajax' => $request->isXmlHttpRequest(),
+            'headers' => self::collectIncomingRequestHeaders(),
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function collectIncomingRequestHeaders()
+    {
+        $raw = array();
+        if (function_exists('getallheaders')) {
+            $fromApache = getallheaders();
+            if (is_array($fromApache)) {
+                $raw = $fromApache;
+            }
+        }
+
+        if ($raw === array()) {
+            foreach ($_SERVER as $name => $value) {
+                if (strpos($name, 'HTTP_') !== 0) {
+                    continue;
+                }
+
+                $headerName = str_replace(
+                    ' ',
+                    '-',
+                    ucwords(strtolower(str_replace('_', ' ', substr($name, 5))))
+                );
+                $raw[$headerName] = $value;
+            }
+        }
+
+        return self::sanitizeHeaderMap($raw);
+    }
+
+    /**
+     * @param array $headers Outgoing curl headers (numeric keys) or name => value map.
+     * @return array
+     */
+    private static function sanitizeHeaderList(array $headers)
+    {
+        $map = array();
+        foreach ($headers as $key => $value) {
+            if (is_int($key) && is_string($value) && strpos($value, ':') !== false) {
+                list($name, $headerValue) = explode(':', $value, 2);
+                $map[trim($name)] = trim($headerValue);
+            } else {
+                $map[(string) $key] = (string) $value;
+            }
+        }
+
+        return self::sanitizeHeaderMap($map);
+    }
+
+    /**
+     * @param array $headers
+     * @return array<string, string>
+     */
+    private static function sanitizeHeaderMap(array $headers)
+    {
+        $redacted = array(
+            'authorization',
+            'proxy-authorization',
+            'cookie',
+            'set-cookie',
+            'x-api-key',
+            'x-auth-token',
+        );
+
+        $sanitized = array();
+        foreach ($headers as $name => $value) {
+            $normalized = strtolower(trim($name));
+            $sanitized[$normalized] = in_array($normalized, $redacted, true)
+                ? '[REDACTED]'
+                : (strlen($value) > 500 ? substr($value, 0, 500) . '…' : (string) $value);
+        }
+
+        ksort($sanitized);
+
+        return $sanitized;
     }
 }
