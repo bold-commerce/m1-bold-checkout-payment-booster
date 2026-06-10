@@ -408,6 +408,7 @@ class RsaConnectTest extends TestCase
         $config = new Bold_CheckoutPaymentBooster_Test_Stub_Config();
         $config->setValue('shop_id', 'shop_abc123');
         $config->setValue('shared_secret', 'oldSecret');
+        $config->setValue('is_check_shared_enabled', true);
         Bold_CheckoutPaymentBooster_Test_Stub_Mage::setSingleton(
             Bold_CheckoutPaymentBooster_Model_Config::RESOURCE,
             $config
@@ -430,6 +431,7 @@ class RsaConnectTest extends TestCase
         $config = new Bold_CheckoutPaymentBooster_Test_Stub_Config();
         $config->setValue('shop_id', 'shop_abc123');
         $config->setValue('shared_secret', 'oldSecret');
+        $config->setValue('is_check_shared_enabled', true);
         Bold_CheckoutPaymentBooster_Test_Stub_Mage::setSingleton(
             Bold_CheckoutPaymentBooster_Model_Config::RESOURCE,
             $config

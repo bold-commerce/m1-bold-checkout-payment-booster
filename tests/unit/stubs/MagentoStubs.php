@@ -283,6 +283,11 @@ class Bold_CheckoutPaymentBooster_Test_Stub_Config
     {
         return isset($this->values['shop_domain']) ? $this->values['shop_domain'] : '';
     }
+
+    public function isCheckSharedEnabled($websiteId)
+    {
+        return !empty($this->values['is_check_shared_enabled']);
+    }
 }
 
 class Bold_CheckoutPaymentBooster_Test_Stub_BoldClient
