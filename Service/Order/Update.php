@@ -36,7 +36,7 @@ class Bold_CheckoutPaymentBooster_Service_Order_Update
         );
 
         if (isset($response->errors) || isset($response->error)) {
-            $message = isset($updateResponse->error) ? json_encode($updateResponse->error) : 'n/a';
+            $message = isset($response->error) ? json_encode($response->error) : 'n/a';
             Mage::throwException('Cannot update order state, order id: ' . $order->getId() . ', error: ' . $message);
         }
     }

@@ -1,0 +1,9 @@
+{
+    "name": "bold/checkout-payment-booster-unit-tests",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
