@@ -9,6 +9,11 @@ class Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership
 
     /** Checkout session key for EPS wallet_pay order id created in this session. */
     const SESSION_WALLET_EPS_ORDER_ID = 'bold_wallet_eps_order_id';
+    const SESSION_WALLET_EPS_QUOTE_ID = 'bold_wallet_eps_quote_id';
+    const SESSION_WALLET_EPS_CREATED_AT = 'bold_wallet_eps_created_at';
+    /** Seconds to reuse the same wallet_pay order id for parallel createOrder calls. */
+    const WALLET_EPS_COALESCE_SECONDS = 15;
+
     /**
      * @param Mage_Sales_Model_Order $order
      * @param Mage_Sales_Model_Quote $quote
@@ -142,6 +147,64 @@ class Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership
         /** @var Mage_Checkout_Model_Session $session */
         $session = Mage::getSingleton('checkout/session');
         $session->setData(self::SESSION_WALLET_EPS_ORDER_ID, (string) $epsOrderId);
+    }
+
+    /**
+     * @param int $quoteId
+     * @return string
+     */
+    public static function getRecentWalletEpsOrderId($quoteId)
+    {
+        if ($quoteId <= 0) {
+            return '';
+        }
+
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $epsOrderId = (string) $session->getData(self::SESSION_WALLET_EPS_ORDER_ID);
+        $storedQuoteId = (int) $session->getData(self::SESSION_WALLET_EPS_QUOTE_ID);
+        $createdAt = (int) $session->getData(self::SESSION_WALLET_EPS_CREATED_AT);
+
+        if ($epsOrderId === ''
+            || $storedQuoteId !== $quoteId
+            || $createdAt <= 0
+            || (time() - $createdAt) > self::WALLET_EPS_COALESCE_SECONDS) {
+            return '';
+        }
+
+        return $epsOrderId;
+    }
+
+    /**
+     * @param int $quoteId
+     * @param string $epsOrderId
+     * @return void
+     */
+    public static function rememberWalletEpsOrderCreate($quoteId, $epsOrderId)
+    {
+        if ($quoteId <= 0 || $epsOrderId === '') {
+            return;
+        }
+
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $session->setData(self::SESSION_WALLET_EPS_ORDER_ID, (string) $epsOrderId);
+        $session->setData(self::SESSION_WALLET_EPS_QUOTE_ID, $quoteId);
+        $session->setData(self::SESSION_WALLET_EPS_CREATED_AT, time());
+    }
+
+    /**
+     * Clear wallet EPS order id when Bold public order rotates.
+     *
+     * @return void
+     */
+    public static function clearWalletEpsOrderId()
+    {
+        /** @var Mage_Checkout_Model_Session $session */
+        $session = Mage::getSingleton('checkout/session');
+        $session->unsetData(self::SESSION_WALLET_EPS_ORDER_ID);
+        $session->unsetData(self::SESSION_WALLET_EPS_QUOTE_ID);
+        $session->unsetData(self::SESSION_WALLET_EPS_CREATED_AT);
     }
 
     /**

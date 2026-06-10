@@ -7,6 +7,8 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
 {
     const PATH = '/checkout/storefront/';
 
+    const FRONTEND_BUILD_ID = '2.1.6-lethalperformance';
+
     /**
      * Billing address.
      *
@@ -232,6 +234,22 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     }
 
     /**
+     * Exposed in checkout JS to verify deployed frontend build.
+     *
+     * @return array
+     */
+    public function getFrontendBuildInfo()
+    {
+        $moduleConfig = Mage::getConfig()->getModuleConfig('Bold_CheckoutPaymentBooster');
+
+        return array(
+            'moduleVersion' => $moduleConfig ? (string) $moduleConfig->version : '',
+            'buildId' => self::FRONTEND_BUILD_ID,
+            'buildLabel' => 'lethal-performance-prod-release Firecheckout',
+        );
+    }
+
+    /**
      * URLs and flags for Apple Pay / Google Pay on checkout (used by base.phtml).
      *
      * @return array
@@ -240,21 +258,46 @@ class Bold_CheckoutPaymentBooster_Block_Payment_Form_Base extends Mage_Payment_B
     {
         $request = Mage::app()->getFrontController()->getRequest();
         $isFirecheckout = $request->getModuleName() === 'firecheckout';
+        $requiredAgreementIds = Mage::helper('checkout')->getRequiredAgreementIds();
+        if (!is_array($requiredAgreementIds)) {
+            $requiredAgreementIds = array();
+        }
 
-        return [
+        return array(
             'formKey' => Mage::getSingleton('core/session')->getFormKey(),
-            'quoteId' => (string)$this->quote->getId(),
-            'quoteIsVirtual' => (bool)$this->quote->getIsVirtual(),
-            'createOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/createOrder', ['_secure' => true]),
-            'updateOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/updateOrder', ['_secure' => true]),
+            'quoteId' => (string) $this->quote->getId(),
+            'quoteIsVirtual' => (bool) $this->quote->getIsVirtual(),
+            'requiredAgreementIds' => array_values(array_map('strval', $requiredAgreementIds)),
+            'createOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/createOrder', array('_secure' => true)),
+            'updateOrderUrl' => $this->getUrl('checkoutpaymentbooster/expresspay/updateOrder', array('_secure' => true)),
             'saveOrderUrl' => $this->getUrl(
                 $isFirecheckout ? 'firecheckout/index/saveOrder' : 'checkout/onepage/saveOrder',
-                ['_secure' => true]
+                array('_secure' => true)
             ),
-            'saveBillingUrl' => $this->getUrl('checkout/onepage/saveBilling', ['_secure' => true]),
-            'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', ['_secure' => true]),
-            'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', ['_secure' => true]),
-            'successUrl' => $this->getUrl('checkout/onepage/success', ['_secure' => true]),
-        ];
+            'saveBillingUrl' => $this->getUrl('checkout/onepage/saveBilling', array('_secure' => true)),
+            'saveShippingUrl' => $this->getUrl('checkout/onepage/saveShipping', array('_secure' => true)),
+            'saveShippingMethodUrl' => $this->getUrl('checkout/onepage/saveShippingMethod', array('_secure' => true)),
+            'successUrl' => $this->getUrl('checkout/onepage/success', array('_secure' => true)),
+            'getCheckoutSessionUrl' => $this->getUrl(
+                'checkoutpaymentbooster/index/getCheckoutSession',
+                array('_secure' => true)
+            ),
+        );
+    }
+
+    /**
+     * Current Bold checkout session for client sync (public order id + tokens).
+     *
+     * @return array
+     */
+    public function getCheckoutSessionPayload()
+    {
+        return array(
+            'public_order_id' => $this->getPublicOrderID(),
+            'jwt_token' => $this->getJwtToken(),
+            'eps_auth_token' => $this->getEpsAuthToken(),
+            'bold_api_url' => $this->getBoldApiUrl(),
+            'eps_gateway_id' => $this->getEpsGatewayId(),
+        );
     }
 }

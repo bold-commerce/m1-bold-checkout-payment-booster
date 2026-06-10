@@ -3,11 +3,16 @@
  * @var Bold_CheckoutPaymentBooster_Block_Payment_Form_Base $this
  */
 ?>
+<!-- Bold CheckoutPaymentBooster build: <?php echo $this->escapeHtml($this->getFrontendBuildInfo()['buildId']) ?> -->
 
 <script type="text/javascript">
     if (typeof window.bold === 'undefined') {
         window.bold = {};
     }
+
+    window.bold.checkoutPaymentBoosterBuild = <?php echo json_encode($this->getFrontendBuildInfo()) ?>;
+    window.bold.version = window.bold.checkoutPaymentBoosterBuild.buildId;
+    window.bold.moduleVersion = window.bold.checkoutPaymentBoosterBuild.moduleVersion;
 
     window.bold.walletCheckoutConfig = <?php echo json_encode($this->getWalletCheckoutJsConfig()) ?>;
 
@@ -22,8 +27,17 @@
         gatewayData: null,
         buildFastlaneInstanceInProgress: false,
         buildPaymentsInstanceInProgress: false,
+        syncCheckoutSessionPromise: null,
         cachedCartData: null,
         getCartDataPromise: null,
+        walletCheckoutCreateAllowed: false,
+        walletCheckoutSessionActive: false,
+        walletCreateOrderConsumed: false,
+        ppcpCheckoutClicked: false,
+        walletPayCreateInFlight: false,
+        walletPayCreatePromise: null,
+        createExpressOrderInFlight: false,
+        createExpressOrderPromise: null,
         isAvailable: <?php echo $this->isAvailable(); ?>,
         groupLabel: '<?php echo $this->getGroupLabel() ?>',
         boldApiUrl: '<?php echo $this->getBoldApiUrl(); ?>',
@@ -359,11 +373,93 @@
             }
         },
         /**
+         * Sync Bold checkout session tokens from Magento before Payments SDK init.
+         *
+         * @returns {Promise<boolean>}
+         */
+        syncCheckoutSessionFromServer: function () {
+            if (this.syncCheckoutSessionPromise) {
+                return this.syncCheckoutSessionPromise;
+            }
+            const cfg = window.bold.walletCheckoutConfig;
+            if (!cfg || !cfg.getCheckoutSessionUrl) {
+                return Promise.resolve(false);
+            }
+            this.syncCheckoutSessionPromise = new Promise((resolve, reject) => {
+                new Ajax.Request(cfg.getCheckoutSessionUrl, {
+                    method: 'post',
+                    parameters: {form_key: cfg.formKey},
+                    requestHeaders: {Accept: 'application/json'},
+                    onSuccess: (response) => {
+                        try {
+                            resolve(this.applyCheckoutSessionPayload(JSON.parse(response.responseText)));
+                        } catch (e) {
+                            reject(e);
+                        }
+                    },
+                    onFailure: () => {
+                        reject(new Error('Failed to sync Bold checkout session'));
+                    },
+                    onComplete: () => {
+                        this.syncCheckoutSessionPromise = null;
+                    }
+                });
+            });
+            return this.syncCheckoutSessionPromise;
+        },
+        /**
+         * Apply server checkout session payload; reset Payments SDK when public_order_id rotates.
+         *
+         * @param {{}} payload
+         * @returns {boolean}
+         */
+        applyCheckoutSessionPayload: function (payload) {
+            if (!payload || !payload.public_order_id) {
+                return false;
+            }
+            const previousId = this.publicOrderId;
+            const rotated = !!(previousId && previousId !== payload.public_order_id);
+            this.publicOrderId = payload.public_order_id;
+            window.bold.publicOrderId = payload.public_order_id;
+            if (payload.jwt_token) {
+                this.jwtToken = payload.jwt_token;
+            }
+            if (payload.eps_auth_token) {
+                this.epsAuthToken = payload.eps_auth_token;
+            }
+            if (payload.bold_api_url) {
+                this.boldApiUrl = payload.bold_api_url;
+            }
+            if (payload.eps_gateway_id) {
+                this.epsGatewayId = payload.eps_gateway_id;
+            }
+            if (rotated) {
+                console.warn('[Bold] public_order_id rotated', previousId, '->', payload.public_order_id);
+                this.resetBoldPaymentsInstance();
+                if (window.bold.boldPaymentMethod) {
+                    window.bold.boldPaymentMethod.walletButtonsRendered = false;
+                }
+            }
+            return rotated;
+        },
+        applyBoldCheckoutSession: function (payload) {
+            return this.applyCheckoutSessionPayload(payload);
+        },
+        resetBoldPaymentsInstance: function () {
+            this.boldPaymentsInstance = null;
+            this.buildPaymentsInstanceInProgress = false;
+        },
+        /**
          * Load SPI SDK.
          *
          * @returns {Promise<void>}
          */
         getBoldPaymentsInstance: async function () {
+            try {
+                await this.syncCheckoutSessionFromServer();
+            } catch (e) {
+                console.warn('[Bold] Checkout session sync failed before Payments SDK init', e);
+            }
             if (this.boldPaymentsInstance) {
                 this.buildPaymentsInstanceInProgress = false;
                 return this.boldPaymentsInstance;
@@ -390,23 +486,91 @@
                     }
                 ],
                 'callbacks': {
+                    /* Sync body for Apple Pay gesture; SDK still expects a Promise return value. */
+                    'onClickPaymentOrder': function (paymentType, paymentPayload) {
+                        const isPayPalButton = paymentType === 'ppcp';
+                        const isWalletButton = this.isWalletCheckoutPayment(paymentPayload)
+                            || paymentType === 'apple'
+                            || paymentType === 'google';
+                        if (!isPayPalButton && !isWalletButton) {
+                            return Promise.resolve();
+                        }
+                        if (isPayPalButton) {
+                            this.ppcpCheckoutClicked = true;
+                        }
+                        this.armWalletCheckoutCreate();
+                        if (isWalletButton) {
+                            this.walletCheckoutSessionActive = true;
+                        }
+                        if (!this.getCachedCartData()) {
+                            this.prefetchCartData().catch(function (e) {
+                                console.warn('[Bold] Wallet cart prefetch on click failed', e);
+                            });
+                        }
+                        return Promise.resolve();
+                    }.bind(this),
                     'onCreatePaymentOrder': async function (paymentType, paymentPayload) {
                         try {
-                            if (this.isWalletCheckoutPayment(paymentPayload)) {
+                            if (this.isWalletCheckoutPayment(paymentPayload)
+                                || paymentType === 'apple'
+                                || paymentType === 'google') {
+                                if (this.shouldDeferWalletButtonCreate()) {
+                                    return undefined;
+                                }
+                                window.bold.walletPayOrderLock = true;
+                                this.walletCreateOrderConsumed = true;
+                                this.walletCheckoutCreateAllowed = false;
+                                this.walletCheckoutSessionActive = true;
                                 return await this.handleWalletCreatePaymentOrder(paymentPayload);
                             }
                             if (paymentType !== 'ppcp') {
                                 return;
                             }
-                            const createOrderResult = await this.createExpressOrder(paymentPayload);
-                            return {payment_data: {id: createOrderResult.order_id}};
+                            if (this.shouldBlockPpcpMountCreate()) {
+                                return undefined;
+                            }
+                            const paymentMethod = window.bold.boldPaymentMethod;
+                            const isCardTokenize = !!(paymentMethod && paymentMethod.isTokenizing);
+                            if (!isCardTokenize) {
+                                if (!this.ppcpCheckoutClicked && !this.walletCheckoutCreateAllowed) {
+                                    this.ppcpCheckoutClicked = true;
+                                    this.armWalletCheckoutCreate();
+                                }
+                            }
+                            if (!this.shouldAllowPpcpCreatePaymentOrder()) {
+                                return undefined;
+                            }
+                            if (!isCardTokenize) {
+                                window.bold.walletPayOrderLock = true;
+                                this.walletCreateOrderConsumed = true;
+                                this.walletCheckoutCreateAllowed = false;
+                            }
+                            try {
+                                const createOrderResult = await this.createExpressOrder(paymentPayload);
+                                return {
+                                    payment_data: {
+                                        id: createOrderResult.order_id,
+                                        order_id: createOrderResult.order_id
+                                    }
+                                };
+                            } finally {
+                                if (!isCardTokenize) {
+                                    this.ppcpCheckoutClicked = false;
+                                }
+                            }
                         } catch (e) {
+                            const paymentMethod = window.bold.boldPaymentMethod;
+                            const wasPayPalAttempt = paymentType === 'ppcp'
+                                && !(paymentMethod && paymentMethod.isTokenizing);
+                            if (wasPayPalAttempt) {
+                                this.handleWalletCheckoutCancelled(paymentType, paymentPayload);
+                            }
                             console.error('Failed to create payment order', e);
                             throw e;
                         }
                     }.bind(this),
                     'onUpdatePaymentOrder': async function (paymentType, paymentPayload) {
-                        if (this.isWalletCheckoutPayment(paymentPayload)) {
+                        if (this.isWalletExpressPayFlow(paymentType, paymentPayload)) {
                             return await this.handleWalletUpdatePaymentOrder(paymentPayload);
                         }
                     }.bind(this),
@@ -420,12 +584,18 @@
                             if (paymentType !== 'ppcp') {
                                 return;
                             }
+                            const paymentMethod = window.bold.boldPaymentMethod;
+                            const isCardTokenize = !!(paymentMethod && paymentMethod.isTokenizing);
+                            if (!isCardTokenize) {
+                                await this.handleWalletApprovePaymentOrder(paymentPayload, paymentInformation);
+                                return;
+                            }
                             if (!paymentInformation.payment_id) {
                                 console.error('No payment ID provided from PayPal.');
                                 return;
                             }
-                            if (window.bold.boldPaymentMethod) {
-                                window.bold.boldPaymentMethod.paymentId = paymentInformation.payment_id;
+                            if (paymentMethod) {
+                                paymentMethod.paymentId = paymentInformation.payment_id;
                             }
                             if (typeof payment !== 'undefined' && payment.save) {
                                 payment.save();
@@ -463,6 +633,11 @@
                     }.bind(this),
                     'onRequireOrderData': function (requirements) {
                         try {
+                            if (!this.getCachedCartData()) {
+                                this.prefetchCartData().catch(function (prefetchError) {
+                                    console.warn('[Bold] Cart prefetch in onRequireOrderData failed', prefetchError);
+                                });
+                            }
                             return this.onRequireOrderDataCallback(requirements);
                         } catch (e) {
                             if (typeof checkout !== 'undefined') {
@@ -470,6 +645,9 @@
                             }
                             throw e;
                         }
+                    }.bind(this),
+                    'onErrorPaymentOrder': function (paymentType, paymentPayload) {
+                        this.handleWalletCheckoutCancelled(paymentType, paymentPayload);
                     }.bind(this),
                 }
             };
@@ -483,8 +661,115 @@
          * @return {void}
          */
         resetPaymentsInstance: function () {
+            this.clearWalletCheckoutSession();
+            this.createExpressOrderInFlight = false;
+            this.createExpressOrderPromise = null;
+            this.walletPayCreateInFlight = false;
+            this.walletPayCreatePromise = null;
             this.boldPaymentsInstance = null;
             this.buildPaymentsInstanceInProgress = false;
+        },
+        armWalletCheckoutCreate: function () {
+            this.walletCheckoutCreateAllowed = true;
+            this.walletCreateOrderConsumed = false;
+            window.bold.walletPayOrderLock = false;
+        },
+        shouldDeferWalletButtonCreate: function () {
+            return !!(this.shouldBlockPpcpMountCreate()
+                || window.bold.walletPayOrderLock
+                || !this.walletCheckoutCreateAllowed
+                || this.walletCreateOrderConsumed);
+        },
+        shouldBlockPpcpMountCreate: function () {
+            return !!(window.bold.checkoutSdkMounting
+                || window.bold.walletSdkMounting
+                || (window.bold.walletPayMountCooldownUntil
+                    && Date.now() < window.bold.walletPayMountCooldownUntil));
+        },
+        shouldAllowPpcpCreatePaymentOrder: function () {
+            if (this.shouldBlockPpcpMountCreate()) {
+                return false;
+            }
+            const method = window.bold.boldPaymentMethod;
+            if (method && method.isTokenizing) {
+                return true;
+            }
+            if (this.ppcpCheckoutClicked) {
+                return !this.walletCreateOrderConsumed;
+            }
+            if (this.walletCheckoutCreateAllowed && !this.walletCreateOrderConsumed) {
+                return true;
+            }
+            return false;
+        },
+        isWalletCheckoutSessionBusy: function () {
+            return !!(this.walletCheckoutSessionActive
+                || this.walletPayCreateInFlight
+                || window.bold.walletPayOrderLock);
+        },
+        shouldBlockWalletDomTeardown: function () {
+            return this.isWalletCheckoutSessionBusy() || !!window.bold.walletSdkMounting;
+        },
+        queuePaymentSectionSyncAfterWallet: function (options) {
+            options = options || {};
+            if (!window.bold.pendingPaymentSectionSyncAfterWallet) {
+                window.bold.pendingPaymentSectionSyncAfterWallet = {
+                    hardReload: false,
+                    forceRender: false,
+                    refreshWallets: false
+                };
+            }
+            const pending = window.bold.pendingPaymentSectionSyncAfterWallet;
+            if (options.hardReload) {
+                pending.hardReload = true;
+                pending.forceRender = true;
+            }
+            if (options.forceRender) {
+                pending.forceRender = true;
+            }
+            if (options.refreshWallets) {
+                pending.refreshWallets = true;
+                pending.forceRender = true;
+            }
+        },
+        flushPaymentSectionSyncAfterWallet: function () {
+            if (!window.bold.pendingPaymentSectionSyncAfterWallet) {
+                return;
+            }
+            const queued = window.bold.pendingPaymentSectionSyncAfterWallet;
+            window.bold.pendingPaymentSectionSyncAfterWallet = null;
+            window.bold.scheduleBoldPaymentSectionSync(queued);
+        },
+        clearWalletCheckoutSession: function () {
+            this.walletCheckoutCreateAllowed = false;
+            this.walletCheckoutSessionActive = false;
+            this.walletCreateOrderConsumed = false;
+            this.ppcpCheckoutClicked = false;
+            window.bold.walletPayOrderLock = false;
+            this.flushPaymentSectionSyncAfterWallet();
+        },
+        resetWalletSessionForCheckoutRefresh: function () {
+            if (this.walletPayCreateInFlight) {
+                return;
+            }
+            this.walletCheckoutSessionActive = false;
+            window.bold.walletPayOrderLock = false;
+            this.walletCheckoutCreateAllowed = false;
+            this.walletCreateOrderConsumed = false;
+            this.ppcpCheckoutClicked = false;
+        },
+        handleWalletCheckoutCancelled: function (paymentType, paymentPayload) {
+            this.clearWalletCheckoutSession();
+            const method = window.bold.boldPaymentMethod;
+            if (method && method.isCurrentRuntime()) {
+                method.paymentId = null;
+                method.isTokenizing = false;
+                method.isCompletingPayment = false;
+                if (typeof checkout !== 'undefined') {
+                    checkout.setLoadWaiting(false);
+                }
+            }
+            console.warn('[Bold] Wallet checkout cancelled or failed', paymentType || '', paymentPayload || '');
         },
         /**
          * Load specified script with attributes.
@@ -528,6 +813,14 @@
         prefetchCartData: function () {
             return this.getCartData();
         },
+        invalidateCartDataCache: function () {
+            this.cachedCartData = null;
+            this.getCartDataPromise = null;
+        },
+        refreshCartData: function () {
+            this.invalidateCartDataCache();
+            return this.getCartData();
+        },
         getCartData: function () {
             if (this.getCartDataPromise) {
                 return this.getCartDataPromise;
@@ -535,7 +828,6 @@
             this.getCartDataPromise = new Promise((resolve, reject) => {
                 new Ajax.Request('/checkoutpaymentbooster/index/getCartData', {
                     method: 'get',
-                    parameters: {form_key: '<?php echo Mage::getSingleton('core/session')->getFormKey() ?>'},
                     onSuccess: (response) => {
                         try {
                             resolve(this.cacheCartData(JSON.parse(response.responseText)));
@@ -596,7 +888,34 @@
             }
             return 0;
         },
+        normalizeOrderDataRequirements: function (requirements) {
+            if (Array.isArray(requirements)) {
+                return requirements;
+            }
+            if (requirements && Array.isArray(requirements.requirements)) {
+                return requirements.requirements;
+            }
+            if (requirements && typeof requirements === 'object') {
+                return Object.keys(requirements);
+            }
+            return ['totals', 'items', 'customer', 'shipping_options', 'shipping_address'];
+        },
+        ensureCartDataForOrderData: function (cartData) {
+            const fallback = this.buildMinimalCartDataFallback();
+            const snapshot = Object.assign({}, fallback, cartData || {});
+            if (!snapshot.totals || typeof snapshot.totals !== 'object') {
+                snapshot.totals = fallback.totals;
+            }
+            if (!snapshot.cart_items || !snapshot.cart_items.length) {
+                const totals = snapshot.totals || {};
+                const amount = this.normalizeWalletAmountCents(totals.order_total)
+                    || this.readCheckoutGrandTotalCents();
+                snapshot.cart_items = [{price: amount, title: 'Order'}];
+            }
+            return snapshot;
+        },
         buildWalletTotalsFromCartData: function (totals) {
+            totals = totals || {};
             const orderBalanceCents = this.normalizeWalletAmountCents(totals.order_total);
             return {
                 order_total: orderBalanceCents / 100,
@@ -661,6 +980,11 @@
                 && paymentPayload.payment_data
                 && paymentPayload.payment_data.payment_type;
             return walletType === 'apple' || walletType === 'google';
+        },
+        isWalletExpressPayFlow: function (paymentType, paymentPayload) {
+            return paymentType === 'apple'
+                || paymentType === 'google'
+                || this.isWalletCheckoutPayment(paymentPayload);
         },
         cloneWalletPayload: function (paymentPayload) {
             try {
@@ -882,7 +1206,17 @@
             if (!shippingOptions) {
                 return;
             }
-            const optionId = shippingOptions.id || shippingOptions.identifier;
+            let optionId = null;
+            if (Array.isArray(shippingOptions)) {
+                const selected = shippingOptions.find(function (option) {
+                    return option && option.is_selected;
+                }) || shippingOptions[0];
+                if (selected) {
+                    optionId = selected.id || selected.identifier || selected.rate_id;
+                }
+            } else {
+                optionId = shippingOptions.id || shippingOptions.identifier || shippingOptions.rate_id;
+            }
             if (!optionId || optionId === 'shipping_option_unselected') {
                 return;
             }
@@ -892,50 +1226,95 @@
             });
         },
         handleWalletCreatePaymentOrder: async function (paymentPayload) {
-            const payload = this.cloneWalletPayload(paymentPayload);
-            await this.applyWalletAddressesFromPayload(payload);
-            const createOrderResult = await this.createExpressOrder(payload);
-            const orderId = createOrderResult.order_id;
-            this.cacheWalletOrderId(orderId);
-            return {payment_data: {id: orderId, order_id: orderId}};
+            if (this.walletPayCreateInFlight && this.walletPayCreatePromise) {
+                return this.walletPayCreatePromise;
+            }
+            this.walletPayCreateInFlight = true;
+            this.walletPayCreatePromise = (async () => {
+                try {
+                    const payload = this.cloneWalletPayload(paymentPayload);
+                    await this.applyWalletAddressesFromPayload(payload);
+                    const createOrderResult = await this.createExpressOrder(payload);
+                    const orderId = createOrderResult.order_id;
+                    this.cacheWalletOrderId(orderId);
+                    return {payment_data: {id: orderId, order_id: orderId}};
+                } catch (e) {
+                    window.bold.walletPayOrderLock = false;
+                    this.walletCreateOrderConsumed = false;
+                    throw e;
+                } finally {
+                    this.walletPayCreateInFlight = false;
+                    this.walletPayCreatePromise = null;
+                }
+            })();
+            return this.walletPayCreatePromise;
         },
         handleWalletUpdatePaymentOrder: async function (paymentPayload) {
             const payload = this.cloneWalletPayload(paymentPayload);
-            if (payload.payment_data) {
-                this.cacheWalletOrderId(payload.payment_data.order_id || payload.payment_data.id);
+            this.walletCheckoutSessionActive = true;
+            window.bold.walletQuoteSyncInProgress = true;
+            const paymentData = payload.payment_data || {};
+            if (paymentData.order_id || paymentData.id) {
+                this.cacheWalletOrderId(paymentData.order_id || paymentData.id);
             }
-            if (!window.bold.walletCheckoutConfig.quoteIsVirtual) {
-                if (payload.payment_data && payload.payment_data.shipping_address) {
-                    await this.applyWalletAddressToQuote('shipping', payload.payment_data.shipping_address);
+            try {
+                if (!window.bold.walletCheckoutConfig.quoteIsVirtual) {
+                    if (paymentData.shipping_address) {
+                        await this.applyWalletAddressToQuote('shipping', paymentData.shipping_address);
+                    }
+                    if (paymentData.shipping_options || paymentData.shipping_address) {
+                        await this.applyWalletShippingFromPayload(payload);
+                    }
                 }
-                await this.applyWalletShippingFromPayload(payload);
-            }
-            if (payload.payment_data && payload.payment_data.billing_address) {
-                await this.applyWalletAddressToQuote('billing', payload.payment_data.billing_address);
-            }
-            await this.prefetchCartData();
-            if (payload.require_order_data) {
-                return this.onRequireOrderDataCallback(payload.require_order_data);
+                if (paymentData.billing_address) {
+                    await this.applyWalletAddressToQuote('billing', paymentData.billing_address);
+                }
+                try {
+                    await this.refreshCartData();
+                } catch (e) {
+                    console.warn('[Bold] Could not refresh cart data during wallet update', e);
+                }
+                const requirements = payload.require_order_data || payload.requirements;
+                const orderData = this.onRequireOrderDataCallback(requirements);
+                if (!orderData || typeof orderData !== 'object') {
+                    return {totals: this.buildWalletTotalsFromCartData(this.ensureCartDataForOrderData(null).totals)};
+                }
+                if (!orderData.totals) {
+                    const cartData = this.ensureCartDataForOrderData(this.getCachedCartData());
+                    orderData.totals = this.buildWalletTotalsFromCartData(cartData.totals);
+                }
+                return orderData;
+            } finally {
+                window.bold.walletQuoteSyncInProgress = false;
             }
         },
         handleWalletApprovePaymentOrder: async function (paymentPayload, paymentInformation) {
-            const orderId = this.resolveWalletOrderId(paymentPayload, paymentInformation);
-            if (!orderId) {
-                throw new Error('Wallet order id is missing');
+            try {
+                const orderId = this.resolveWalletOrderId(paymentPayload, paymentInformation);
+                if (!orderId) {
+                    throw new Error('Wallet order id is missing');
+                }
+                this.cacheWalletOrderId(orderId);
+                await this.applyWalletAddressesFromPayload(paymentPayload);
+                await this.applyWalletShippingFromPayload(paymentPayload);
+                const method = window.bold.boldPaymentMethod;
+                if (!method) {
+                    throw new Error('Bold payment method is not initialized');
+                }
+                method.paymentId = orderId;
+                await method.placeWalletOrder();
+            } finally {
+                this.clearWalletCheckoutSession();
             }
-            this.cacheWalletOrderId(orderId);
-            await this.applyWalletAddressesFromPayload(paymentPayload);
-            await this.applyWalletShippingFromPayload(paymentPayload);
-            const method = window.bold.boldPaymentMethod;
-            if (!method) {
-                throw new Error('Bold payment method is not initialized');
-            }
-            method.paymentId = orderId;
-            await method.placeWalletOrder();
         },
-        createExpressOrder: async function (paymentPayload) {
+        createExpressOrder: function (paymentPayload) {
+            if (this.createExpressOrderInFlight && this.createExpressOrderPromise) {
+                return this.createExpressOrderPromise;
+            }
+            this.createExpressOrderInFlight = true;
             const cfg = window.bold.walletCheckoutConfig;
-            return new Promise((resolve, reject) => {
+            const gatewayId = paymentPayload && paymentPayload.gateway_id;
+            this.createExpressOrderPromise = new Promise((resolve, reject) => {
                 new Ajax.Request(cfg.createOrderUrl, {
                     method: 'POST',
                     headers: {
@@ -944,34 +1323,44 @@
                     parameters: {
                         form_key: cfg.formKey,
                         quote_id: cfg.quoteId,
-                        gateway_id: paymentPayload.gateway_id,
-                        shipping_strategy: paymentPayload.shipping_strategy || 'dynamic'
+                        gateway_id: gatewayId,
+                        shipping_strategy: (paymentPayload && paymentPayload.shipping_strategy) || 'dynamic'
                     },
-                    onSuccess: function (response) {
-                        resolve(JSON.parse(response.responseText));
+                    onSuccess: (response) => {
+                        try {
+                            resolve(JSON.parse(response.responseText));
+                        } catch (e) {
+                            reject(e);
+                        }
                     },
-                    onFailure: function () {
+                    onFailure: () => {
                         reject(new Error('Failed to create express order'));
+                    },
+                    onComplete: () => {
+                        this.createExpressOrderInFlight = false;
+                        this.createExpressOrderPromise = null;
                     }
                 });
             });
+            return this.createExpressOrderPromise;
         },
         onRequireOrderDataCallback: function (requirements) {
-            let cartData = this.getCachedCartData();
-            if (!cartData) {
-                this.prefetchCartData();
-                cartData = this.buildMinimalCartDataFallback();
-            }
-            if (!cartData.cart_items || !cartData.cart_items.length) {
-                const totals = cartData.totals || {};
-                const amount = this.normalizeWalletAmountCents(totals.order_total) || this.readCheckoutGrandTotalCents();
-                cartData.cart_items = [{price: amount, title: 'Order'}];
-            }
+            const normalizedRequirements = this.normalizeOrderDataRequirements(requirements);
+            const cartData = this.ensureCartDataForOrderData(this.getCachedCartData());
             try {
-                return this.buildOrderDataFromCartData(requirements, cartData);
+                const orderData = this.buildOrderDataFromCartData(normalizedRequirements, cartData) || {};
+                if (!orderData.totals) {
+                    orderData.totals = this.buildWalletTotalsFromCartData(cartData.totals);
+                }
+                return orderData;
             } catch (e) {
                 console.error('[Bold] onRequireOrderData failed', e);
-                return this.buildOrderDataFromCartData(requirements, this.buildMinimalCartDataFallback());
+                const fallbackCart = this.ensureCartDataForOrderData(this.buildMinimalCartDataFallback());
+                const orderData = this.buildOrderDataFromCartData(normalizedRequirements, fallbackCart) || {};
+                if (!orderData.totals) {
+                    orderData.totals = this.buildWalletTotalsFromCartData(fallbackCart.totals);
+                }
+                return orderData;
             }
         },
         buildMinimalCartDataFallback: function () {
@@ -1021,8 +1410,10 @@
         uiRenderRetryScheduled: false,
         initialize: async function () {
             this.syncPaymentRuntimeVersion();
-            if (!this.isAvailable && !document.getElementById('payment_form_bold')) {
-                this.hidePaymentMethod();
+            if (!this.isAvailable) {
+                this.logBoldAvailabilityState('initialize');
+            }
+            if (!this.isBoldPaymentAvailableInCheckout()) {
                 return;
             }
             await this.waitForPaymentFormDom();
@@ -1043,6 +1434,7 @@
             this.waitForCheckoutInitialization();
             if (this.shouldShowBoldPaymentForm()) {
                 this.ensurePaymentFormVisible();
+                this.scheduleRenderPaymentForm(false, false);
             }
         },
         schedulePaymentFormBootstrapRetry: function () {
@@ -1118,24 +1510,151 @@
         isBoldPaymentActive: function () {
             return this.shouldShowBoldPaymentForm();
         },
-        isPaymentUiReady: function () {
+        isSpiFrameReady: function () {
             const form = this.getPaymentFormBold();
-            if (!form || form.style.display === 'none') {
+            if (!form) {
+                return false;
+            }
+            if (!this.shouldShowBoldPaymentForm() && form.style.display === 'none') {
                 return false;
             }
             const frame = this.getActiveSpiFrame();
-            if (!frame || frame.offsetHeight === 0) {
-                return false;
+            return !!(frame && form.contains(frame) && frame.offsetHeight > 0);
+        },
+        /** SPI/card iframe visible — wallets may still be loading in parallel. */
+        isPaymentUiReady: function () {
+            return this.isSpiFrameReady();
+        },
+        isWalletButtonsUiReady: function () {
+            if (!this.shouldRenderCheckoutWalletButtons()) {
+                return true;
             }
             return this.hasRenderedPpcpButtons();
         },
+        scheduleWalletsIfNeeded: function () {
+            if (this.shouldRenderCheckoutWalletButtons() && !this.hasVisibleWalletButtons()) {
+                this.scheduleWalletButtonsRender();
+            }
+        },
+        hasVisibleWalletButtons: function () {
+            const form = this.getPaymentFormBold();
+            const host = this.getPpcpButtonsContainer();
+            if (!form || !host || !form.contains(host)) {
+                return false;
+            }
+            const candidates = host.querySelectorAll(
+                'iframe, [data-funding-source], .paypal-buttons, apple-pay-button, button, [role="button"]'
+            );
+            for (let i = 0; i < candidates.length; i++) {
+                const el = candidates[i];
+                if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+                    return true;
+                }
+            }
+            return false;
+        },
+        hasRenderedPpcpButtons: function () {
+            return this.hasVisibleWalletButtons();
+        },
+        invalidateWalletButtonsForTotalsChange: function () {
+            if (!this.shouldRenderCheckoutWalletButtons()) {
+                return;
+            }
+            if (window.bold.baseInstance && window.bold.baseInstance.isWalletCheckoutSessionBusy()) {
+                return;
+            }
+            this.clearPpcpButtonsContent();
+        },
+        shouldRenderCheckoutWalletButtons: function () {
+            return this.shouldShowBoldPaymentForm();
+        },
+        shouldRenderSpi: function (hardReset) {
+            if (hardReset) {
+                return true;
+            }
+            const form = this.getPaymentFormBold();
+            if (!form) {
+                return false;
+            }
+            const frame = this.getActiveSpiFrame();
+            if (!frame || !form.contains(frame)) {
+                return true;
+            }
+            if (this.shouldShowBoldPaymentForm() && frame.offsetHeight <= 0) {
+                return true;
+            }
+            return false;
+        },
+        shouldRenderWalletButtons: function (hardReset) {
+            if (!this.shouldRenderCheckoutWalletButtons()) {
+                return false;
+            }
+            if (hardReset) {
+                return true;
+            }
+            return !this.hasRenderedPpcpButtons();
+        },
+        walletButtonsRenderScheduled: false,
+        scheduleWalletButtonsRender: function () {
+            if (!this.shouldRenderCheckoutWalletButtons() || this.walletButtonsRenderScheduled) {
+                return;
+            }
+            this.walletButtonsRenderScheduled = true;
+            const self = this;
+            (async function () {
+                try {
+                    if (!self.isSpiFrameReady()) {
+                        self.scheduleRenderPaymentForm(false, false);
+                        await self.awaitPendingPaymentRender();
+                        const deadline = Date.now() + 15000;
+                        while (!self.isSpiFrameReady() && Date.now() < deadline) {
+                            await self.delay(100);
+                        }
+                    }
+                    if (self.isSpiFrameReady()) {
+                        await self.ensurePpcpWalletButtons();
+                    }
+                } finally {
+                    self.walletButtonsRenderScheduled = false;
+                }
+            })();
+        },
         ensurePpcpWalletButtons: async function () {
-            if (!this.isCurrentRuntime() || !this.hasValidBaseInstance() || this.hasRenderedPpcpButtons()) {
+            if (!this.isCurrentRuntime() || !this.hasValidBaseInstance() || !this.shouldRenderCheckoutWalletButtons()) {
+                return;
+            }
+            if (this.hasRenderedPpcpButtons()) {
                 return;
             }
             this.ensurePpcpButtonsContainer();
             const paymentInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
             await this.renderPpcpWalletButtonsWithRetry(paymentInstance, false);
+        },
+        registerCheckoutWalletIntentListener: function () {
+            if (window.bold.checkoutWalletIntentRegistered) {
+                return;
+            }
+            window.bold.checkoutWalletIntentRegistered = true;
+            document.observe('pointerdown', function (evt) {
+                if (!evt.isTrusted) {
+                    return;
+                }
+                const method = window.bold.boldPaymentMethod;
+                if (!method || !method.shouldRenderCheckoutWalletButtons()) {
+                    return;
+                }
+                const el = evt.element();
+                if (!el || !el.closest) {
+                    return;
+                }
+                if (el.closest('#smart-ppcp-buttons') || el.closest('.bold-checkout-wallet-buttons')) {
+                    if (window.bold.baseInstance) {
+                        window.bold.baseInstance.ppcpCheckoutClicked = true;
+                        window.bold.baseInstance.armWalletCheckoutCreate();
+                    }
+                    method.scheduleWalletButtonsRender();
+                }
+            });
         },
         syncBoldAsCurrentPaymentMethod: function () {
             const methods = Array.from(document.querySelectorAll('input[name="payment[method]"]'));
@@ -1178,22 +1697,38 @@
             if (!this.hasValidBaseInstance()) {
                 return;
             }
-            if (!options.hardReload && this.isPaymentUiReady()) {
+            if (options.refreshWallets) {
+                this.invalidateWalletButtonsForTotalsChange();
+            }
+            if (!options.hardReload && this.isPaymentUiReady() && this.isWalletButtonsUiReady()) {
+                this.ensurePpcpButtonsContainer();
                 return;
             }
+            if (!options.hardReload && this.isPaymentUiReady()) {
+                this.ensurePpcpButtonsContainer();
+                this.scheduleWalletsIfNeeded();
+                if (!options.forceRender && !options.refreshWallets) {
+                    return;
+                }
+            }
             const needsRender = !!options.hardReload
-                || (!!options.forceRender && !this.isPaymentUiReady());
+                || !!options.refreshWallets
+                || (!!options.forceRender && (!this.isPaymentUiReady() || !this.isWalletButtonsUiReady()));
             if (!needsRender) {
                 return;
             }
             await this.awaitPendingPaymentRender();
             if (options.hardReload) {
+                this.bumpPaymentRuntimeVersion();
                 this.resetPaymentFlowState();
                 if (typeof checkout !== 'undefined') {
                     checkout.setLoadWaiting(false);
                 }
             }
-            await this.renderPaymentForm(!!options.hardReload, !!options.hardReload);
+            await this.renderPaymentForm(
+                !!options.hardReload || !!options.refreshWallets,
+                !!options.hardReload
+            );
             if (this.shouldShowBoldPaymentForm()) {
                 this.ensurePaymentFormVisible();
             }
@@ -1373,17 +1908,6 @@
                 inner.removeChild(inner.firstChild);
             }
         },
-        hasRenderedPpcpButtons: function () {
-            const host = this.getPpcpButtonsContainer();
-            if (!host) {
-                return false;
-            }
-            const inner = host.querySelector('[id="paypal-button-container"]') || host;
-            if (inner.children.length > 0) {
-                return true;
-            }
-            return !!host.querySelector('iframe, [data-funding-source], .paypal-buttons, button, [role="button"]');
-        },
         needsPpcpButtonsRender: function () {
             return !!this.getPaymentFormBold() && !this.hasRenderedPpcpButtons();
         },
@@ -1401,6 +1925,13 @@
         resetPaymentFormContainer: function (resetSdk) {
             if (typeof resetSdk === 'undefined') {
                 resetSdk = true;
+            }
+            if (window.bold.baseInstance && window.bold.baseInstance.shouldBlockWalletDomTeardown()) {
+                window.bold.baseInstance.queuePaymentSectionSyncAfterWallet({hardReload: true, forceRender: true});
+                return;
+            }
+            if (window.bold.baseInstance) {
+                window.bold.baseInstance.clearWalletCheckoutSession();
             }
             const form = this.getPaymentFormBold();
             if (!form) {
@@ -1440,10 +1971,10 @@
             if (forceReset || !this.isCurrentRuntime()) {
                 return false;
             }
-            if (!this.isPaymentRenderReady()) {
+            if (!this.isSpiFrameReady()) {
                 return false;
             }
-            if (this.needsPpcpButtonsRender()) {
+            if (this.shouldRenderCheckoutWalletButtons() && !this.hasVisibleWalletButtons()) {
                 return false;
             }
             return true;
@@ -1458,11 +1989,22 @@
             if (!paymentInstance || typeof paymentInstance.renderWalletPayments !== 'function') {
                 return false;
             }
+            if (!force && window.bold.baseInstance && window.bold.baseInstance.isWalletCheckoutSessionBusy()) {
+                return this.hasRenderedPpcpButtons();
+            }
+            if (!force && this.hasRenderedPpcpButtons()) {
+                return true;
+            }
+            if (!force && window.bold.walletButtonsRendering) {
+                return this.hasRenderedPpcpButtons();
+            }
             if (force) {
                 this.clearPpcpButtonsContent();
             } else if (!this.needsPpcpButtonsRender()) {
                 return this.hasRenderedPpcpButtons();
             }
+            window.bold.walletButtonsRendering = true;
+            window.bold.walletSdkMounting = true;
             this.ensurePpcpButtonsContainer();
             const shopName = window.bold.baseInstance && window.bold.baseInstance.groupLabel
                 ? window.bold.baseInstance.groupLabel
@@ -1501,6 +2043,10 @@
                 }
                 console.warn('[Bold] renderWalletPayments failed', e);
                 return false;
+            } finally {
+                window.bold.walletButtonsRendering = false;
+                window.bold.walletSdkMounting = false;
+                window.bold.walletPayMountCooldownUntil = Date.now() + 2000;
             }
         },
         renderSpiPayments: async function (paymentInstance, renderGeneration) {
@@ -1563,7 +2109,7 @@
             if (immediate) {
                 run();
             } else {
-                this.renderPaymentFormTimer = setTimeout(run, 500);
+                this.renderPaymentFormTimer = setTimeout(run, 200);
             }
         },
         renderPaymentForm: async function (forceReset, hardReset) {
@@ -1577,7 +2123,13 @@
             if (!form) {
                 return;
             }
+            if (this.shouldShowBoldPaymentForm()) {
+                this.ensurePaymentFormVisible();
+            }
             if (this.canSkipPaymentRender(forceReset)) {
+                if (this.shouldRenderCheckoutWalletButtons() && !this.hasRenderedPpcpButtons()) {
+                    this.scheduleWalletButtonsRender();
+                }
                 return;
             }
             await this.awaitPendingPaymentRender();
@@ -1587,8 +2139,10 @@
             const renderGeneration = window.bold.spiRenderGeneration;
             const renderTask = (async () => {
                 window.bold.spiRenderInProgress = true;
+                window.bold.checkoutSdkMounting = true;
                 try {
                     if (hardReset) {
+                        this.bumpPaymentRuntimeVersion();
                         this.resetPaymentFormContainer(true);
                         await this.delay(300);
                     }
@@ -1600,19 +2154,26 @@
                         return;
                     }
                     this.ensurePpcpButtonsContainer();
-                    const shouldRenderSpi = hardReset || !this.getActiveSpiFrame();
-                    if (!this.isFastlaneAvailable && shouldRenderSpi) {
-                        await this.renderSpiPayments(paymentInstance, renderGeneration);
-                    } else if (this.isFastlaneAvailable && shouldRenderSpi) {
+                    const needsSpi = this.shouldRenderSpi(hardReset);
+                    const needsWallets = this.shouldRenderWalletButtons(hardReset);
+                    const self = this;
+                    const renderSpi = async function () {
+                        if (!needsSpi) {
+                            return;
+                        }
+                        if (!self.isFastlaneAvailable) {
+                            await self.renderSpiPayments(paymentInstance, renderGeneration);
+                            return;
+                        }
                         try {
                             await paymentInstance.renderPayments('payment_form_bold', {
                                 fastlane: true,
                                 shouldRenderSpiFrame: false
                             });
                         } catch (e) {
-                            if (this.isSdkAlreadyRenderedMessage(e)) {
-                                this.resetPaymentFormContainer(true);
-                                await this.delay(400);
+                            if (self.isSdkAlreadyRenderedMessage(e)) {
+                                self.resetPaymentFormContainer(true);
+                                await self.delay(400);
                                 const retryInstance = await window.bold.baseInstance.getBoldPaymentsInstance();
                                 await retryInstance.renderPayments('payment_form_bold', {
                                     fastlane: true,
@@ -1622,17 +2183,22 @@
                                 throw e;
                             }
                         }
-                    }
+                    };
+                    const renderWallets = async function () {
+                        if (!needsWallets) {
+                            return;
+                        }
+                        await self.renderPpcpWalletButtonsWithRetry(paymentInstance, hardReset || forceReset);
+                    };
+                    await Promise.all([renderSpi(), renderWallets()]);
                     if (!this.isCurrentRuntime() || renderGeneration !== window.bold.spiRenderGeneration) {
                         return;
                     }
                     this.dedupeSpiFrames();
                     this.ensurePaymentFormVisible();
-                    if (!this.hasRenderedPpcpButtons()) {
-                        await this.renderPpcpWalletButtonsWithRetry(paymentInstance, hardReset);
-                    }
                 } finally {
                     window.bold.spiRenderInProgress = false;
+                    window.bold.checkoutSdkMounting = false;
                 }
             })();
             window.bold.paymentRenderPromise = renderTask;
@@ -1644,8 +2210,12 @@
                 if (window.bold.paymentRenderPromise === renderTask) {
                     window.bold.paymentRenderPromise = null;
                 }
-                if (this.shouldShowBoldPaymentForm() && !this.isPaymentUiReady()
-                    && !this.uiRenderRetryScheduled && hardReset) {
+                if (this.shouldShowBoldPaymentForm() && !this.hasRenderedPpcpButtons()) {
+                    this.scheduleWalletButtonsRender();
+                }
+                if (this.shouldShowBoldPaymentForm()
+                    && !this.isWalletButtonsUiReady()
+                    && !this.uiRenderRetryScheduled) {
                     this.uiRenderRetryScheduled = true;
                     const self = this;
                     setTimeout(function () {
@@ -1688,7 +2258,7 @@
                 return;
             }
             if (!this.isAvailable) {
-                this.hidePaymentMethod();
+                this.logBoldAvailabilityState('onPaymentSectionReloaded');
                 return;
             }
             if (options.hardReload) {
@@ -1743,7 +2313,9 @@
             }
             this.ensurePaymentFormVisible();
             if (!this.isPaymentUiReady()) {
-                this.scheduleRenderPaymentForm(true, false);
+                this.scheduleRenderPaymentForm(false, false);
+            } else {
+                this.scheduleWalletsIfNeeded();
             }
         },
         syncPaymentIdToForm: function (orderId) {
@@ -1794,9 +2366,52 @@
             }
             throw new Error('Checkout is not ready to place order');
         },
+        getBoldPaymentDd: function () {
+            return document.getElementById('dd_method_bold')
+                || document.querySelector('dd[id="dd_method_bold"]');
+        },
+        getBoldPaymentDt: function () {
+            const radio = document.getElementById('p_method_bold');
+            if (!radio) {
+                return null;
+            }
+            return radio.closest ? radio.closest('dt') : null;
+        },
+        logBoldAvailabilityState: function (context) {
+            const build = window.bold.checkoutPaymentBoosterBuild || {};
+            console.warn(
+                '[Bold CheckoutPaymentBooster] Bold session not ready (' + context + ').',
+                'buildId:', build.buildId,
+                'p_method_bold:', !!document.getElementById('p_method_bold'),
+                'payment_form_bold:', !!document.getElementById('payment_form_bold'),
+                'isAvailable flag:', this.isAvailable
+            );
+        },
         hidePaymentMethod: function () {
-            if (this.paymentMethodElement) {
-                this.paymentMethodElement.style.display = 'none';
+            const form = this.getPaymentFormBold();
+            if (form) {
+                form.style.display = 'none';
+                form.classList.add('bold-payment-inactive');
+            }
+            const dd = this.getBoldPaymentDd();
+            if (dd) {
+                dd.classList.add('bold-payment-dd-inactive');
+            }
+            const dt = this.getBoldPaymentDt();
+            if (dt) {
+                dt.style.display = '';
+                dt.style.visibility = 'visible';
+            }
+        },
+        showPaymentMethodInList: function () {
+            const dt = this.getBoldPaymentDt();
+            if (dt) {
+                dt.style.display = '';
+                dt.style.visibility = 'visible';
+            }
+            const dd = this.getBoldPaymentDd();
+            if (dd) {
+                dd.classList.remove('bold-payment-dd-inactive');
             }
         },
         waitForCheckoutInitialization: function () {
@@ -1997,16 +2612,21 @@
     };
 
     window.bold.initBoldPaymentMethod = function () {
-        if (!<?php echo $this->isAvailable(); ?>) {
+        const hasBoldRadio = !!document.getElementById('p_method_bold');
+        if (!<?php echo $this->isAvailable(); ?> && !hasBoldRadio) {
             return;
         }
         if (!window.bold.boldPaymentMethod) {
             window.bold.boldPaymentMethod = new BoldPaymentMethod();
         }
+        if (hasBoldRadio && window.bold.boldPaymentMethod) {
+            window.bold.boldPaymentMethod.showPaymentMethodInList();
+        }
     };
 
     window.bold.ensureBoldPaymentRuntime = function () {
-        if (!<?php echo $this->isAvailable(); ?>) {
+        const hasBoldRadio = !!document.getElementById('p_method_bold');
+        if (!<?php echo $this->isAvailable(); ?> && !hasBoldRadio) {
             return null;
         }
         window.bold.ensureBoldBaseInstance();
@@ -2029,15 +2649,26 @@
     window.bold.scheduleBoldPaymentSectionSync = function (options) {
         options = options || {};
         const instance = window.bold.boldPaymentMethod;
-        if (!options.hardReload && instance && instance.isPaymentUiReady()) {
+        const baseInstance = window.bold.baseInstance;
+        if (baseInstance && baseInstance.isWalletCheckoutSessionBusy()) {
+            baseInstance.queuePaymentSectionSyncAfterWallet(options);
+            return;
+        }
+        if (options.refreshWallets && baseInstance) {
+            baseInstance.resetWalletSessionForCheckoutRefresh();
+        }
+        if (!options.hardReload && !options.refreshWallets && instance
+            && instance.isPaymentUiReady() && instance.isWalletButtonsUiReady()) {
             instance.ensurePaymentFormVisible();
+            instance.ensurePpcpButtonsContainer();
             return;
         }
         if (window.bold.paymentSyncInProgress) {
             if (!window.bold.pendingPaymentSectionSync) {
                 window.bold.pendingPaymentSectionSync = {
                     hardReload: false,
-                    forceRender: false
+                    forceRender: false,
+                    refreshWallets: false
                 };
             }
             if (options.hardReload) {
@@ -2046,12 +2677,16 @@
             if (options.forceRender) {
                 window.bold.pendingPaymentSectionSync.forceRender = true;
             }
+            if (options.refreshWallets) {
+                window.bold.pendingPaymentSectionSync.refreshWallets = true;
+            }
             return;
         }
         if (!window.bold.pendingPaymentSectionSync) {
             window.bold.pendingPaymentSectionSync = {
                 hardReload: false,
-                forceRender: false
+                forceRender: false,
+                refreshWallets: false
             };
         }
         if (options.hardReload) {
@@ -2061,17 +2696,25 @@
         if (options.forceRender) {
             window.bold.pendingPaymentSectionSync.forceRender = true;
         }
+        if (options.refreshWallets) {
+            window.bold.pendingPaymentSectionSync.refreshWallets = true;
+            window.bold.pendingPaymentSectionSync.forceRender = true;
+        }
         if (window.bold.paymentSectionSyncTimer) {
             clearTimeout(window.bold.paymentSectionSyncTimer);
         }
         window.bold.paymentSectionSyncTimer = setTimeout(function () {
             window.bold.paymentSectionSyncTimer = null;
             window.bold.runBoldPaymentSectionSync();
-        }, 350);
+        }, 150);
     };
 
     window.bold.runBoldPaymentSectionSync = async function () {
-        const pending = window.bold.pendingPaymentSectionSync || {hardReload: false, forceRender: false};
+        const pending = window.bold.pendingPaymentSectionSync || {
+            hardReload: false,
+            forceRender: false,
+            refreshWallets: false
+        };
         window.bold.pendingPaymentSectionSync = null;
         if (window.bold.paymentSyncInProgress) {
             return;
@@ -2082,21 +2725,23 @@
         }
         window.bold.paymentSyncInProgress = true;
         try {
-            if (window.bold.baseInstance && typeof window.bold.baseInstance.getCartData === 'function') {
+            if (window.bold.baseInstance && typeof window.bold.baseInstance.refreshCartData === 'function') {
                 try {
-                    await window.bold.baseInstance.getCartData();
+                    await window.bold.baseInstance.refreshCartData();
                 } catch (e) {
                     console.warn('[Bold] Could not refresh cart data before checkout sync', e);
                 }
             }
             await instance.ensureBoldCheckoutUi({
                 hardReload: !!pending.hardReload,
-                forceRender: !!pending.forceRender
+                forceRender: !!pending.forceRender,
+                refreshWallets: !!pending.refreshWallets
             });
             instance.waitForPaymentInitialization();
             instance.waitForCheckoutInitialization();
             window.bold.lastPaymentSyncFinishedAt = Date.now();
             window.bold.lastSyncUiReady = instance.isPaymentUiReady();
+            window.bold.lastSyncWalletsReady = instance.isWalletButtonsUiReady();
         } catch (e) {
             console.error('[Bold] payment section sync failed', e);
         } finally {
@@ -2104,7 +2749,10 @@
             if (window.bold.pendingPaymentSectionSync) {
                 const queued = window.bold.pendingPaymentSectionSync;
                 window.bold.pendingPaymentSectionSync = null;
-                if (!queued.hardReload && window.bold.lastSyncUiReady) {
+                const walletsReady = !instance.shouldRenderCheckoutWalletButtons()
+                    || window.bold.lastSyncWalletsReady;
+                if (!queued.hardReload && !queued.refreshWallets
+                    && window.bold.lastSyncUiReady && walletsReady) {
                     return;
                 }
                 window.bold.scheduleBoldPaymentSectionSync(queued);
@@ -2116,6 +2764,9 @@
         if (!window.bold.ensureBoldPaymentRuntime()) {
             return;
         }
+        if (sections && sections['shipping-method'] && window.bold.baseInstance) {
+            window.bold.baseInstance.invalidateCartDataCache();
+        }
         if (!sections) {
             window.bold.scheduleBoldPaymentSectionSync({forceRender: true});
             return;
@@ -2124,11 +2775,18 @@
             window.bold.scheduleBoldPaymentSectionSync({hardReload: true});
             return;
         }
+        const totalsSections = ['shipping-method', 'total', 'cart'];
+        const refreshWallets = totalsSections.some(function (section) {
+            return !!sections[section];
+        });
         const shouldSync = window.bold.checkoutSectionsTriggeringBoldSync.some(function (section) {
             return !!sections[section];
         });
         if (shouldSync) {
-            window.bold.scheduleBoldPaymentSectionSync({forceRender: true});
+            window.bold.scheduleBoldPaymentSectionSync({
+                forceRender: true,
+                refreshWallets: refreshWallets
+            });
         }
     };
 
@@ -2158,6 +2816,16 @@
         window.bold.firecheckoutPaymentReloadRegistered = true;
         document.observe('firecheckout:setResponseAfter', function (e) {
             const sections = e.memo.response && e.memo.response.update_section;
+            const baseInstance = window.bold.baseInstance;
+            if (window.bold.walletQuoteSyncInProgress
+                || (baseInstance && baseInstance.isWalletCheckoutSessionBusy())) {
+                if (baseInstance && typeof baseInstance.prefetchCartData === 'function') {
+                    baseInstance.prefetchCartData().catch(function (err) {
+                        console.warn('[Bold] Cart prefetch during wallet session failed', err);
+                    });
+                }
+                return;
+            }
             window.bold.handleFirecheckoutCheckoutChange(sections);
         });
         document.observe('payment-method:switched', function (e) {
@@ -2174,11 +2842,12 @@
         });
         document.observe('firecheckout:paymentMethod:afterInitAfter', function () {
             const instance = window.bold.boldPaymentMethod;
-            if (instance && instance.isPaymentUiReady()) {
+            if (instance && instance.isPaymentUiReady() && instance.isWalletButtonsUiReady()) {
                 instance.ensurePaymentFormVisible();
+                instance.ensurePpcpButtonsContainer();
                 return;
             }
-            window.bold.scheduleBoldPaymentSectionSync({forceRender: true});
+            window.bold.scheduleBoldPaymentSectionSync({hardReload: true, refreshWallets: true});
         });
         window.bold.registerPaymentMethodDomObserver = function () {
             if (window.bold.paymentMethodDomObserver) {
@@ -2191,6 +2860,9 @@
             }
             window.bold.paymentMethodDomObserver = new MutationObserver(function (mutations) {
                 if (window.bold.spiRenderInProgress) {
+                    return;
+                }
+                if (window.bold.baseInstance && window.bold.baseInstance.isWalletCheckoutSessionBusy()) {
                     return;
                 }
                 let formInjected = false;
@@ -2206,7 +2878,7 @@
                     });
                 });
                 if (formInjected && !window.bold.paymentSyncInProgress) {
-                    window.bold.scheduleBoldPaymentSectionSync({forceRender: true});
+                    window.bold.scheduleBoldPaymentSectionSync({hardReload: true});
                 }
             });
             window.bold.paymentMethodDomObserver.observe(root, {childList: true, subtree: true});
@@ -2221,6 +2893,10 @@
     function boldBoosterBootstrap() {
         window.bold.ensureBoldBaseInstance();
         window.bold.initBoldPaymentMethod();
+        if (window.bold.boldPaymentMethod
+            && typeof window.bold.boldPaymentMethod.registerCheckoutWalletIntentListener === 'function') {
+            window.bold.boldPaymentMethod.registerCheckoutWalletIntentListener();
+        }
         if (window.bold.baseInstance && typeof window.bold.baseInstance.prefetchCartData === 'function') {
             window.bold.baseInstance.prefetchCartData().catch(function (e) {
                 console.warn('[Bold] Initial cart data prefetch failed', e);

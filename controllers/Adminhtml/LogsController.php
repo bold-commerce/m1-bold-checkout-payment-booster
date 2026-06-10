@@ -3,7 +3,8 @@ class Bold_CheckoutPaymentBooster_Adminhtml_LogsController extends Mage_Adminhtm
 {
     protected function _isAllowed()
     {
-        return true;
+        // Restrict log export to admins who can edit Bold configuration.
+        return Mage::getSingleton('admin/session')->isAllowed('system/config');
     }
 
     public function exportAction()
