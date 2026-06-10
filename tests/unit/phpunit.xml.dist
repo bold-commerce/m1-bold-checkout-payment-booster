@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+    bootstrap="bootstrap.php"
+    colors="true"
+    failOnRisky="true"
+    failOnWarning="true"
+>
+    <testsuites>
+        <testsuite name="Bold CheckoutPaymentBooster Duplicate Orders">
+            <file>CheckoutSessionOwnershipTest.php</file>
+            <file>PlacementGuardTest.php</file>
+        </testsuite>
+    </testsuites>
+    <filter>
+        <whitelist>
+            <directory suffix=".php">../../Service/Order</directory>
+        </whitelist>
+    </filter>
+</phpunit>
