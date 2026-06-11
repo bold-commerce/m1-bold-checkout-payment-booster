@@ -86,6 +86,13 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         // Keep the new secret in memory until Bold confirms PATCH/POST and checkShared
         // succeeds — Magento must not persist locally until both sides agree.
         $sharedSecret = self::generateSharedSecret();
+        Mage::log(
+            'RSA shared secret generated for website ' . $websiteId
+            . ': shared_secret=' . self::formatSharedSecretForLog($websiteId, $sharedSecret)
+            . ' callback_url=' . $callbackUrl,
+            Zend_Log::INFO,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+        );
         $body = [
             'url' => $callbackUrl,
             'shared_secret' => $sharedSecret,
@@ -106,6 +113,14 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             );
         }
 
+        Mage::log(
+            'RSA shared secret registered with Bold for website ' . $websiteId
+            . ': shared_secret=' . self::formatSharedSecretForLog($websiteId, $sharedSecret)
+            . ' callback_url=' . $callbackUrl,
+            Zend_Log::INFO,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+        );
+
         if ($config->isCheckSharedEnabled($websiteId)
             && !self::verifySharedSecretWithBoldCheckShared($websiteId, $sharedSecret, $callbackUrl)
         ) {
@@ -117,6 +132,12 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
         }
 
         $config->setSharedSecret($sharedSecret, $websiteId);
+        Mage::log(
+            'RSA shared secret saved to Magento config for website ' . $websiteId
+            . ': shared_secret=' . self::formatSharedSecretForLog($websiteId, $sharedSecret),
+            Zend_Log::INFO,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME
+        );
     }
 
     /**
@@ -437,5 +458,38 @@ class Bold_CheckoutPaymentBooster_Service_Rsa_Connect
             $randomString .= $characters[rand(0, $charactersLength - 1)];
         }
         return $randomString;
+    }
+
+    /**
+     * @param int $websiteId
+     * @param string $sharedSecret
+     * @return string
+     */
+    private static function formatSharedSecretForLog($websiteId, $sharedSecret)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        if (!$config->isRsaSharedSecretLogMasked($websiteId)) {
+            return (string)$sharedSecret;
+        }
+
+        return self::maskSharedSecretForLog($sharedSecret);
+    }
+
+    /**
+     * @param string $sharedSecret
+     * @return string
+     */
+    private static function maskSharedSecretForLog($sharedSecret)
+    {
+        $sharedSecret = (string)$sharedSecret;
+        $length = strlen($sharedSecret);
+        if ($length === 0) {
+            return '(empty)';
+        }
+
+        $visible = min(4, $length);
+
+        return str_repeat('*', $length - $visible) . substr($sharedSecret, -$visible);
     }
 }

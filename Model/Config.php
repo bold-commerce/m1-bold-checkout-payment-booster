@@ -33,6 +33,7 @@ class Bold_CheckoutPaymentBooster_Model_Config
     const PATH_FASTLANE_EMAIL_CONTAINER_STYLES = 'checkout/bold_checkout_payment_booster_advanced/fastlane_email_container_styles';
     const PATH_IS_LOG_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_log_enabled';
     const PATH_IS_CHECK_SHARED_ENABLED = 'checkout/bold_checkout_payment_booster_advanced/is_check_shared_enabled';
+    const PATH_IS_RSA_SHARED_SECRET_LOG_MASKED = 'checkout/bold_checkout_payment_booster_advanced/is_rsa_shared_secret_log_masked';
 
     /**
      * Check if the Payment Booster is enabled.
@@ -279,6 +280,19 @@ class Bold_CheckoutPaymentBooster_Model_Config
     public function isCheckSharedEnabled($websiteId)
     {
         return (bool)Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_CHECK_SHARED_ENABLED);
+    }
+
+    /**
+     * When true (default), RSA rotation logs mask the shared secret. Set to 0 to log the full value.
+     *
+     * @param int $websiteId
+     * @return bool
+     */
+    public function isRsaSharedSecretLogMasked($websiteId)
+    {
+        $value = Mage::app()->getWebsite($websiteId)->getConfig(self::PATH_IS_RSA_SHARED_SECRET_LOG_MASKED);
+
+        return $value === null || $value === '' || (bool)$value;
     }
 
     /**
