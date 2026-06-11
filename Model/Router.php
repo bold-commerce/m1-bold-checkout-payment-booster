@@ -162,6 +162,9 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
             $authorized = false;
         }
         if (!$authorized) {
+            // Always log auth diagnostics (not gated on is_log_enabled) so secret
+            // drift is visible without ad-hoc debug logging in production.
+            $this->logAuthFailure($websiteId);
             $this->logRequest($tracingId, 'Authorization failed.', $websiteId);
             $response->setBody(json_encode(['errors' => ['Unauthorized.']]));
             $response->setHttpResponseCode(401);
@@ -247,21 +250,55 @@ class Bold_CheckoutPaymentBooster_Model_Router extends Mage_Core_Controller_Vari
         /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
         $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
         $sharedSecret = $config->getSharedSecret($websiteId);
-        preg_match('/signature="(\S*?)"/', $request->getHeader('Signature'), $matches);
-        $signature = isset($matches[1]) ? $matches[1] : null;
-        if (!$signature) {
-            return false;
-        }
-        return hash_equals(
-            base64_encode(
-                hash_hmac(
-                    'sha256',
-                    'x-hmac-timestamp: ' . $request->getHeader('X-HMAC-Timestamp'),
-                    $sharedSecret,
-                    true
-                )
+        $signatureHeader = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::getInboundHeader(
+            $request,
+            'Signature'
+        );
+        $timestamp = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::getInboundHeader(
+            $request,
+            'X-HMAC-Timestamp'
+        );
+
+        return Bold_CheckoutPaymentBooster_Service_Inbound_Auth::verifyHmac(
+            $sharedSecret,
+            $signatureHeader,
+            $timestamp
+        );
+    }
+
+    /**
+     * Log HMAC mismatch details for support — never logs the raw shared secret.
+     *
+     * @param int $websiteId
+     * @return void
+     */
+    private function logAuthFailure($websiteId)
+    {
+        /** @var Bold_CheckoutPaymentBooster_Model_Config $config */
+        $config = Mage::getSingleton(Bold_CheckoutPaymentBooster_Model_Config::RESOURCE);
+        $sharedSecret = $config->getSharedSecret($websiteId);
+        $request = $this->getFront()->getRequest();
+        $signatureHeader = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::getInboundHeader(
+            $request,
+            'Signature'
+        );
+        $timestamp = Bold_CheckoutPaymentBooster_Service_Inbound_Auth::getInboundHeader(
+            $request,
+            'X-HMAC-Timestamp'
+        );
+
+        Mage::log(
+            sprintf(
+                'Bold auth result: websiteId=%s matched=NO has_signature=%s has_timestamp=%s secret_len=%s secret_sha8=%s',
+                $websiteId,
+                $signatureHeader ? 'YES' : 'NO',
+                $timestamp ? 'YES' : 'NO',
+                $sharedSecret ? strlen($sharedSecret) : 0,
+                Bold_CheckoutPaymentBooster_Service_Inbound_Auth::secretFingerprint($sharedSecret)
             ),
-            $signature
+            Zend_Log::WARN,
+            Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+            true
         );
     }
 }
