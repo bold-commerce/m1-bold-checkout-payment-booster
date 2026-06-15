@@ -31,10 +31,27 @@ class Bold_CheckoutPaymentBooster_Service_Bold
                 return;
             }
         }
+        $previousPublicOrderId = self::getPublicOrderId();
         $checkoutData = Bold_CheckoutPaymentBooster_Service_Order_Init::init($quote, $flowId);
         /** @var Mage_Checkout_Model_Session $checkoutSession */
         $checkoutSession = Mage::getSingleton('checkout/session');
         $checkoutSession->setBoldCheckoutData($checkoutData);
+
+        $newPublicOrderId = isset($checkoutData->public_order_id) ? $checkoutData->public_order_id : null;
+        if ($previousPublicOrderId && $newPublicOrderId && $previousPublicOrderId !== $newPublicOrderId) {
+            Mage::log(
+                sprintf(
+                    '[BoldCheckout] public_order_id rotated quote=%s %s -> %s',
+                    $quote->getId(),
+                    $previousPublicOrderId,
+                    $newPublicOrderId
+                ),
+                Zend_Log::INFO,
+                Bold_CheckoutPaymentBooster_Model_Config::LOG_FILE_NAME,
+                true
+            );
+            Bold_CheckoutPaymentBooster_Service_Order_CheckoutSessionOwnership::clearWalletEpsOrderId();
+        }
     }
 
     /**

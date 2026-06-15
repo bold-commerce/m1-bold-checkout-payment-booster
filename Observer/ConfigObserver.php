@@ -5,86 +5,60 @@
  */
 class Bold_CheckoutPaymentBooster_Observer_ConfigObserver
 {
+    /** Group IDs that belong to this module (defined in etc/system.xml). */
+    const BOLD_CONFIG_GROUPS = array(
+        'bold_checkout_payment_booster_onboarding',
+        'bold_checkout_payment_booster',
+        'bold_checkout_payment_booster_advanced',
+    );
+
     /**
-     * Set Bold shop ID.
+     * Run Bold config save pipeline for checkout section changes.
+     *
+     * Single entry point replaces saveShopInfo, CORS, RSA, and processFlows observers
+     * so failures stop the pipeline before flows run without valid RSA.
+     *
+     * Fires on admin_system_config_changed_section_checkout (whole section), so we
+     * guard against unrelated Checkout group saves (e.g. native Magento checkout
+     * settings) by checking that at least one Bold group was included in the POST.
      *
      * @param Varien_Event_Observer $event
      * @return void
-     * @throws Mage_Core_Exception
      * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
      */
-    public function saveShopInfo(Varien_Event_Observer $event)
+    public function onCheckoutConfigChanged(Varien_Event_Observer $event)
     {
+        if (!$this->isBoldGroupSubmitted()) {
+            return;
+        }
+
         $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
         try {
-            Bold_CheckoutPaymentBooster_Service_ShopInfo::saveShopInfo($websiteId);
+            Bold_CheckoutPaymentBooster_Service_Config_SavePipeline::run($websiteId);
         } catch (Exception $exception) {
             $this->addErrorMessage($exception->getMessage());
         }
     }
 
     /**
-     * Create|update or disable Payment Booster and Fastlane flows considering configuration.
+     * Return true when the current POST contains at least one Bold config group.
      *
-     * @param Varien_Event_Observer $event
-     * @return void
-     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
+     * @return bool
      */
-    public function processFlows(Varien_Event_Observer $event)
+    private function isBoldGroupSubmitted()
     {
-        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
-        try {
-            Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterFlow($websiteId);
-            Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterPdpFlow($websiteId);
-            Bold_CheckoutPaymentBooster_Service_Flow::processPaymentBoosterCartFlow($websiteId);
-        } catch (Exception $exception) {
-            $this->addErrorMessage($exception->getMessage());
+        $submittedGroups = Mage::app()->getRequest()->getPost('groups', array());
+        if (!is_array($submittedGroups)) {
+            return false;
         }
-    }
 
-    /**
-     * Add Magento domain for specific website to the CORS allow list.
-     *
-     * @param Varien_Event_Observer $event
-     * @return void
-     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
-     */
-    public function addDomainToCorsAllowList(Varien_Event_Observer $event)
-    {
-        try {
-            $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
-            $defaultStore = Mage::app()->getWebsite($websiteId)->getDefaultStore();
-            $magentoUrl = $defaultStore->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB);
-            $domainList = Bold_CheckoutPaymentBooster_Service_Eps_Cors::getAllowList((int)$websiteId);
-            foreach ($domainList as $domain) {
-                if ($domain->domain === rtrim($magentoUrl, '/')) {
-                    return;
-                }
+        foreach (self::BOLD_CONFIG_GROUPS as $group) {
+            if (array_key_exists($group, $submittedGroups)) {
+                return true;
             }
-            Bold_CheckoutPaymentBooster_Service_Eps_Cors::addDomainToCorsAllowList(
-                (int)$websiteId,
-                (string)$magentoUrl
-            );
-        } catch (Mage_Core_Exception $e) {
-            $this->addErrorMessage($e->getMessage());
         }
-    }
 
-    /**
-     * Set RSA configuration.
-     *
-     * @param Varien_Event_Observer $event
-     * @return void
-     * @see etc/config.xml adminhtml/events: admin_system_config_changed_section_checkout
-     */
-    public function setRsaConfig(Varien_Event_Observer $event)
-    {
-        $websiteId = Mage::app()->getWebsite($event->getWebsite())->getId();
-        try {
-            Bold_CheckoutPaymentBooster_Service_Rsa_Connect::setRsaConfig($websiteId);
-        } catch (Exception $exception) {
-            $this->addErrorMessage($exception->getMessage());
-        }
+        return false;
     }
 
     /**
